@@ -1,0 +1,38 @@
+[package]
+name = "ve3-asset-staking"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+
+exclude = [
+  "contract.wasm",
+  "hash.txt",
+]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+library = []
+
+[dependencies]
+cosmwasm-std = { workspace = true, features = ["stargate"] }
+cosmwasm-schema.workspace = true
+cw-storage-plus.workspace = true
+cw-asset.workspace = true
+schemars.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+ve3-shared.workspace = true
+ve3-global-config.workspace = true
+semver.workspace = true
+cw2.workspace = true
+cw20.workspace = true
+cw20-base.workspace = true
+cw-utils.workspace = true
