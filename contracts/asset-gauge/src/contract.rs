@@ -31,7 +31,7 @@ use crate::utils::{
 };
 
 /// Contract name that is used for migration.
-const CONTRACT_NAME: &str = "amp-gauges";
+const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 /// Contract version that is used for migration.
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 

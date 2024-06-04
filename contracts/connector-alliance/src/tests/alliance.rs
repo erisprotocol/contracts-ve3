@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::{MsgDelegate, MsgRedelegate};
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
-use ve3_shared::connector_alliance::{
+use ve3_shared::contract_connector_alliance::{
     AllianceDelegateMsg, AllianceDelegation, AllianceUndelegateMsg, Config, ExecuteMsg,
 };
 use ve3_shared::constants::AT_DELEGATION_CONTROLLER;

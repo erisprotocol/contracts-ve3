@@ -1,5 +1,6 @@
 use cosmwasm_std::{OverflowError, StdError};
 use cw20_base::ContractError as cw20baseError;
+use cw_asset::AssetError;
 use thiserror::Error;
 
 /// This enum describes vAMP contract errors
@@ -13,6 +14,12 @@ pub enum ContractError {
 
     #[error("{0}")]
     Overflow(#[from] OverflowError),
+
+    #[error("{0}")]
+    AssetError(#[from] AssetError),
+
+    #[error("{0}")]
+    NftError(#[from] cw721_base::error::ContractError),
 
     #[error("{location:?}: {orig:?}")]
     OverflowLocation {

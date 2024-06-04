@@ -1,7 +1,14 @@
-use crate::{error::ContractError, state::Config};
-use eris::governance_helper::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, WEEK};
+use std::collections::HashMap;
 
-use cosmwasm_std::{Addr, Order, StdResult, Storage, Uint128};
+use crate::error::ContractError;
+use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
+use ve3_shared::{
+    constants::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, WEEK},
+    extensions::asset_info_ext::AssetInfoExt,
+    voting_escrow::{AssetInfoLockConfig, Config},
+};
+
+use cosmwasm_std::{Addr, Coin, Order, StdError, StdResult, Storage, Uint128};
 use cw_storage_plus::Bound;
 
 use crate::state::{Point, BLACKLIST, HISTORY, LAST_SLOPE_CHANGE, SLOPE_CHANGES};
@@ -38,6 +45,51 @@ pub(crate) fn assert_blacklist(storage: &dyn Storage, addr: &Addr) -> Result<(),
     } else {
         Ok(())
     }
+}
+
+/// Find the amount of a denom sent along a message, assert it is non-zero, and no other denom were
+/// sent together
+pub fn validate_received_funds(
+    funds: &[Coin],
+    allowed: &HashMap<AssetInfo, AssetInfoLockConfig>,
+) -> StdResult<Asset> {
+    if funds.len() != 1 {
+        return Err(StdError::generic_err(format!(
+            "must deposit exactly one coin; received {}",
+            funds.len()
+        )));
+    }
+
+    let fund = &funds[0];
+    let asset = AssetInfo::native(fund.denom);
+    let is_allowed = allowed.contains_key(&asset);
+
+    if !is_allowed {
+        return Err(StdError::generic_err(format!("received unsupported denom {0}", fund.denom)));
+    }
+
+    if fund.amount.is_zero() {
+        return Err(StdError::generic_err("deposit amount must be non-zero"));
+    }
+
+    Ok(asset.with_balance(fund.amount))
+}
+
+pub fn validate_received_cw20(
+    asset: Asset,
+    allowed: &HashMap<AssetInfo, AssetInfoLockConfig>,
+) -> StdResult<Asset> {
+    let is_allowed = allowed.contains_key(&asset.info);
+
+    if !is_allowed {
+        return Err(StdError::generic_err(format!("received unsupported denom {0}", asset.info)));
+    }
+
+    if asset.amount.is_zero() {
+        return Err(StdError::generic_err("deposit amount must be non-zero"));
+    }
+
+    Ok(asset)
 }
 
 /// Main function used to calculate a user's voting power at a specific period as: previous_power - slope*(x - previous_x).

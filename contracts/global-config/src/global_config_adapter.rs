@@ -71,3 +71,41 @@ impl GlobalConfig {
         ));
     }
 }
+
+pub trait ConfigExt {
+    fn get_address(
+        &self,
+        querier: &QuerierWrapper,
+        address_type: &str,
+    ) -> Result<Addr, SharedError>;
+
+    fn global_config(&self) -> GlobalConfig;
+}
+
+impl ConfigExt for ve3_shared::contract_asset_staking::Config {
+    fn get_address(
+        &self,
+        querier: &QuerierWrapper,
+        address_type: &str,
+    ) -> Result<Addr, SharedError> {
+        GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+    }
+
+    fn global_config(&self) -> GlobalConfig {
+        GlobalConfig(self.global_config_addr.clone())
+    }
+}
+
+impl ConfigExt for ve3_shared::voting_escrow::Config {
+    fn get_address(
+        &self,
+        querier: &QuerierWrapper,
+        address_type: &str,
+    ) -> Result<Addr, SharedError> {
+        GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+    }
+
+    fn global_config(&self) -> GlobalConfig {
+        GlobalConfig(self.global_config_addr.clone())
+    }
+}

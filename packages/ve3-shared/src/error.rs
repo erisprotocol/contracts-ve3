@@ -1,10 +1,14 @@
 use cosmwasm_std::StdError;
+use cw_asset::AssetError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum SharedError {
     #[error("{0}")]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    AssetError(#[from] AssetError),
 
     #[error("Unauthorized")]
     Unauthorized {},
@@ -23,4 +27,7 @@ pub enum SharedError {
 
     #[error("Not supported: {0}")]
     NotSupported(String),
+
+    #[error("Insufficient Balance: {0}")]
+    InsufficientBalance(String),
 }

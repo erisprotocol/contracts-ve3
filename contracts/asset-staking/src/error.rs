@@ -1,4 +1,4 @@
-use cosmwasm_std::{DecimalRangeExceeded, StdError};
+use cosmwasm_std::{DecimalRangeExceeded, OverflowError, StdError};
 use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -13,6 +13,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     SharedError(#[from] SharedError),
+
+    #[error("{0}")]
+    OverflowError(#[from] OverflowError),
 
     #[error("{0}")]
     AssetError(#[from] AssetError),

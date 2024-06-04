@@ -11,6 +11,7 @@ pub trait AssetInfoExt {
         querier: &QuerierWrapper,
         address: &Addr,
     ) -> Result<Asset, AssetError>;
+    
 }
 
 impl AssetInfoExt for AssetInfo {

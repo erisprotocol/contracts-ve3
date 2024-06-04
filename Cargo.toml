@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    # "contracts/voting-escrow",
+    "contracts/voting-escrow",
     "contracts/connector-alliance",
     "contracts/global-config",
     # "contracts/connector-emission",
@@ -37,6 +37,8 @@ overflow-checks = true
 cw2 = "1.1"
 cw20 = "1.1"
 cw20-base = "1.1"
+cw721 = { version = "0.18.0" }
+cw721-base = { version = "0.18.0", features = ["library"] }
 cosmwasm-std = "1.5"
 cosmwasm-schema = "1.5"
 cw-storage-plus = "1.2"

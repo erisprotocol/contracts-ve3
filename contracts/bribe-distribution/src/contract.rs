@@ -18,7 +18,7 @@ use funds_distributor_api::msg::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, Migrat
 use funds_distributor_api::response::instantiate_response;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:funds-distributor";
+const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -39,7 +39,11 @@ pub fn instantiate(
     let minimum_eligible_weight = msg.minimum_eligible_weight.unwrap_or_default();
     MINIMUM_ELIGIBLE_WEIGHT.save(deps.storage, &minimum_eligible_weight)?;
 
-    let mut ctx = Context { deps, env, info };
+    let mut ctx = Context {
+        deps,
+        env,
+        info,
+    };
 
     save_initial_weights(&mut ctx, msg.initial_weights, minimum_eligible_weight)?;
 
@@ -53,12 +57,16 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> DistributorResult<Response> {
-    let ctx = &mut Context { deps, env, info };
+    let ctx = &mut Context {
+        deps,
+        env,
+        info,
+    };
     match msg {
         ExecuteMsg::UpdateUserWeights(msg) => update_user_weights(ctx, msg),
         ExecuteMsg::UpdateMinimumEligibleWeight(msg) => {
             execute_update_minimum_eligible_weight(ctx, msg)
-        }
+        },
         ExecuteMsg::DistributeNative {} => distribute_native(ctx),
         ExecuteMsg::ClaimRewards(msg) => claim_rewards(ctx, msg),
         ExecuteMsg::Receive(msg) => receive_cw20(ctx, msg),
@@ -79,13 +87,16 @@ pub fn reply(_deps: DepsMut, _env: Env, _msg: Reply) -> DistributorResult<Respon
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> DistributorResult<Binary> {
-    let qctx = QueryContext { deps, env };
+    let qctx = QueryContext {
+        deps,
+        env,
+    };
 
     let response = match msg {
         QueryMsg::UserRewards(params) => to_json_binary(&query_user_rewards(qctx, params)?)?,
         QueryMsg::MinimumEligibleWeight {} => {
             to_json_binary(&query_minimum_eligible_weight(qctx)?)?
-        }
+        },
     };
     Ok(response)
 }

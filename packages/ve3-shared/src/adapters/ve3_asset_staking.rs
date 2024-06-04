@@ -1,12 +1,10 @@
-use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{coins, to_json_binary, Addr, CosmosMsg, Uint128, WasmMsg};
-use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
-use cw_asset::{Asset, AssetInfo};
-
 use crate::{
-    alliance_protocol::{Cw20HookMsg, ExecuteMsg},
+    contract_asset_staking::{Cw20HookMsg, ExecuteMsg},
     error::SharedError,
 };
+use cosmwasm_std::{coins, to_json_binary, Addr, CosmosMsg, WasmMsg};
+use cw20::Cw20ExecuteMsg;
+use cw_asset::{Asset, AssetInfo};
 
 pub struct Ve3AssetStaking(pub Addr);
 

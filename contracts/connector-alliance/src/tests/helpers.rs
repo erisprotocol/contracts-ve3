@@ -3,7 +3,7 @@ use crate::state::CONFIG;
 use crate::token_factory::CustomExecuteMsg;
 use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockStorage};
 use cosmwasm_std::{DepsMut, Empty, OwnedDeps, Response, StdResult, Uint128};
-use ve3_shared::connector_alliance::{
+use ve3_shared::contract_connector_alliance::{
     AllianceDelegateMsg, AllianceDelegation, AllianceRedelegateMsg, AllianceRedelegation,
     AllianceUndelegateMsg, Config, ExecuteMsg, InstantiateMsg,
 };

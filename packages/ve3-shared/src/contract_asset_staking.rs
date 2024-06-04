@@ -1,9 +1,8 @@
-use crate::alliance_oracle_types::ChainId;
+use crate::stake_config::StakeConfig;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo};
-use std::collections::HashMap;
 
 #[cw_serde]
 pub struct Config {
@@ -18,21 +17,14 @@ pub struct AssetDistribution {
 }
 
 #[cw_serde]
+#[derive(Default)]
 pub struct AssetConfig {
-    pub yearly_take_rate: Decimal,
     pub last_taken_s: u64,
-    pub stake_config: StakeConfig,
-}
+    pub taken: Uint128,
+    pub harvested: Uint128,
 
-#[cw_serde]
-pub enum StakeConfig {
-    Default,
-    Astroport {
-        contract: String,
-    },
-    Ura {
-        contract: String,
-    },
+    pub yearly_take_rate: Decimal,
+    pub stake_config: StakeConfig,
 }
 
 #[cw_serde]
@@ -54,13 +46,14 @@ pub enum ExecuteMsg {
     ClaimRewardsMultiple(Vec<AssetInfo>),
 
     // controller
-    WhitelistAssets(HashMap<ChainId, Vec<AssetInfo>>),
+    WhitelistAssets(Vec<AssetInfo>),
     RemoveAssets(Vec<AssetInfo>),
     SetAssetRewardDistribution(Vec<AssetDistribution>),
 
     // operator
     UpdateRewards {},
     DistributeTakeRate {
+        update: Option<bool>,
         assets: Option<Vec<AssetInfo>>,
     },
     Callback(CallbackMsg),
@@ -68,8 +61,12 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub enum CallbackMsg {
-    UpdateRewardsCallback {
+    UpdateRewards {
         initial_balance: Asset,
+    },
+    AddTributes {
+        asset: AssetInfo,
+        initial_balances: Vec<Asset>,
     },
 }
 
@@ -114,7 +111,7 @@ pub enum QueryMsg {
     TotalStakedBalances {},
 }
 
-pub type WhitelistedAssetsResponse = HashMap<ChainId, Vec<AssetInfo>>;
+pub type WhitelistedAssetsResponse = Vec<AssetInfo>;
 
 #[cw_serde]
 pub struct AssetQuery {
@@ -139,6 +136,8 @@ pub struct MigrateMsg {}
 pub struct StakedBalanceRes {
     pub asset: AssetInfo,
     pub balance: Uint128,
+    pub shares: Uint128,
+    pub config: AssetConfig,
 }
 
 #[cw_serde]

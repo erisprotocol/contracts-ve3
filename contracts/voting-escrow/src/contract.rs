@@ -1,40 +1,35 @@
-use astroport::asset::native_asset;
-use astroport::common::{claim_ownership, drop_ownership_proposal, propose_new_owner};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr,  from_json, to_json_binary, Addr, , CosmosMsg, Deps, DepsMut, 
+    Env, MessageInfo, Response,  StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{get_contract_version, set_contract_version};
-use cw20::{BalanceResponse, Logo, LogoInfo, MarketingInfoResponse, TokenInfoResponse};
-use cw20_base::contract::{
-    execute_update_marketing, execute_upload_logo, query_download_logo, query_marketing_info,
+use cw20::Cw20ReceiveMsg;
+use cw20_base::state::{MinterData, TokenInfo,  TOKEN_INFO};
+use cw_asset::{Asset,  AssetInfoUnchecked};
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
+use ve3_global_config::global_config_adapter::ConfigExt;
+use ve3_shared::constants::{EPOCH_START, MIN_LOCK_PERIODS, WEEK};
+use ve3_shared::extensions::decimal_ext::DecimalExt;
+use ve3_shared::helpers::governance::{get_period, get_periods_count};
+use ve3_shared::helpers::slope::{adjust_vp_and_slope, calc_coefficient};
+use ve3_shared::voting_escrow::{
+    AssetInfoLockConfig, Config, ExecuteMsg, InstantiateMsg, LockInfoResponse, Metadata, MigrateMsg, PushExecuteMsg, ReceiveMsg, VeNftCollection
 };
-use cw20_base::state::{MinterData, TokenInfo, LOGO, MARKETING_INFO, TOKEN_INFO};
-use eris::governance_helper::{get_period, get_periods_count, EPOCH_START, MIN_LOCK_PERIODS, WEEK};
-use eris::helper::{addr_opt_validate, validate_addresses, validate_received_funds};
-use eris::helpers::slope::{adjust_vp_and_slope, calc_coefficient};
-use eris::voting_escrow::{
-    BlacklistedVotersResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, LockInfoResponse,
-    MigrateMsg, PushExecuteMsg, QueryMsg, VotingPowerResponse, DEFAULT_LIMIT, MAX_LIMIT,
-};
-use eris::DecimalCheckedOps;
-use std::collections::HashSet;
 
 use crate::error::ContractError;
-use crate::marketing_validation::{validate_marketing_info, validate_whitelist_links};
-use crate::state::{
-    Config, Lock, Point, BLACKLIST, CONFIG, HISTORY, LAST_SLOPE_CHANGE, LOCKED, OWNERSHIP_PROPOSAL,
-};
+use crate::state::{Lock, Point, BLACKLIST, CONFIG, HISTORY, LAST_SLOPE_CHANGE, LOCKED};
 use crate::utils::{
     assert_blacklist, assert_not_decommissioned, assert_periods_remaining, assert_time_limits,
     calc_voting_power, cancel_scheduled_slope, fetch_last_checkpoint, fetch_slope_changes,
-    schedule_slope_change,
+    schedule_slope_change, validate_received_cw20, validate_received_funds,
 };
 
+
 /// Contract name that is used for migration.
-const CONTRACT_NAME: &str = "eris-voting-escrow";
+const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 /// Contract version that is used for migration.
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -43,22 +38,26 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    validate_whitelist_links(&msg.logo_urls_whitelist)?;
-    let guardian_addr = addr_opt_validate(deps.api, &msg.guardian_addr)?;
+    let validated = msg
+        .deposit_assets
+        .into_iter()
+        .map(|(asset, config)| -> Result<_, ContractError> {
+            let asset = AssetInfoUnchecked::from_str(&asset)?.check(deps.api, None)?;
+
+            Ok((asset, config))
+        })
+        .collect::<Result<HashMap<_, _>, ContractError>>()?;
 
     let config = Config {
-        owner: deps.api.addr_validate(&msg.owner)?,
-        guardian_addr,
-        deposit_denom: msg.deposit_denom,
-        logo_urls_whitelist: msg.logo_urls_whitelist.clone(),
-        // makes no sense to set during init, as other contracts might not be deployed yet.
+        global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
         push_update_contracts: vec![],
         decommissioned: None,
+        allowed_deposit_assets: validated,
     };
     CONFIG.save(deps.storage, &config)?;
 
@@ -73,44 +72,10 @@ pub fn instantiate(
     HISTORY.save(deps.storage, (env.contract.address.clone(), cur_period), &point)?;
     BLACKLIST.save(deps.storage, &vec![])?;
 
-    if let Some(marketing) = msg.marketing {
-        if msg.logo_urls_whitelist.is_empty() {
-            return Err(ContractError::MarketingInfoValidationError(
-                "Logo URLs whitelist can not be empty".to_string(),
-            ));
-        }
-
-        validate_marketing_info(
-            marketing.project.as_ref(),
-            marketing.description.as_ref(),
-            marketing.logo.as_ref(),
-            &config.logo_urls_whitelist,
-        )?;
-
-        let logo = if let Some(logo) = marketing.logo {
-            LOGO.save(deps.storage, &logo)?;
-
-            match logo {
-                Logo::Url(url) => Some(LogoInfo::Url(url)),
-                Logo::Embedded(_) => Some(LogoInfo::Embedded),
-            }
-        } else {
-            None
-        };
-
-        let data = MarketingInfoResponse {
-            project: marketing.project,
-            description: marketing.description,
-            marketing: addr_opt_validate(deps.api, &marketing.marketing)?,
-            logo,
-        };
-        MARKETING_INFO.save(deps.storage, &data)?;
-    }
-
     // Store token info
     let data = TokenInfo {
-        name: "Vote Escrowed ampLP".to_string(),
-        symbol: "vAMP".to_string(),
+        name: "Vote Escrowed".to_string(),
+        symbol: "veLUNA".to_string(),
         decimals: 6,
         total_supply: Uint128::zero(),
         mint: Some(MinterData {
@@ -120,6 +85,12 @@ pub fn instantiate(
     };
 
     TOKEN_INFO.save(deps.storage, &data)?;
+    
+    let nft = VeNftCollection::default();
+    nft.instantiate(deps, env, info, cw721_base::InstantiateMsg { 
+        name: "veLUNA".to_string(), 
+        symbol: "veLUNA".to_string(), 
+        minter: env.contract.address.to_string() })?;
 
     Ok(Response::default())
 }
@@ -145,111 +116,83 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
-    match msg {
-        ExecuteMsg::ExtendLockTime {
-            time,
-        } => extend_lock_time(deps, env, info, time),
-        ExecuteMsg::Withdraw {} => withdraw(deps, env, info),
-        ExecuteMsg::ProposeNewOwner {
-            new_owner,
-            expires_in,
-        } => {
-            let config = CONFIG.load(deps.storage)?;
-            propose_new_owner(
-                deps,
-                info,
-                env,
-                new_owner,
-                expires_in,
-                config.owner,
-                OWNERSHIP_PROPOSAL,
-            )
-            .map_err(Into::into)
-        },
-        ExecuteMsg::DropOwnershipProposal {} => {
-            let config: Config = CONFIG.load(deps.storage)?;
+    let nft = VeNftCollection::default();
 
-            drop_ownership_proposal(deps, info, config.owner, OWNERSHIP_PROPOSAL)
-                .map_err(Into::into)
-        },
-        ExecuteMsg::ClaimOwnership {} => {
-            claim_ownership(deps, info, env, OWNERSHIP_PROPOSAL, |deps, new_owner| {
-                CONFIG
-                    .update::<_, StdError>(deps.storage, |mut v| {
-                        v.owner = new_owner;
-                        Ok(v)
-                    })
-                    .map(|_| ())
-            })
-            .map_err(Into::into)
-        },
+    match msg {
+        // OWNER
         ExecuteMsg::UpdateBlacklist {
             append_addrs,
             remove_addrs,
         } => update_blacklist(deps, env, info, append_addrs, remove_addrs),
-        ExecuteMsg::UpdateMarketing {
-            project,
-            description,
-            marketing,
-        } => {
-            validate_marketing_info(project.as_ref(), description.as_ref(), None, &[])?;
-            execute_update_marketing(deps, env, info, project, description, marketing)
-                .map_err(Into::into)
-        },
-        ExecuteMsg::UploadLogo(logo) => {
-            let config = CONFIG.load(deps.storage)?;
-            validate_marketing_info(None, None, Some(&logo), &config.logo_urls_whitelist)?;
-            execute_upload_logo(deps, env, info, logo).map_err(Into::into)
-        },
-        ExecuteMsg::SetLogoUrlsWhitelist {
-            whitelist,
-        } => {
-            let mut config = CONFIG.load(deps.storage)?;
-            let marketing_info = MARKETING_INFO.load(deps.storage)?;
-            if info.sender != config.owner && Some(info.sender) != marketing_info.marketing {
-                Err(ContractError::Unauthorized {})
-            } else {
-                validate_whitelist_links(&whitelist)?;
-                config.logo_urls_whitelist = whitelist;
-                CONFIG.save(deps.storage, &config)?;
-                Ok(Response::default().add_attribute("action", "veamp/set_logo_urls_whitelist"))
-            }
-        },
         ExecuteMsg::UpdateConfig {
-            new_guardian,
             push_update_contracts,
-            decommissioned: decommissioned,
-        } => execute_update_config(deps, info, new_guardian, push_update_contracts, decommissioned),
+            decommissioned,
+            append_deposit_assets,
+            remove_deposit_assets,
+        } => execute_update_config(
+            deps,
+            info,
+            push_update_contracts,
+            decommissioned,
+            append_deposit_assets,
+            remove_deposit_assets,
+        ),
 
+        // USER
+        ExecuteMsg::Withdraw {
+            token_id,
+        } => withdraw(deps, env, nft, info, token_id),
+        
         ExecuteMsg::CreateLock {
             time,
         } => {
             let config = CONFIG.load(deps.storage)?;
-            let amount = validate_received_funds(&info.funds, config.deposit_denom.as_ref())?;
-            let sender = info.sender;
-            assert_blacklist(deps.storage, &sender)?;
-            create_lock(deps, env, sender, amount, time)
+            let asset = validate_received_funds(&info.funds, &config.allowed_deposit_assets)?;
+            create_lock(deps, env, nft, info.sender, asset, time)
+        },
+        ExecuteMsg::ExtendLockTime {
+            time,
+            token_id,
+        } => extend_lock_time(deps, env, nft, info, token_id, time),
+        ExecuteMsg::ExtendLockAmount {
+            token_id,
+        } => {
+            let config = CONFIG.load(deps.storage)?;
+            let asset = validate_received_funds(&info.funds, &config.allowed_deposit_assets)?;
+            deposit_for(deps, env, nft, config, asset, info.sender, token_id)
         },
 
-        ExecuteMsg::ExtendLockAmount {
-            extend_to_min_periods,
+        ExecuteMsg::Receive(cw20_msg) => receive(deps, env, info, cw20_msg),
+
+        _ => Ok(nft.execute(deps, env, info, msg.into())?),
+    }
+}
+
+fn receive(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    let api = deps.api;
+    let received = Asset::cw20(info.sender, cw20_msg.amount);
+    let sender = deps.api.addr_validate(&cw20_msg.sender)?;
+    let nft = VeNftCollection::default();
+
+    match from_json(&cw20_msg.msg)? {
+        ReceiveMsg::CreateLock {
+            time,
         } => {
             let config = CONFIG.load(deps.storage)?;
-            let amount = validate_received_funds(&info.funds, config.deposit_denom.as_ref())?;
-            let sender = info.sender;
-            assert_blacklist(deps.storage, &sender)?;
-            deposit_for(deps, env, amount, sender, extend_to_min_periods)
+            let asset_validated = validate_received_cw20(received, &config.allowed_deposit_assets)?;
+            create_lock(deps, env, nft, sender, asset_validated, time)
         },
-        ExecuteMsg::DepositFor {
-            user,
+        ReceiveMsg::ExtendLockAmount {
+            token_id,
         } => {
             let config = CONFIG.load(deps.storage)?;
-            let amount = validate_received_funds(&info.funds, config.deposit_denom.as_ref())?;
-            let sender = info.sender;
-            assert_blacklist(deps.storage, &sender)?;
-            let addr = deps.api.addr_validate(&user)?;
-            assert_blacklist(deps.storage, &addr)?;
-            deposit_for(deps, env, amount, addr, None)
+            let asset = validate_received_cw20(received, &config.allowed_deposit_assets)?;
+            deposit_for(deps, env, nft, config, asset, sender, token_id)
         },
     }
 }
@@ -365,7 +308,7 @@ fn checkpoint(
             if end > point.end {
                 // This is extend_lock_time. Recalculating user's voting power
                 let mut lock = LOCKED.load(store, addr.clone())?;
-                let mut new_voting_power = calc_coefficient(dt).checked_mul_uint(lock.amount)?;
+                let mut new_voting_power = calc_coefficient(dt).checked_mul_uint(lock.asset)?;
                 let slope = adjust_vp_and_slope(&mut new_voting_power, dt)?; // end_vp
                                                                              // new_voting_power should always be >= current_power. saturating_sub is used for extra safety
                 add_voting_power = new_voting_power.saturating_sub(current_power);
@@ -447,11 +390,28 @@ fn checkpoint(
 fn create_lock(
     deps: DepsMut,
     env: Env,
-    user: Addr,
-    amount: Uint128,
+    nft: VeNftCollection,
+    sender: Addr,
+    asset: Asset,
     time: u64,
 ) -> Result<Response, ContractError> {
+    assert_blacklist(deps.storage, &sender)?;
     assert_time_limits(time)?;
+
+    let mint_response = nft.mint(deps, MessageInfo {
+        sender: env.contract.address,
+        funds: vec![],
+    }, token_id, sender, None, Metadata {
+        image: None,
+        image_data: None,
+        external_url: None,
+        description: None,
+        name: None,
+        attributes: None,
+        background_color: None,
+        animation_url: None,
+        youtube_url: None,
+    })?;
 
     let block_period = get_period(env.block.time.seconds())?;
     let periods = get_periods_count(time);
@@ -462,28 +422,30 @@ fn create_lock(
     let config = CONFIG.load(deps.storage)?;
     assert_not_decommissioned(&config)?;
 
-    LOCKED.update(deps.storage, user.clone(), env.block.height, |lock_opt| {
-        if lock_opt.is_some() && !lock_opt.unwrap().amount.is_zero() {
+    LOCKED.update(deps.storage, sender.clone(), env.block.height, |lock_opt| {
+        if lock_opt.is_some() && !lock_opt.unwrap().asset.is_zero() {
             return Err(ContractError::LockAlreadyExists {});
         }
         Ok(Lock {
-            amount,
+            token_id,
+            asset,
             start: block_period,
             end,
             last_extend_lock_period: block_period,
         })
     })?;
 
-    checkpoint(deps.storage, env.clone(), user.clone(), Some(amount), Some(end))?;
+    checkpoint(deps.storage, env.clone(), sender.clone(), Some(amount), Some(end))?;
 
-    let lock_info = get_user_lock_info(deps.as_ref(), &env, user.to_string())?;
+    let lock_info = get_user_lock_info(deps.as_ref(), &env, sender.to_string())?;
 
     Ok(Response::default()
         .add_attribute("action", "veamp/create_lock")
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, user, Ok(lock_info))?))
+        .add_attributes(mint_response.attributes)
+        .add_messages(get_push_update_msgs(config, sender, Ok(lock_info))?))
 }
 
 /// Deposits an 'amount' of ampLP tokens into 'user''s lock.
@@ -497,59 +459,57 @@ fn create_lock(
 fn deposit_for(
     deps: DepsMut,
     env: Env,
-    amount: Uint128,
-    user: Addr,
-    extend_to_min_periods: Option<bool>,
+    nft: VeNftCollection,
+    config: Config,
+    asset: Asset,
+    sender: Addr,
+    token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
+    assert_blacklist(deps.storage, &sender)?;
     assert_not_decommissioned(&config)?;
 
     let mut new_end = None;
-    LOCKED.update(deps.storage, user.clone(), env.block.height, |lock_opt| match lock_opt {
-        Some(mut lock) if !lock.amount.is_zero() => {
+    LOCKED.update(deps.storage, sender.clone(), env.block.height, |lock_opt| match lock_opt {
+        Some(mut lock) if !lock.asset.is_zero() => {
             let block_period = get_period(env.block.time.seconds())?;
 
-            match extend_to_min_periods {
-                Some(true) => {
-                    if lock.end < block_period + MIN_LOCK_PERIODS {
-                        lock.end = block_period + MIN_LOCK_PERIODS;
-                        new_end = Some(lock.end);
-                    }
-                },
-                Some(false) | None => {
-                    if lock.end <= block_period {
-                        Err(ContractError::LockExpired {})?
-                    }
-                    assert_periods_remaining(lock.end - block_period)?
-                },
+            if lock.end < block_period + MIN_LOCK_PERIODS {
+                lock.end = block_period + MIN_LOCK_PERIODS;
+                new_end = Some(lock.end);
             }
 
-            lock.amount += amount;
+            lock.asset += amount;
             Ok(lock)
         },
         _ => Err(ContractError::LockDoesNotExist {}),
     })?;
 
-    checkpoint(deps.storage, env.clone(), user.clone(), Some(amount), new_end)?;
+    checkpoint(deps.storage, env.clone(), sender.clone(), Some(amount), new_end)?;
 
-    let lock_info = get_user_lock_info(deps.as_ref(), &env, user.to_string())?;
+    let lock_info = get_user_lock_info(deps.as_ref(), &env, sender.to_string())?;
 
     Ok(Response::default()
         .add_attribute("action", "veamp/deposit_for")
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, user, Ok(lock_info))?))
+        .add_messages(get_push_update_msgs(config, sender, Ok(lock_info))?))
 }
 
 /// Withdraws the whole amount of locked ampLP from a specific user lock.
 /// If the user lock doesn't exist or if it has not yet expired, then a [`ContractError`] is returned.
-fn withdraw(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn withdraw(
+    deps: DepsMut,
+    env: Env,
+    nft: VeNftCollection,
+    info: MessageInfo,
+    token_id: Uint128,
+) -> Result<Response, ContractError> {
     let sender = info.sender;
     // 'LockDoesNotExist' is thrown either when a lock does not exist in LOCKED or when a lock exists but lock.amount == 0
     let mut lock = LOCKED
         .may_load(deps.storage, sender.clone())?
-        .filter(|lock| !lock.amount.is_zero())
+        .filter(|lock| !lock.asset.is_zero())
         .ok_or(ContractError::LockDoesNotExist {})?;
 
     let cur_period = get_period(env.block.time.seconds())?;
@@ -560,10 +520,10 @@ fn withdraw(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
         Err(ContractError::LockHasNotExpired {})
     } else {
         let transfer_msg =
-            native_asset(config.deposit_denom.clone(), lock.amount).into_msg(sender.clone())?;
+            native_asset(config.deposit_denom.clone(), lock.asset).into_msg(sender.clone())?;
 
-        let amount = lock.amount;
-        lock.amount = Uint128::zero();
+        let amount = lock.asset;
+        lock.asset = Uint128::zero();
         LOCKED.save(deps.storage, sender.clone(), &lock, env.block.height)?;
 
         if lock.end > cur_period {
@@ -701,14 +661,16 @@ fn get_push_update_msgs(
 fn extend_lock_time(
     deps: DepsMut,
     env: Env,
+    nft: VeNftCollection,
     info: MessageInfo,
+    token_id: Uint128,
     time: u64,
 ) -> Result<Response, ContractError> {
     let user = info.sender;
     assert_blacklist(deps.storage, &user)?;
     let mut lock = LOCKED
         .may_load(deps.storage, user.clone())?
-        .filter(|lock| !lock.amount.is_zero())
+        .filter(|lock| !lock.asset.is_zero())
         .ok_or(ContractError::LockDoesNotExist {})?;
 
     // Disable the ability to extend the lock time by less than a week
@@ -843,7 +805,7 @@ fn update_blacklist(
 
         let lock_opt = LOCKED.may_load(deps.storage, addr.clone())?;
         if let Some(Lock {
-            amount,
+            asset: amount,
             end,
             ..
         }) = lock_opt
@@ -882,19 +844,14 @@ fn update_blacklist(
 fn execute_update_config(
     deps: DepsMut,
     info: MessageInfo,
-    new_guardian: Option<String>,
     push_update_contracts: Option<Vec<String>>,
     decommissioned: Option<bool>,
+    append_deposit_assets: Option<HashMap<String, AssetInfoLockConfig>>,
+    remove_deposit_assets: Option<Vec<String>>,
 ) -> Result<Response, ContractError> {
     let mut cfg = CONFIG.load(deps.storage)?;
 
-    if cfg.owner != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    if let Some(new_guardian) = new_guardian {
-        cfg.guardian_addr = Some(deps.api.addr_validate(&new_guardian)?);
-    }
+    cfg.global_config().assert_owner(&deps.querier, &info.sender)?;
 
     if let Some(decommissioned) = decommissioned {
         if decommissioned {
@@ -911,315 +868,9 @@ fn execute_update_config(
 
     CONFIG.save(deps.storage, &cfg)?;
 
+    todo!("implement xxx");
+
     Ok(Response::default().add_attribute("action", "veamp/execute_update_config"))
-}
-
-/// Expose available contract queries.
-///
-/// ## Queries
-/// * **QueryMsg::TotalVotingPower {}** Fetch the total voting power (vAMP supply) at the current block.
-///
-/// * **QueryMsg::UserVotingPower { user }** Fetch the user's voting power (vAMP balance) at the current block.
-///
-/// * **QueryMsg::TotalVotingPowerAt { time }** Fetch the total voting power (vAMP supply) at a specified timestamp.
-///
-/// * **QueryMsg::UserVotingPowerAt { time }** Fetch the user's voting power (vAMP balance) at a specified timestamp.
-///
-/// * **QueryMsg::LockInfo { user }** Fetch a user's lock information.
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
-    match msg {
-        QueryMsg::CheckVotersAreBlacklisted {
-            voters,
-        } => Ok(to_json_binary(&check_voters_are_blacklisted(deps, voters)?)?),
-        QueryMsg::BlacklistedVoters {
-            start_after,
-            limit,
-        } => Ok(to_json_binary(&get_blacklisted_voters(deps, start_after, limit)?)?),
-        QueryMsg::TotalVamp {} => Ok(to_json_binary(&get_total_vamp(deps, env, None)?)?),
-        QueryMsg::UserVamp {
-            user,
-        } => Ok(to_json_binary(&get_user_vamp(deps, env, user, None)?)?),
-        QueryMsg::TotalVampAt {
-            time,
-        } => Ok(to_json_binary(&get_total_vamp(deps, env, Some(time))?)?),
-        QueryMsg::TotalVampAtPeriod {
-            period,
-        } => Ok(to_json_binary(&get_total_vamp_at_period(deps, env, period)?)?),
-        QueryMsg::UserVampAt {
-            user,
-            time,
-        } => Ok(to_json_binary(&get_user_vamp(deps, env, user, Some(time))?)?),
-        QueryMsg::UserVampAtPeriod {
-            user,
-            period,
-        } => Ok(to_json_binary(&get_user_vamp_at_period(deps, user, period)?)?),
-        QueryMsg::LockInfo {
-            user,
-        } => Ok(to_json_binary(&get_user_lock_info(deps, &env, user)?)?),
-        QueryMsg::UserDepositAtHeight {
-            user,
-            height,
-        } => Ok(to_json_binary(&get_user_deposit_at_height(deps, user, height)?)?),
-        QueryMsg::Config {} => {
-            let config = CONFIG.load(deps.storage)?;
-            Ok(to_json_binary(&ConfigResponse {
-                owner: config.owner.to_string(),
-                guardian_addr: config.guardian_addr,
-                deposit_token_addr: config.deposit_denom.to_string(),
-                logo_urls_whitelist: config.logo_urls_whitelist,
-                decommissioned: config.decommissioned.unwrap_or_default(),
-                push_update_contracts: config
-                    .push_update_contracts
-                    .into_iter()
-                    .map(|a| a.to_string())
-                    .collect(),
-            })?)
-        },
-        QueryMsg::Balance {
-            address,
-        } => Ok(to_json_binary(&get_user_balance(deps, env, address)?)?),
-        QueryMsg::TokenInfo {} => Ok(to_json_binary(&query_token_info(deps, env)?)?),
-        QueryMsg::MarketingInfo {} => Ok(to_json_binary(&query_marketing_info(deps)?)?),
-        QueryMsg::DownloadLogo {} => Ok(to_json_binary(&query_download_logo(deps)?)?),
-    }
-}
-
-/// Checks if specified addresses are blacklisted.
-///
-/// * **voters** addresses to check if they are blacklisted.
-pub fn check_voters_are_blacklisted(
-    deps: Deps,
-    voters: Vec<String>,
-) -> Result<BlacklistedVotersResponse, ContractError> {
-    let black_list = BLACKLIST.load(deps.storage)?;
-
-    for voter in voters {
-        let voter_addr = deps.api.addr_validate(voter.as_str())?;
-        if !black_list.contains(&voter_addr) {
-            return Ok(BlacklistedVotersResponse::VotersNotBlacklisted {
-                voter,
-            });
-        }
-    }
-
-    Ok(BlacklistedVotersResponse::VotersBlacklisted {})
-}
-
-/// Returns a list of blacklisted voters.
-///
-/// * **start_after** is an optional field that specifies whether the function should return
-/// a list of voters starting from a specific address onward.
-///
-/// * **limit** max amount of voters addresses to return.
-pub fn get_blacklisted_voters(
-    deps: Deps,
-    start_after: Option<String>,
-    limit: Option<u32>,
-) -> Result<Vec<Addr>, ContractError> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let mut black_list = BLACKLIST.load(deps.storage)?;
-
-    if black_list.is_empty() {
-        return Ok(vec![]);
-    }
-
-    black_list.sort();
-
-    let mut start_index = Default::default();
-    if let Some(start_after) = start_after {
-        let start_addr = deps.api.addr_validate(start_after.as_str())?;
-        start_index = black_list
-            .iter()
-            .position(|addr| *addr == start_addr)
-            .ok_or_else(|| ContractError::AddressNotBlacklisted(start_addr.to_string()))?
-            + 1; // start from the next element of the slice
-    }
-
-    // validate end index of the slice
-    let end_index = (start_index + limit).min(black_list.len());
-
-    Ok(black_list[start_index..end_index].to_vec())
-}
-
-/// Return a user's lock information.
-///
-/// * **user** user for which we return lock information.
-fn get_user_lock_info(
-    deps: Deps,
-    env: &Env,
-    user: String,
-) -> Result<LockInfoResponse, ContractError> {
-    let addr = deps.api.addr_validate(&user)?;
-    if let Some(lock) = LOCKED.may_load(deps.storage, addr.clone())? {
-        let cur_period = get_period(env.block.time.seconds())?;
-
-        let last_checkpoint = fetch_last_checkpoint(deps.storage, &addr, cur_period)?;
-        // The voting power point at the specified `time` was found
-        let (voting_power, slope, fixed_amount) =
-            if let Some(point) = last_checkpoint.map(|(_, point)| point) {
-                if point.start == cur_period {
-                    (point.power, point.slope, point.fixed)
-                } else {
-                    // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
-                    (calc_voting_power(&point, cur_period), point.slope, point.fixed)
-                }
-            } else {
-                (Uint128::zero(), Uint128::zero(), Uint128::zero())
-            };
-
-        let coefficient = calc_coefficient(lock.end - lock.last_extend_lock_period);
-
-        let resp = LockInfoResponse {
-            amount: lock.amount,
-            coefficient,
-            start: lock.start,
-            end: lock.end,
-            voting_power,
-            fixed_amount,
-            slope,
-        };
-        Ok(resp)
-    } else {
-        Err(ContractError::UserNotFound(addr.to_string()))
-    }
-}
-
-/// Return a user's staked ampLP amount at a given block height.
-///
-/// * **user** user for which we return lock information.
-///
-/// * **block_height** block height at which we return the staked ampLP amount.
-fn get_user_deposit_at_height(deps: Deps, user: String, block_height: u64) -> StdResult<Uint128> {
-    let addr = deps.api.addr_validate(&user)?;
-    let locked_opt = LOCKED.may_load_at_height(deps.storage, addr, block_height)?;
-    if let Some(lock) = locked_opt {
-        Ok(lock.amount)
-    } else {
-        Ok(Uint128::zero())
-    }
-}
-
-/// Calculates a user's voting power at a given timestamp.
-/// If time is None, then it calculates the user's voting power at the current block.
-///
-/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
-///
-/// * **time** timestamp at which to fetch the user's voting power (vAMP balance).
-fn get_user_vamp(
-    deps: Deps,
-    env: Env,
-    user: String,
-    time: Option<u64>,
-) -> StdResult<VotingPowerResponse> {
-    let period = get_period(time.unwrap_or_else(|| env.block.time.seconds()))?;
-    get_user_vamp_at_period(deps, user, period)
-}
-
-/// Calculates a user's voting power at a given period number.
-///
-/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
-///
-/// * **period** period number at which to fetch the user's voting power (vAMP balance).
-fn get_user_vamp_at_period(
-    deps: Deps,
-    user: String,
-    period: u64,
-) -> StdResult<VotingPowerResponse> {
-    let user = deps.api.addr_validate(&user)?;
-    let last_checkpoint = fetch_last_checkpoint(deps.storage, &user, period)?;
-
-    if let Some(point) = last_checkpoint.map(|(_, point)| point) {
-        // The voting power point at the specified `time` was found
-        let voting_power = if point.start == period {
-            point.power + point.fixed
-        } else if point.end <= period {
-            // the current period is after the voting end -> get default end power.
-            point.fixed
-        } else {
-            // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
-            calc_voting_power(&point, period) + point.fixed
-        };
-        Ok(VotingPowerResponse {
-            vamp: voting_power,
-        })
-    } else {
-        // User not found
-        Ok(VotingPowerResponse {
-            vamp: Uint128::zero(),
-        })
-    }
-}
-
-/// Calculates a user's voting power at the current block.
-///
-/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
-fn get_user_balance(deps: Deps, env: Env, user: String) -> StdResult<BalanceResponse> {
-    let vp_response = get_user_vamp(deps, env, user, None)?;
-    Ok(BalanceResponse {
-        balance: vp_response.vamp,
-    })
-}
-
-/// Calculates the total voting power (total vAMP supply) at the given timestamp.
-/// If `time` is None, then it calculates the total voting power at the current block.
-///
-/// * **time** timestamp at which we fetch the total voting power (vAMP supply).
-fn get_total_vamp(deps: Deps, env: Env, time: Option<u64>) -> StdResult<VotingPowerResponse> {
-    let period = get_period(time.unwrap_or_else(|| env.block.time.seconds()))?;
-    get_total_vamp_at_period(deps, env, period)
-}
-
-/// Calculates the total voting power (total vAMP supply) at the given period number.
-///
-/// * **period** period number at which we fetch the total voting power (vAMP supply).
-fn get_total_vamp_at_period(deps: Deps, env: Env, period: u64) -> StdResult<VotingPowerResponse> {
-    let last_checkpoint = fetch_last_checkpoint(deps.storage, &env.contract.address, period)?;
-
-    let point = last_checkpoint.map_or(
-        Point {
-            power: Uint128::zero(),
-            start: period,
-            end: period,
-            slope: Default::default(),
-            fixed: Uint128::zero(),
-        },
-        |(_, point)| point,
-    );
-
-    let voting_power = if point.start == period {
-        point.power + point.fixed
-    } else {
-        let scheduled_slope_changes = fetch_slope_changes(deps.storage, point.start, period)?;
-        let mut init_point = point;
-        for (recalc_period, scheduled_change) in scheduled_slope_changes {
-            init_point = Point {
-                power: calc_voting_power(&init_point, recalc_period),
-                start: recalc_period,
-                slope: init_point.slope - scheduled_change,
-                fixed: init_point.fixed,
-                ..init_point
-            }
-        }
-        calc_voting_power(&init_point, period) + init_point.fixed
-    };
-
-    Ok(VotingPowerResponse {
-        vamp: voting_power,
-    })
-}
-
-/// Fetch the vAMP token information, such as the token name, symbol, decimals and total supply (total voting power).
-fn query_token_info(deps: Deps, env: Env) -> StdResult<TokenInfoResponse> {
-    let info = TOKEN_INFO.load(deps.storage)?;
-    let total_vp = get_total_vamp(deps, env, None)?;
-    let res = TokenInfoResponse {
-        name: info.name,
-        symbol: info.symbol,
-        decimals: info.decimals,
-        total_supply: total_vp.vamp,
-    };
-    Ok(res)
 }
 
 /// Manages contract migration.

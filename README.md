@@ -14,6 +14,7 @@ asset-staking
 - changes:
   - removed temp balance
   - disallow receiving funds
+  - implement take rate from amp extractor
 
 global-config
 
@@ -31,3 +32,5 @@ This repository is based on multiple open source contracts available in Cosmos:
 - White Whale Modifications on Alliance Protocol: <https://github.com/White-Whale-Defi-Platform/cw-alliance-hub>
 
 - Global Config: https://github.com/mars-protocol/contracts/blob/master/contracts/address-provider/src/contract.rs
+
+- ERIS Amp Extractor

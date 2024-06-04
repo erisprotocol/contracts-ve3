@@ -18,7 +18,7 @@ use terra_proto_rs::alliance::alliance::{
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
 use ve3_global_config::global_config_adapter::GlobalConfig;
-use ve3_shared::connector_alliance::{
+use ve3_shared::contract_connector_alliance::{
     AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
     ExecuteMsg, InstantiateMsg, MigrateMsg,
 };
