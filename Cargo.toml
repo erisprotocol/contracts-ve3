@@ -5,7 +5,7 @@ members = [
     "contracts/global-config",
     # "contracts/connector-emission",
     "contracts/asset-staking",
-    # "contracts/asset-gauge",
+    "contracts/asset-gauge",
     # "contracts/bribe-manager",
     # "contracts/bribe-distribution",
     "packages/*",

@@ -12,7 +12,7 @@ use crate::utils::{
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    MessageInfo, Response, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ReceiveMsg;
@@ -302,24 +302,24 @@ pub enum Operation {
 }
 
 impl Operation {
-    fn add_amount(self) -> Option<Uint128> {
+    fn add_amount(&self) -> Option<Uint128> {
         match self {
-            Operation::Add(amount) => Some(amount),
+            Operation::Add(amount) => Some(amount.clone()),
             _ => None,
         }
     }
-    fn reduce_amount(self) -> Option<Uint128> {
+    fn reduce_amount(&self) -> Option<Uint128> {
         match self {
-            Operation::Reduce(amount) => Some(amount),
+            Operation::Reduce(amount) => Some(amount.clone()),
             _ => None,
         }
     }
 
-    fn apply_to(self, rhs: Uint128) -> Result<Uint128, ContractError> {
+    fn apply_to(&self, rhs: Uint128) -> Result<Uint128, ContractError> {
         match self {
             Operation::None => Ok(rhs),
-            Operation::Add(amount) => Ok(rhs.checked_add(amount)?),
-            Operation::Reduce(amount) => Ok(rhs.saturating_sub(amount)),
+            Operation::Add(amount) => Ok(rhs.checked_add(amount.clone())?),
+            Operation::Reduce(amount) => Ok(rhs.saturating_sub(amount.clone())),
         }
     }
 }
@@ -488,14 +488,14 @@ fn create_lock(
     let periods = get_periods_count(time);
     let end = block_period + periods;
 
-    _create_lock(deps, env, nft, config, asset, underlying_amount, sender, end)
+    _create_lock(deps, env, nft, &config, asset, underlying_amount, sender, end)
 }
 
 fn _create_lock(
     mut deps: DepsMut,
     env: Env,
     nft: VeNftCollection,
-    config: Config,
+    config: &Config,
     asset: Asset,
     underlying_amount: Uint128,
     recipient: Addr,
@@ -569,16 +569,12 @@ fn merge_lock(
         .tokens
         .load(deps.storage, token_id_1_str)
         .map_err(|_| ContractError::LockDoesNotExist(token_id_1.to_string()))?;
-    let mut lock2 = LOCKED
-        .load(deps.storage, token_id_2_str)
-        .map_err(|_| ContractError::LockDoesNotExist(token_id_2_str.to_string()))?;
-    let mut token2 = nft
-        .tokens
+    let lock2 = LOCKED
         .load(deps.storage, token_id_2_str)
         .map_err(|_| ContractError::LockDoesNotExist(token_id_2_str.to_string()))?;
 
     // only allow editing of locks by approvals (token2 not needed, as it is checked by the burn function)
-    nft.check_can_send(deps.as_ref(), &env, &message_info(sender), &token1)?;
+    nft.check_can_send(deps.as_ref(), &env, &message_info(sender.clone()), &token1)?;
 
     if lock1.asset.info != lock2.asset.info {
         return Err(ContractError::LocksNeedSameAssets(
@@ -608,6 +604,8 @@ fn merge_lock(
     checkpoint(deps.storage, env.clone(), token_id_1_str, underlying_change, None)?;
 
     // burn lock 2 without transfering assets.
+    // this also removes it from LOCKED
+    // burn checks that the sender has approval for the lock or is the owner
     let cur_period = get_period(env.block.time.seconds())?;
     let burn_attrs = _burn(&mut deps, &env, nft, sender, token_id_2_str, lock2, cur_period)?;
 
@@ -619,11 +617,11 @@ fn merge_lock(
         .add_attribute("voting_power", lock1_info.voting_power.to_string())
         .add_attribute("fixed_power", lock1_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock1_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id_1.to_string(), Ok(lock1_info), None)?)
+        .add_messages(get_push_update_msgs(&config, token_id_1.to_string(), Ok(lock1_info), None)?)
         // add burnt lock attrs
         .add_attributes(burn_attrs)
         .add_messages(get_push_update_msgs(
-            config,
+            &config,
             token_id_2.to_string(),
             Ok(lock2_info),
             None,
@@ -631,7 +629,7 @@ fn merge_lock(
 }
 
 fn split_lock(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     nft: VeNftCollection,
     sender: Addr,
@@ -664,7 +662,7 @@ fn split_lock(
         .map_err(|_| ContractError::LockNotEnoughFunds {})?;
 
     let new_underlying_value = exchange_rate.map_or(lock.asset.amount, |e| e * lock.asset.amount);
-    let underlying_change = lock.update_underlying_value(&deps, new_underlying_value)?;
+    let underlying_change = lock.update_underlying_value(new_underlying_value)?;
 
     // save lock & keep NFT data in sync
     LOCKED.save(deps.storage, token_id_str, &lock, env.block.height)?;
@@ -678,14 +676,14 @@ fn split_lock(
     let new_asset = lock.asset.info.with_balance(new_lock_amount);
     let new_underlying = exchange_rate.map_or(lock.asset.amount, |e| e * new_lock_amount);
     let create_response =
-        _create_lock(deps, env, nft, config, new_asset, new_underlying, recipient, lock.end)?;
+        _create_lock(deps, env, nft, &config, new_asset, new_underlying, recipient, lock.end)?;
 
     Ok(Response::default()
         .add_attribute("action", "ve/split_lock")
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?)
+        .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info), None)?)
         // add new lock msgs
         .add_attributes(create_response.attributes)
         .add_submessages(create_response.messages))
@@ -757,7 +755,7 @@ fn deposit_for(
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?))
+        .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info), None)?))
 }
 
 fn change_lock_owner(
@@ -812,7 +810,7 @@ fn change_lock_owner(
         .add_attribute("old_owner", old_owner.to_string())
         .add_attribute("new_owner", lock.owner.to_string())
         .add_messages(get_push_update_msgs(
-            config,
+            &config,
             token_id.to_string(),
             Ok(lock_info),
             Some(old_owner),
@@ -888,7 +886,7 @@ fn extend_lock_time(
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?))
+        .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info), None)?))
 }
 
 /// Withdraws the whole amount of locked ampLP from a specific user lock.
@@ -902,7 +900,7 @@ fn withdraw(
 ) -> Result<Response, ContractError> {
     let token_id_str = &token_id.to_string();
 
-    let mut lock = LOCKED
+    let lock = LOCKED
         .load(deps.storage, token_id_str)
         .map_err(|_| ContractError::LockDoesNotExist(token_id.to_string()))?;
 
@@ -915,12 +913,12 @@ fn withdraw(
     if lock.end > cur_period && !is_decommissioned {
         Err(ContractError::LockHasNotExpired {})
     } else {
-        let transfer_msg = lock.asset.transfer_msg(sender)?;
+        let transfer_msg = lock.asset.transfer_msg(sender.clone())?;
 
         attrs = _burn(&mut deps, &env, nft, sender, token_id_str, lock, cur_period)?;
 
         let lock_info = get_token_lock_info(deps.as_ref(), &env, token_id.to_string(), None);
-        let msgs = get_push_update_msgs(config, token_id.to_string(), lock_info, None)?;
+        let msgs = get_push_update_msgs(&config, token_id.to_string(), lock_info, None)?;
 
         Ok(Response::default()
             .add_message(transfer_msg)
@@ -1030,7 +1028,7 @@ fn get_push_update_msgs_multi(
         .into_iter()
         .map(|token_id| {
             let lock_info = get_token_lock_info(deps, &env, token_id.to_string(), None);
-            get_push_update_msgs(config.clone(), token_id, lock_info, None)
+            get_push_update_msgs(&config, token_id, lock_info, None)
         })
         .collect::<StdResult<Vec<_>>>()?
         .into_iter()
@@ -1041,7 +1039,7 @@ fn get_push_update_msgs_multi(
 }
 
 fn get_push_update_msgs(
-    config: Config,
+    config: &Config,
     token_id: String,
     lock_info: Result<LockInfoResponse, ContractError>,
     old_owner: Option<Addr>,
@@ -1050,7 +1048,7 @@ fn get_push_update_msgs(
     if let Ok(lock_info) = lock_info {
         config
             .push_update_contracts
-            .into_iter()
+            .iter()
             .map(|contract| {
                 Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: contract.to_string(),
@@ -1199,7 +1197,7 @@ fn update_blacklist(
                     deps.storage,
                     env.clone(),
                     token_id_str,
-                    Some(underlying_amount),
+                    Operation::Add(underlying_amount),
                     Some(end),
                 )?;
             }

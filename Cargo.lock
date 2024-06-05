@@ -1109,6 +1109,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
 
 [[package]]
+name = "ve3-asset-gauge"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus 1.2.0",
+ "cw2 1.1.2",
+ "cw20",
+ "thiserror",
+]
+
+[[package]]
 name = "ve3-asset-staking"
 version = "1.0.0"
 dependencies = [

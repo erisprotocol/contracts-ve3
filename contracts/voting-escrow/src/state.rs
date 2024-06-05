@@ -39,21 +39,6 @@ pub struct Lock {
     pub owner: Addr,
 }
 
-// distribute -> (address, VP)
-// 
-// VOTE
-// (address, period, User VP)
-// (address, period, LP1, VP) <- distribute 1
-// (address, period, LP2, VP) <- distribute 2
-// (period, global VP)
-// claim (perid1, period2, ...)
-
-// WW:
-// User stakes more RSTK
-// DAODAO -> update user vote (100)
-// Asset Gauge -> (period 12, VP 100)
-// query period 20
-
 impl Lock {
     pub fn get_nft_extension(&self) -> Extension {
         Extension {
@@ -87,12 +72,11 @@ impl Lock {
     ) -> Result<Operation, ContractError> {
         let new_underlying_amount =
             asset_config.get_underlying_amount(&deps.querier, self.asset.amount)?;
-        self.update_underlying_value(deps, new_underlying_amount)
+        self.update_underlying_value(new_underlying_amount)
     }
 
     pub fn update_underlying_value(
         &mut self,
-        deps: &DepsMut,
         new_underlying_amount: Uint128,
     ) -> Result<Operation, ContractError> {
         let add_reduce_underlying = if new_underlying_amount > self.underlying_amount {
