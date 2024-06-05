@@ -25,6 +25,22 @@ impl GlobalConfig {
         }
     }
 
+    pub fn assert_owner_or_address_type(
+        &self,
+        querier: &QuerierWrapper,
+        address_type: &str,
+        sender: &Addr,
+    ) -> Result<(), SharedError> {
+        let ownership = OWNERSHIP.query(querier, self.0.clone())?;
+        if let Some(owner) = ownership.owner {
+            if *sender == owner {
+                return Ok(());
+            }
+        }
+
+        self.assert_has_access(querier, address_type, sender)
+    }
+
     pub fn get_address(
         &self,
         querier: &QuerierWrapper,

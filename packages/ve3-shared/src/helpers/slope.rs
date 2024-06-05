@@ -1,6 +1,5 @@
-use cosmwasm_std::{Decimal, StdResult, Uint128};
-
 use crate::constants::MAX_LOCK_TIME;
+use cosmwasm_std::{Decimal, StdResult, Uint128};
 
 use super::governance::get_periods_count;
 
@@ -8,7 +7,7 @@ use super::governance::get_periods_count;
 pub fn calc_coefficient(interval: u64) -> Decimal {
     // coefficient = 9 * (end - start) / MAX_LOCK_TIME
     // +1 is added in the fixed part and not included here.
-    Decimal::from_ratio(30_u64 * interval, get_periods_count(MAX_LOCK_TIME) * 10)
+    Decimal::from_ratio(90_u64 * interval, get_periods_count(MAX_LOCK_TIME) * 10)
 }
 
 /// Adjusting voting power according to the slope. The maximum loss is 103/104 * 104 which is 0.000103

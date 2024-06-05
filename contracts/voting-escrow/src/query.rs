@@ -1,17 +1,15 @@
+use crate::constants::CONTRACT_TOTAL_VP_TOKEN_ID;
 use crate::error::ContractError;
 use crate::state::{Point, BLACKLIST, CONFIG, LOCKED};
 use crate::utils::{calc_voting_power, fetch_last_checkpoint, fetch_slope_changes};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult, Uint128};
-use cw20::{BalanceResponse, TokenInfoResponse};
-use cw20_base::contract::{query_download_logo, query_marketing_info};
-use cw20_base::state::TOKEN_INFO;
+use cw20::BalanceResponse;
 use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
-use ve3_shared::helpers::governance::get_period;
 use ve3_shared::helpers::slope::calc_coefficient;
 use ve3_shared::voting_escrow::{
-    BlacklistedVotersResponse, Config, LockInfoResponse, QueryMsg, VotingPowerResponse,
+    GetPeriod, LockInfoResponse, QueryMsg, Time, VeNftCollection, VotingPowerResponse,
 };
 
 /// Expose available contract queries.
@@ -28,39 +26,25 @@ use ve3_shared::voting_escrow::{
 /// * **QueryMsg::LockInfo { user }** Fetch a user's lock information.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+    let nft = VeNftCollection::default();
     match msg {
-        QueryMsg::CheckVotersAreBlacklisted {
-            voters,
-        } => Ok(to_json_binary(&check_voters_are_blacklisted(deps, voters)?)?),
         QueryMsg::BlacklistedVoters {
             start_after,
             limit,
         } => Ok(to_json_binary(&get_blacklisted_voters(deps, start_after, limit)?)?),
-        QueryMsg::TotalVamp {} => Ok(to_json_binary(&get_total_vamp(deps, env, None)?)?),
-        QueryMsg::UserVamp {
-            user,
-        } => Ok(to_json_binary(&get_user_vamp(deps, env, user, None)?)?),
-        QueryMsg::TotalVampAt {
+        QueryMsg::TotalVamp {
             time,
-        } => Ok(to_json_binary(&get_total_vamp(deps, env, Some(time))?)?),
-        QueryMsg::TotalVampAtPeriod {
-            period,
-        } => Ok(to_json_binary(&get_total_vamp_at_period(deps, env, period)?)?),
-        QueryMsg::UserVampAt {
-            user,
+        } => Ok(to_json_binary(&get_total_vamp_at_time(deps, env, time)?)?),
+        QueryMsg::LockVamp {
             time,
-        } => Ok(to_json_binary(&get_user_vamp(deps, env, user, Some(time))?)?),
-        QueryMsg::UserVampAtPeriod {
-            user,
-            period,
-        } => Ok(to_json_binary(&get_user_vamp_at_period(deps, user, period)?)?),
+            token_id,
+        } => Ok(to_json_binary(&get_user_vamp_at_time(deps, env, token_id, time)?)?),
+
         QueryMsg::LockInfo {
-            user,
-        } => Ok(to_json_binary(&get_user_lock_info(deps, &env, user)?)?),
-        QueryMsg::UserDepositAtHeight {
-            user,
-            height,
-        } => Ok(to_json_binary(&get_user_deposit_at_height(deps, user, height)?)?),
+            token_id,
+            time,
+        } => Ok(to_json_binary(&get_token_lock_info(deps, &env, token_id, time)?)?),
+
         QueryMsg::Config {} => {
             let config = CONFIG.load(deps.storage)?;
             Ok(to_json_binary(&config)?)
@@ -68,31 +52,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Balance {
             address,
         } => Ok(to_json_binary(&get_user_balance(deps, env, address)?)?),
-        QueryMsg::TokenInfo {} => Ok(to_json_binary(&query_token_info(deps, env)?)?),
-        QueryMsg::MarketingInfo {} => Ok(to_json_binary(&query_marketing_info(deps)?)?),
-        QueryMsg::DownloadLogo {} => Ok(to_json_binary(&query_download_logo(deps)?)?),
+
+        _ => Ok(nft.query(deps, env, msg.into())?),
     }
-}
-
-/// Checks if specified addresses are blacklisted.
-///
-/// * **voters** addresses to check if they are blacklisted.
-pub fn check_voters_are_blacklisted(
-    deps: Deps,
-    voters: Vec<String>,
-) -> Result<BlacklistedVotersResponse, ContractError> {
-    let black_list = BLACKLIST.load(deps.storage)?;
-
-    for voter in voters {
-        let voter_addr = deps.api.addr_validate(voter.as_str())?;
-        if !black_list.contains(&voter_addr) {
-            return Ok(BlacklistedVotersResponse::VotersNotBlacklisted {
-                voter,
-            });
-        }
-    }
-
-    Ok(BlacklistedVotersResponse::VotersBlacklisted {})
 }
 
 /// Returns a list of blacklisted voters.
@@ -134,24 +96,24 @@ pub fn get_blacklisted_voters(
 /// Return a user's lock information.
 ///
 /// * **user** user for which we return lock information.
-fn get_user_lock_info(
+pub fn get_token_lock_info(
     deps: Deps,
     env: &Env,
-    user: String,
+    token_id: String,
+    time: Option<Time>,
 ) -> Result<LockInfoResponse, ContractError> {
-    let addr = deps.api.addr_validate(&user)?;
-    if let Some(lock) = LOCKED.may_load(deps.storage, addr.clone())? {
-        let cur_period = get_period(env.block.time.seconds())?;
+    if let Some(lock) = LOCKED.may_load(deps.storage, &token_id)? {
+        let period = time.get_period(env)?;
 
-        let last_checkpoint = fetch_last_checkpoint(deps.storage, &addr, cur_period)?;
+        let last_checkpoint = fetch_last_checkpoint(deps.storage, &token_id, period)?;
         // The voting power point at the specified `time` was found
         let (voting_power, slope, fixed_amount) =
             if let Some(point) = last_checkpoint.map(|(_, point)| point) {
-                if point.start == cur_period {
+                if point.start == period {
                     (point.power, point.slope, point.fixed)
                 } else {
                     // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
-                    (calc_voting_power(&point, cur_period), point.slope, point.fixed)
+                    (calc_voting_power(&point, period), point.slope, point.fixed)
                 }
             } else {
                 (Uint128::zero(), Uint128::zero(), Uint128::zero())
@@ -160,7 +122,9 @@ fn get_user_lock_info(
         let coefficient = calc_coefficient(lock.end - lock.last_extend_lock_period);
 
         let resp = LockInfoResponse {
-            amount: lock.asset,
+            owner: lock.owner,
+            asset: lock.asset,
+            underlying_amount: lock.underlying_amount,
             coefficient,
             start: lock.start,
             end: lock.end,
@@ -170,73 +134,7 @@ fn get_user_lock_info(
         };
         Ok(resp)
     } else {
-        Err(ContractError::UserNotFound(addr.to_string()))
-    }
-}
-
-/// Return a user's staked ampLP amount at a given block height.
-///
-/// * **user** user for which we return lock information.
-///
-/// * **block_height** block height at which we return the staked ampLP amount.
-fn get_user_deposit_at_height(deps: Deps, user: String, block_height: u64) -> StdResult<Uint128> {
-    let addr = deps.api.addr_validate(&user)?;
-    let locked_opt = LOCKED.may_load_at_height(deps.storage, addr, block_height)?;
-    if let Some(lock) = locked_opt {
-        Ok(lock.asset)
-    } else {
-        Ok(Uint128::zero())
-    }
-}
-
-/// Calculates a user's voting power at a given timestamp.
-/// If time is None, then it calculates the user's voting power at the current block.
-///
-/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
-///
-/// * **time** timestamp at which to fetch the user's voting power (vAMP balance).
-fn get_user_vamp(
-    deps: Deps,
-    env: Env,
-    user: String,
-    time: Option<u64>,
-) -> StdResult<VotingPowerResponse> {
-    let period = get_period(time.unwrap_or_else(|| env.block.time.seconds()))?;
-    get_user_vamp_at_period(deps, user, period)
-}
-
-/// Calculates a user's voting power at a given period number.
-///
-/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
-///
-/// * **period** period number at which to fetch the user's voting power (vAMP balance).
-fn get_user_vamp_at_period(
-    deps: Deps,
-    user: String,
-    period: u64,
-) -> StdResult<VotingPowerResponse> {
-    let user = deps.api.addr_validate(&user)?;
-    let last_checkpoint = fetch_last_checkpoint(deps.storage, &user, period)?;
-
-    if let Some(point) = last_checkpoint.map(|(_, point)| point) {
-        // The voting power point at the specified `time` was found
-        let voting_power = if point.start == period {
-            point.power + point.fixed
-        } else if point.end <= period {
-            // the current period is after the voting end -> get default end power.
-            point.fixed
-        } else {
-            // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
-            calc_voting_power(&point, period) + point.fixed
-        };
-        Ok(VotingPowerResponse {
-            vamp: voting_power,
-        })
-    } else {
-        // User not found
-        Ok(VotingPowerResponse {
-            vamp: Uint128::zero(),
-        })
+        Err(ContractError::LockDoesNotExist(token_id))
     }
 }
 
@@ -244,26 +142,22 @@ fn get_user_vamp_at_period(
 ///
 /// * **user** user/staker for which we fetch the current voting power (vAMP balance).
 fn get_user_balance(deps: Deps, env: Env, user: String) -> StdResult<BalanceResponse> {
-    let vp_response = get_user_vamp(deps, env, user, None)?;
+    let vp_response = get_user_vamp_at_time(deps, env, user, None)?;
     Ok(BalanceResponse {
         balance: vp_response.vamp,
     })
 }
 
-/// Calculates the total voting power (total vAMP supply) at the given timestamp.
-/// If `time` is None, then it calculates the total voting power at the current block.
-///
-/// * **time** timestamp at which we fetch the total voting power (vAMP supply).
-fn get_total_vamp(deps: Deps, env: Env, time: Option<u64>) -> StdResult<VotingPowerResponse> {
-    let period = get_period(time.unwrap_or_else(|| env.block.time.seconds()))?;
-    get_total_vamp_at_period(deps, env, period)
-}
-
 /// Calculates the total voting power (total vAMP supply) at the given period number.
 ///
 /// * **period** period number at which we fetch the total voting power (vAMP supply).
-fn get_total_vamp_at_period(deps: Deps, env: Env, period: u64) -> StdResult<VotingPowerResponse> {
-    let last_checkpoint = fetch_last_checkpoint(deps.storage, &env.contract.address, period)?;
+fn get_total_vamp_at_time(
+    deps: Deps,
+    env: Env,
+    time: Option<Time>,
+) -> StdResult<VotingPowerResponse> {
+    let period = time.get_period(&env)?;
+    let last_checkpoint = fetch_last_checkpoint(deps.storage, CONTRACT_TOTAL_VP_TOKEN_ID, period)?;
 
     let point = last_checkpoint.map_or(
         Point {
@@ -298,15 +192,38 @@ fn get_total_vamp_at_period(deps: Deps, env: Env, period: u64) -> StdResult<Voti
     })
 }
 
-/// Fetch the vAMP token information, such as the token name, symbol, decimals and total supply (total voting power).
-fn query_token_info(deps: Deps, env: Env) -> StdResult<TokenInfoResponse> {
-    let info = TOKEN_INFO.load(deps.storage)?;
-    let total_vp = get_total_vamp(deps, env, None)?;
-    let res = TokenInfoResponse {
-        name: info.name,
-        symbol: info.symbol,
-        decimals: info.decimals,
-        total_supply: total_vp.vamp,
-    };
-    Ok(res)
+/// Calculates a user's voting power at a given period number.
+///
+/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
+///
+/// * **period** period number at which to fetch the user's voting power (vAMP balance).
+fn get_user_vamp_at_time(
+    deps: Deps,
+    env: Env,
+    token_id: String,
+    time: Option<Time>,
+) -> StdResult<VotingPowerResponse> {
+    let period = time.get_period(&env)?;
+    let last_checkpoint = fetch_last_checkpoint(deps.storage, &token_id, period)?;
+
+    if let Some(point) = last_checkpoint.map(|(_, point)| point) {
+        // The voting power point at the specified `time` was found
+        let voting_power = if point.start == period {
+            point.power + point.fixed
+        } else if point.end <= period {
+            // the current period is after the voting end -> get default end power.
+            point.fixed
+        } else {
+            // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
+            calc_voting_power(&point, period) + point.fixed
+        };
+        Ok(VotingPowerResponse {
+            vamp: voting_power,
+        })
+    } else {
+        // User not found
+        Ok(VotingPowerResponse {
+            vamp: Uint128::zero(),
+        })
+    }
 }

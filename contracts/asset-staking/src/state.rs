@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_asset::AssetInfo;
 use cw_storage_plus::{Item, Map};
-use ve3_shared::contract_asset_staking::{AssetConfig, AssetDistribution, Config};
+use ve3_shared::contract_asset_staking::{AssetConfigRuntime, AssetDistribution, Config};
 
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const WHITELIST: Map<&AssetInfo, bool> = Map::new("whitelist");
@@ -15,7 +15,7 @@ pub const ASSET_REWARD_DISTRIBUTION: Item<Vec<AssetDistribution>> =
     Item::new("asset_reward_distribution");
 pub const ASSET_REWARD_RATE: Map<&AssetInfo, Decimal> = Map::new("asset_reward_rate");
 
-pub const ASSET_CONFIG: Map<&AssetInfo, AssetConfig> = Map::new("asset_config");
+pub const ASSET_CONFIG: Map<&AssetInfo, AssetConfigRuntime> = Map::new("asset_config");
 pub const ASSET_TRIBUTES: Map<&AssetInfo, HashMap<AssetInfo, Uint128>> = Map::new("asset_tributes");
 
 pub const USER_ASSET_REWARD_RATE: Map<(Addr, &AssetInfo), Decimal> =

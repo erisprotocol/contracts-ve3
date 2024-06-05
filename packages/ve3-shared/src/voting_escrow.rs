@@ -1,14 +1,22 @@
-use crate::voting_escrow::QueryMsg::{LockInfo, TotalVamp, TotalVampAt, UserVamp, UserVampAt};
+use crate::adapters::eris::ErisHub;
+use crate::helpers::governance::get_period;
+use crate::voting_escrow::QueryMsg::{LockInfo, LockVamp, TotalVamp};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Binary, Decimal, Empty, QuerierWrapper, StdResult, Uint128};
+use cosmwasm_std::{Addr, Binary, Decimal, Empty, Env, QuerierWrapper, StdResult, Uint128};
 use cw20::Expiration;
 #[allow(unused_imports)]
 use cw20::{
     BalanceResponse, Cw20ReceiveMsg, DownloadLogoResponse, Logo, MarketingInfoResponse,
     TokenInfoResponse,
 };
+use cw721::{
+    AllNftInfoResponse, ApprovalResponse, ApprovalsResponse, ContractInfoResponse, NftInfoResponse,
+    NumTokensResponse, OperatorsResponse, OwnerOfResponse, TokensResponse,
+};
 use cw721_base::ExecuteMsg as CW721ExecuteMsg;
-use cw_asset::AssetInfo;
+use cw721_base::MinterResponse;
+use cw721_base::QueryMsg as CW721QueryMsg;
+use cw_asset::{Asset, AssetInfo};
 use std::{collections::HashMap, fmt};
 
 /// This structure stores marketing information for voting escrow.
@@ -30,7 +38,7 @@ pub struct InstantiateMsg {
     // global address config
     pub global_config_addr: String,
     // assets that are allowed to be locked including a config of how to calculate base power
-    pub deposit_assets: HashMap<String, AssetInfoLockConfig>,
+    pub deposit_assets: HashMap<String, AssetInfoConfig>,
 }
 
 /// This structure describes the execute functions in the contract.
@@ -65,8 +73,8 @@ pub enum ExecuteMsg {
     /// Update config
     UpdateConfig {
         // assets that are allowed to be locked including a config of how to calculate base power
-        append_deposit_assets: Option<HashMap<String, AssetInfoLockConfig>>,
-        remove_deposit_assets: Option<Vec<String>>,
+        // for now removal is not supported
+        append_deposit_assets: Option<HashMap<String, AssetInfoConfig>>,
 
         push_update_contracts: Option<Vec<String>>,
         // allows withdrawals of tokens.
@@ -115,7 +123,7 @@ pub enum ExecuteMsg {
     },
 }
 
-pub type VeNftCollection<'a> = cw721_base::Cw721Contract<'a, Metadata, Empty, Empty, Empty>;
+pub type VeNftCollection<'a> = cw721_base::Cw721Contract<'a, Extension, Empty, Empty, Empty>;
 
 #[cw_serde]
 pub struct Trait {
@@ -124,18 +132,20 @@ pub struct Trait {
     pub value: String,
 }
 
+pub type Extension = Metadata;
+
 // see: https://docs.opensea.io/docs/metadata-standards
 #[cw_serde]
 pub struct Metadata {
     pub image: Option<String>,
-    pub image_data: Option<String>,
-    pub external_url: Option<String>,
+    // pub image_data: Option<String>,
+    // pub external_url: Option<String>,
     pub description: Option<String>,
     pub name: Option<String>,
     pub attributes: Option<Vec<Trait>>,
-    pub background_color: Option<String>,
-    pub animation_url: Option<String>,
-    pub youtube_url: Option<String>,
+    // pub background_color: Option<String>,
+    // pub animation_url: Option<String>,
+    // pub youtube_url: Option<String>,
 }
 
 impl From<ExecuteMsg> for CW721ExecuteMsg<Metadata, Empty> {
@@ -203,7 +213,7 @@ pub enum ReceiveMsg {
 #[cw_serde]
 pub enum PushExecuteMsg {
     UpdateVote {
-        user: String,
+        token_id: String,
         lock_info: LockInfoResponse,
     },
 }
@@ -232,79 +242,257 @@ impl fmt::Display for BlacklistedVotersResponse {
     }
 }
 
+#[cw_serde]
+#[derive(Default)]
+pub enum Time {
+    #[default]
+    Current,
+    Time(u64),
+    Period(u64),
+}
+
+pub trait GetPeriod {
+    fn get_period(self, env: &Env) -> StdResult<u64>;
+}
+impl GetPeriod for Option<Time> {
+    fn get_period(self, env: &Env) -> StdResult<u64> {
+        match self {
+            Some(time) => match time {
+                Time::Current => get_period(env.block.time.seconds()),
+                Time::Time(time) => get_period(time),
+                Time::Period(period) => Ok(period),
+            },
+            None => get_period(env.block.time.seconds()),
+        }
+    }
+}
+
 /// This structure describes the query messages available in the contract.
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// Checks if specified addresses are blacklisted
-    #[returns(BlacklistedVotersResponse)]
-    CheckVotersAreBlacklisted {
-        voters: Vec<String>,
-    },
     /// Return the blacklisted voters
     #[returns(Vec<Addr>)]
     BlacklistedVoters {
         start_after: Option<String>,
         limit: Option<u32>,
     },
+
     /// Return the user's vAMP balance
     #[returns(BalanceResponse)]
     Balance {
         address: String,
     },
-    /// Fetch the vAMP token information
-    #[returns(TokenInfoResponse)]
-    TokenInfo {},
-    /// Fetch vAMP's marketing information
-    #[returns(MarketingInfoResponse)]
-    MarketingInfo {},
-    /// Download the vAMP logo
-    #[returns(DownloadLogoResponse)]
-    DownloadLogo {},
+
     /// Return the current total amount of vAMP
     #[returns(VotingPowerResponse)]
-    TotalVamp {},
-    /// Return the total amount of vAMP at some point in the past
-    #[returns(VotingPowerResponse)]
-    TotalVampAt {
-        time: u64,
+    TotalVamp {
+        time: Option<Time>,
     },
-    /// Return the total voting power at a specific period
-    #[returns(VotingPowerResponse)]
-    TotalVampAtPeriod {
-        period: u64,
-    },
+
     /// Return the user's current voting power (vAMP balance)
     #[returns(VotingPowerResponse)]
-    UserVamp {
-        user: String,
+    LockVamp {
+        token_id: String,
+        time: Option<Time>,
     },
-    /// Return the user's vAMP balance at some point in the past
-    #[returns(VotingPowerResponse)]
-    UserVampAt {
-        user: String,
-        time: u64,
-    },
-    /// Return the user's voting power at a specific period
-    #[returns(VotingPowerResponse)]
-    UserVampAtPeriod {
-        user: String,
-        period: u64,
-    },
+
     /// Return information about a user's lock position
     #[returns(LockInfoResponse)]
     LockInfo {
-        user: String,
-    },
-    /// Return user's locked ampLP balance at the given block height
-    #[returns(Uint128)]
-    UserDepositAtHeight {
-        user: String,
-        height: u64,
+        token_id: String,
+        time: Option<Time>,
     },
     /// Return the vAMP contract configuration
     #[returns(Config)]
     Config {},
+
+    /// With MetaData Extension.
+    /// Returns metadata about one particular token,
+    /// based on *ERC721 Metadata JSON Schema*
+    /// https://docs.opensea.io/docs/metadata-standards
+    ///
+    /// {    
+    ///    "name": "AllianceNFT # 1",
+    ///    "token_uri": null,
+    ///    "extension": {
+    ///      "image": "https://ipfs.io/ipfs/{hash}",
+    ///      "description": "Received for participating on Game Of Alliance",
+    ///      "name": "AllianceNFT # 1",
+    ///      "attributes": [{
+    ///              "display_type" : null,
+    ///              "trait_type": "x",
+    ///              "value": "1"
+    ///          },{
+    ///              "display_type" : null,
+    ///              "trait_type": "y",
+    ///              "value": "1"
+    ///          },{
+    ///              "display_type" : null,
+    ///              "trait_type": "width",
+    ///              "value": "120"
+    ///          },{
+    ///              "display_type" : null,
+    ///              "trait_type": "height",
+    ///              "value": "120"
+    ///          },{
+    ///              "display_type" : null,
+    ///              "trait_type": "rarity",
+    ///              "value": 11
+    ///          }],
+    ///      "image_data": null,
+    ///      "external_url": null,
+    ///      "background_color": null,
+    ///      "animation_url": null,
+    ///      "youtube_url": null
+    ///    }
+    ///  }
+    #[returns(NftInfoResponse<Extension>)]
+    NftInfo {
+        token_id: String,
+    },
+
+    /// With MetaData Extension.
+    /// Returns the result of both `NftInfo` and `OwnerOf` as one query as an optimization
+    #[returns(AllNftInfoResponse<Extension>)]
+    AllNftInfo {
+        token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
+    },
+
+    /// CW721 Queries
+
+    /// Return the owner of the given token, error if token does not exist
+    #[returns(OwnerOfResponse)]
+    OwnerOf {
+        token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
+    },
+    /// Return operator that can access all of the owner's tokens.
+    /// Return the owner of the given token, error if token does not exist
+    #[returns(ApprovalResponse)]
+    Approval {
+        token_id: String,
+        spender: String,
+        include_expired: Option<bool>,
+    },
+    /// Return approvals that a token has
+    #[returns(ApprovalsResponse)]
+    Approvals {
+        token_id: String,
+        include_expired: Option<bool>,
+    },
+    /// List all operators that can access all of the owner's tokens
+    #[returns(OperatorsResponse)]
+    AllOperators {
+        owner: String,
+        /// unset or false will filter out expired items, you must set to true to see them
+        include_expired: Option<bool>,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// Total number of tokens issued
+    #[returns(NumTokensResponse)]
+    NumTokens {},
+
+    /// With MetaData Extension.
+    #[returns(ContractInfoResponse)]
+    ContractInfo {},
+
+    /// With Enumerable extension.
+    /// Returns all tokens owned by the given address, [] if unset.
+    #[returns(TokensResponse)]
+    Tokens {
+        owner: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// With Enumerable extension.
+    /// Requires pagination. Lists all token_ids controlled by the contract.
+    #[returns(TokensResponse)]
+    AllTokens {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+
+    // Return the minter
+    #[returns(MinterResponse)]
+    Minter {},
+}
+
+impl From<QueryMsg> for CW721QueryMsg<Empty> {
+    fn from(msg: QueryMsg) -> CW721QueryMsg<Empty> {
+        match msg {
+            QueryMsg::OwnerOf {
+                token_id,
+                include_expired,
+            } => CW721QueryMsg::OwnerOf {
+                token_id,
+                include_expired,
+            },
+            QueryMsg::Approval {
+                token_id,
+                spender,
+                include_expired,
+            } => CW721QueryMsg::Approval {
+                token_id,
+                spender,
+                include_expired,
+            },
+            QueryMsg::Approvals {
+                token_id,
+                include_expired,
+            } => CW721QueryMsg::Approvals {
+                token_id,
+                include_expired,
+            },
+            QueryMsg::AllOperators {
+                owner,
+                include_expired,
+                start_after,
+                limit,
+            } => CW721QueryMsg::AllOperators {
+                owner,
+                include_expired,
+                start_after,
+                limit,
+            },
+            QueryMsg::NumTokens {} => CW721QueryMsg::NumTokens {},
+            QueryMsg::ContractInfo {} => CW721QueryMsg::ContractInfo {},
+            QueryMsg::NftInfo {
+                token_id,
+            } => CW721QueryMsg::NftInfo {
+                token_id,
+            },
+            QueryMsg::AllNftInfo {
+                token_id,
+                include_expired,
+            } => CW721QueryMsg::AllNftInfo {
+                token_id,
+                include_expired,
+            },
+            QueryMsg::Tokens {
+                owner,
+                start_after,
+                limit,
+            } => CW721QueryMsg::Tokens {
+                owner,
+                start_after,
+                limit,
+            },
+            QueryMsg::AllTokens {
+                start_after,
+                limit,
+            } => CW721QueryMsg::AllTokens {
+                start_after,
+                limit,
+            },
+            QueryMsg::Minter {} => CW721QueryMsg::Minter {},
+            _ => panic!("cannot covert {:?} to CW721QueryMsg", msg),
+        }
+    }
 }
 
 /// This structure is used to return a user's amount of vAMP.
@@ -317,8 +505,11 @@ pub struct VotingPowerResponse {
 /// This structure is used to return the lock information for a vAMP position.
 #[cw_serde]
 pub struct LockInfoResponse {
-    /// The amount of ampLP locked in the position
-    pub amount: Uint128,
+    pub owner: Addr,
+
+    pub asset: Asset,
+    /// The underlying_amount locked in the position
+    pub underlying_amount: Uint128,
     /// This is the initial boost for the lock position
     pub coefficient: Decimal,
     /// Start time for the vAMP position decay
@@ -340,7 +531,7 @@ pub struct Config {
     // global address config
     pub global_config_addr: Addr,
     // assets that are allowed to be locked including a config of how to calculate base power
-    pub allowed_deposit_assets: HashMap<AssetInfo, AssetInfoLockConfig>,
+    pub allowed_deposit_assets: HashMap<AssetInfo, AssetInfoConfig>,
     /// The list of contracts to receive updates on user's lock info changes
     pub push_update_contracts: Vec<Addr>,
     /// Address that can only blacklist vAMP stakers and remove their governance power
@@ -348,11 +539,33 @@ pub struct Config {
 }
 
 #[cw_serde]
-pub enum AssetInfoLockConfig {
+pub enum AssetInfoConfig {
     Default,
     ExchangeRate {
         contract: Addr,
     },
+}
+
+impl AssetInfoConfig {
+    pub fn get_exchange_rate(&self, querier: &QuerierWrapper) -> StdResult<Option<Decimal>> {
+        match self {
+            AssetInfoConfig::Default => Ok(None),
+            AssetInfoConfig::ExchangeRate {
+                contract,
+            } => Ok(Some(ErisHub(contract).query_exchange_rate(querier)?)),
+        }
+    }
+
+    pub fn get_underlying_amount(
+        &self,
+        querier: &QuerierWrapper,
+        amount: Uint128,
+    ) -> StdResult<Uint128> {
+        match self.get_exchange_rate(querier)? {
+            Some(exchange_rate) => Ok(exchange_rate * amount),
+            None => Ok(amount),
+        }
+    }
 }
 
 /// This structure describes a Migration message.
@@ -369,8 +582,9 @@ pub fn get_voting_power(
 ) -> StdResult<Uint128> {
     let vp: VotingPowerResponse = querier.query_wasm_smart(
         escrow_addr,
-        &UserVamp {
-            user: user.into(),
+        &LockVamp {
+            token_id: user.into(),
+            time: None,
         },
     )?;
     Ok(vp.vamp)
@@ -384,14 +598,14 @@ pub fn get_voting_power(
 pub fn get_voting_power_at(
     querier: &QuerierWrapper,
     escrow_addr: impl Into<String>,
-    user: impl Into<String>,
+    token_id: impl Into<String>,
     timestamp: u64,
 ) -> StdResult<Uint128> {
     let vp: VotingPowerResponse = querier.query_wasm_smart(
         escrow_addr,
-        &UserVampAt {
-            user: user.into(),
-            time: timestamp,
+        &LockVamp {
+            token_id: token_id.into(),
+            time: Some(Time::Time(timestamp)),
         },
     )?;
 
@@ -403,7 +617,12 @@ pub fn get_total_voting_power(
     querier: &QuerierWrapper,
     escrow_addr: impl Into<String>,
 ) -> StdResult<Uint128> {
-    let vp: VotingPowerResponse = querier.query_wasm_smart(escrow_addr, &TotalVamp {})?;
+    let vp: VotingPowerResponse = querier.query_wasm_smart(
+        escrow_addr,
+        &TotalVamp {
+            time: None,
+        },
+    )?;
 
     Ok(vp.vamp)
 }
@@ -418,8 +637,8 @@ pub fn get_total_voting_power_at(
 ) -> StdResult<Uint128> {
     let vp: VotingPowerResponse = querier.query_wasm_smart(
         escrow_addr,
-        &TotalVampAt {
-            time: timestamp,
+        &TotalVamp {
+            time: Some(Time::Time(timestamp)),
         },
     )?;
 
@@ -436,8 +655,8 @@ pub fn get_total_voting_power_at_by_period(
 ) -> StdResult<Uint128> {
     let vp: VotingPowerResponse = querier.query_wasm_smart(
         escrow_addr,
-        &QueryMsg::TotalVampAtPeriod {
-            period,
+        &QueryMsg::TotalVamp {
+            time: Some(Time::Period(period)),
         },
     )?;
 
@@ -455,7 +674,8 @@ pub fn get_lock_info(
     let lock_info: LockInfoResponse = querier.query_wasm_smart(
         escrow_addr,
         &LockInfo {
-            user: user.into(),
+            token_id: user.into(),
+            time: None,
         },
     )?;
     Ok(lock_info)

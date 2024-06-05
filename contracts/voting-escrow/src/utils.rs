@@ -1,14 +1,13 @@
-use std::collections::HashMap;
-
 use crate::error::ContractError;
-use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
+use cw_asset::{Asset, AssetInfo};
+use std::collections::HashMap;
 use ve3_shared::{
     constants::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, WEEK},
     extensions::asset_info_ext::AssetInfoExt,
-    voting_escrow::{AssetInfoLockConfig, Config},
+    voting_escrow::{AssetInfoConfig, Config},
 };
 
-use cosmwasm_std::{Addr, Coin, Order, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Coin, MessageInfo, Order, StdError, StdResult, Storage, Uint128};
 use cw_storage_plus::Bound;
 
 use crate::state::{Point, BLACKLIST, HISTORY, LAST_SLOPE_CHANGE, SLOPE_CHANGES};
@@ -37,8 +36,26 @@ pub(crate) fn assert_not_decommissioned(config: &Config) -> Result<(), ContractE
     }
 }
 
+pub(crate) fn assert_asset_allowed(
+    config: &Config,
+    asset: &Asset,
+) -> Result<AssetInfoConfig, ContractError> {
+    if asset.amount.is_zero() {
+        return Err(ContractError::LockRequiresAmount {});
+    }
+
+    if config.allowed_deposit_assets.contains_key(&asset.info) {
+        Ok(config.allowed_deposit_assets[&asset.info].clone())
+    } else {
+        Err(ContractError::WrongAsset(asset.info.to_string()))
+    }
+}
+
 /// Checks if the blacklist contains a specific address.
-pub(crate) fn assert_blacklist(storage: &dyn Storage, addr: &Addr) -> Result<(), ContractError> {
+pub(crate) fn assert_not_blacklisted(
+    storage: &dyn Storage,
+    addr: &Addr,
+) -> Result<(), ContractError> {
     let blacklist = BLACKLIST.load(storage)?;
     if blacklist.contains(addr) {
         Err(ContractError::AddressBlacklisted(addr.to_string()))
@@ -51,7 +68,7 @@ pub(crate) fn assert_blacklist(storage: &dyn Storage, addr: &Addr) -> Result<(),
 /// sent together
 pub fn validate_received_funds(
     funds: &[Coin],
-    allowed: &HashMap<AssetInfo, AssetInfoLockConfig>,
+    allowed: &HashMap<AssetInfo, AssetInfoConfig>,
 ) -> StdResult<Asset> {
     if funds.len() != 1 {
         return Err(StdError::generic_err(format!(
@@ -61,7 +78,7 @@ pub fn validate_received_funds(
     }
 
     let fund = &funds[0];
-    let asset = AssetInfo::native(fund.denom);
+    let asset = AssetInfo::native(fund.denom.clone());
     let is_allowed = allowed.contains_key(&asset);
 
     if !is_allowed {
@@ -77,7 +94,7 @@ pub fn validate_received_funds(
 
 pub fn validate_received_cw20(
     asset: Asset,
-    allowed: &HashMap<AssetInfo, AssetInfoLockConfig>,
+    allowed: &HashMap<AssetInfo, AssetInfoConfig>,
 ) -> StdResult<Asset> {
     let is_allowed = allowed.contains_key(&asset.info);
 
@@ -104,11 +121,11 @@ pub(crate) fn calc_voting_power(point: &Point, period: u64) -> Uint128 {
 /// Fetches the last checkpoint in [`HISTORY`] for the given address.
 pub(crate) fn fetch_last_checkpoint(
     storage: &dyn Storage,
-    addr: &Addr,
+    token_id: &str,
     period_key: u64,
 ) -> StdResult<Option<(u64, Point)>> {
     HISTORY
-        .prefix(addr.clone())
+        .prefix(token_id)
         .range(storage, None, Some(Bound::inclusive(period_key)), Order::Descending)
         .next()
         .transpose()
@@ -179,4 +196,11 @@ pub(crate) fn fetch_slope_changes(
             Order::Ascending,
         )
         .collect()
+}
+
+pub(crate) fn message_info(sender: Addr) -> MessageInfo {
+    MessageInfo {
+        sender,
+        funds: vec![],
+    }
 }

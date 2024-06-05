@@ -1,7 +1,7 @@
 use cosmwasm_std::{OverflowError, StdError};
-use cw20_base::ContractError as cw20baseError;
 use cw_asset::AssetError;
 use thiserror::Error;
+use ve3_shared::error::SharedError;
 
 /// This enum describes vAMP contract errors
 #[derive(Error, Debug)]
@@ -10,7 +10,7 @@ pub enum ContractError {
     Std(#[from] StdError),
 
     #[error("{0}")]
-    Cw20Base(#[from] cw20baseError),
+    SharedError(#[from] SharedError),
 
     #[error("{0}")]
     Overflow(#[from] OverflowError),
@@ -19,7 +19,7 @@ pub enum ContractError {
     AssetError(#[from] AssetError),
 
     #[error("{0}")]
-    NftError(#[from] cw721_base::error::ContractError),
+    NftError(#[from] cw721_base::ContractError),
 
     #[error("{location:?}: {orig:?}")]
     OverflowLocation {
@@ -30,14 +30,20 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Asset not supported: {0}")]
+    WrongAsset(String),
+
+    #[error("Asset not supported: {0} expected: {1}")]
+    WrongAssetExpected(String, String),
+
+    #[error("You need to provide assets to create or deposit for a lock.")]
+    LockRequiresAmount {},
+
     #[error("Lock already exists")]
     LockAlreadyExists {},
 
-    #[error("Lock does not exist")]
-    LockDoesNotExist {},
-
-    #[error("User {0} not found")]
-    UserNotFound(String),
+    #[error("Lock does not exist: {0}")]
+    LockDoesNotExist(String),
 
     #[error("Lock time must be within limits (week <= lock time < 2 years)")]
     LockTimeLimitsError {},
@@ -65,18 +71,6 @@ pub enum ContractError {
 
     #[error("Append and remove arrays are empty")]
     AddressBlacklistEmpty {},
-
-    #[error("Marketing info validation error: {0}")]
-    MarketingInfoValidationError(String),
-
-    #[error("Logo binary data exceeds 5KB limit")]
-    LogoTooBig {},
-
-    #[error("Invalid xml preamble for SVG")]
-    InvalidXmlPreamble {},
-
-    #[error("Invalid png header")]
-    InvalidPngHeader {},
 
     #[error("Checkpoint initialization error")]
     CheckpointInitializationFailed {},

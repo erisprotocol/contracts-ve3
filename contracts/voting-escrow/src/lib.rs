@@ -1,6 +1,6 @@
+pub mod constants;
 pub mod contract;
-pub mod state;
-
 pub mod error;
-mod utils;
 pub mod query;
+pub mod state;
+mod utils;

@@ -18,11 +18,17 @@ pub struct AssetDistribution {
 
 #[cw_serde]
 #[derive(Default)]
-pub struct AssetConfig {
+pub struct AssetConfigRuntime {
     pub last_taken_s: u64,
     pub taken: Uint128,
     pub harvested: Uint128,
 
+    pub yearly_take_rate: Decimal,
+    pub stake_config: StakeConfig,
+}
+
+#[cw_serde]
+pub struct AssetConfig {
     pub yearly_take_rate: Decimal,
     pub stake_config: StakeConfig,
 }
@@ -48,6 +54,8 @@ pub enum ExecuteMsg {
     // controller
     WhitelistAssets(Vec<AssetInfo>),
     RemoveAssets(Vec<AssetInfo>),
+    // cant update multiple as we need to track bribe recapturing
+    UpdateAssetConfig(UpdateAssetConfig),
     SetAssetRewardDistribution(Vec<AssetDistribution>),
 
     // operator
@@ -57,6 +65,12 @@ pub enum ExecuteMsg {
         assets: Option<Vec<AssetInfo>>,
     },
     Callback(CallbackMsg),
+}
+
+#[cw_serde]
+pub struct UpdateAssetConfig {
+    pub asset: AssetInfo,
+    pub config: AssetConfig,
 }
 
 #[cw_serde]
@@ -137,7 +151,7 @@ pub struct StakedBalanceRes {
     pub asset: AssetInfo,
     pub balance: Uint128,
     pub shares: Uint128,
-    pub config: AssetConfig,
+    pub config: AssetConfigRuntime,
 }
 
 #[cw_serde]

@@ -21,8 +21,8 @@ use ve3_shared::constants::{
     AT_TAKE_RECIPIENT, SECONDS_PER_YEAR,
 };
 use ve3_shared::contract_asset_staking::{
-    AssetConfig, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg, InstantiateMsg,
-    MigrateMsg,
+    AssetConfigRuntime, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg,
+    InstantiateMsg, MigrateMsg, UpdateAssetConfig,
 };
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
@@ -97,6 +97,7 @@ pub fn execute(
         // controller
         ExecuteMsg::WhitelistAssets(assets) => whitelist_assets(deps, info, assets),
         ExecuteMsg::RemoveAssets(assets) => remove_assets(deps, info, assets),
+        ExecuteMsg::UpdateAssetConfig(update) => update_asset_config(deps, env, info, update),
         ExecuteMsg::SetAssetRewardDistribution(asset_reward_distribution) => {
             set_asset_reward_distribution(deps, info, asset_reward_distribution)
         },
@@ -176,14 +177,51 @@ fn set_asset_reward_distribution(
     Ok(Response::new().add_attributes(vec![("action", "set_asset_reward_distribution")]))
 }
 
+fn update_asset_config(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    update: UpdateAssetConfig,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    assert_asset_whitelist_controller(&deps, &info, &config)?;
+    assert_asset_whitelisted(&deps, &update.asset)?;
+    let current = ASSET_CONFIG.may_load(deps.storage, &update.asset)?.unwrap_or_default();
+
+    let mut updated = current.clone();
+    updated.stake_config = update.config.stake_config;
+    updated.yearly_take_rate = update.config.yearly_take_rate;
+    ASSET_CONFIG.save(deps.storage, &update.asset, &updated)?;
+
+    let mut msgs = vec![];
+    if current.stake_config != updated.stake_config {
+        // if stake config changed, withdraw from one (or do nothing), deposit on the other.
+        let (balance, _) = TOTAL_BALANCES.load(deps.storage, &update.asset)?;
+        let available = balance - current.taken;
+        let asset = update.asset.with_balance(available);
+
+        let mut unstake_msgs =
+            current.stake_config.unstake_check_received_msg(&deps, &env, asset.clone())?;
+        let mut stake_msgs = updated.stake_config.stake_check_received_msg(&deps, &env, asset)?;
+
+        msgs.append(&mut unstake_msgs);
+        msgs.append(&mut stake_msgs);
+    }
+
+    Ok(Response::new().add_attributes(vec![
+        ("action", "update_asset_config"),
+        ("asset", &update.asset.to_string()),
+    ]))
+}
+
 fn whitelist_assets(
     deps: DepsMut,
     info: MessageInfo,
     assets: Vec<AssetInfo>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    assert_whitelist_controller(&deps, &info, &config)?;
-    for (asset) in &assets {
+    assert_asset_whitelist_controller(&deps, &info, &config)?;
+    for asset in &assets {
         WHITELIST.save(deps.storage, &asset, &true)?;
         ASSET_REWARD_RATE.update(deps.storage, asset, |rate| -> StdResult<_> {
             Ok(rate.unwrap_or(Decimal::zero()))
@@ -204,7 +242,7 @@ fn remove_assets(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     // Only allow the governance address to update whitelisted assets
-    assert_whitelist_controller(&deps, &info, &config)?;
+    assert_asset_whitelist_controller(&deps, &info, &config)?;
     for asset in &assets {
         WHITELIST.remove(deps.storage, &asset);
     }
@@ -221,7 +259,7 @@ fn stake(
     amount: Uint128,
     recipient: Addr,
 ) -> Result<Response, ContractError> {
-    WHITELIST.load(deps.storage, &asset).map_err(|_| ContractError::AssetNotWhitelisted {})?;
+    assert_asset_whitelisted(&deps, &asset)?;
 
     let rewards = _claim_reward(deps.storage, recipient.clone(), asset.clone())?;
     if !rewards.is_zero() {
@@ -304,7 +342,7 @@ fn _take(
     asset: &AssetInfo,
     total_balance: Uint128,
     save_config: bool,
-) -> Result<(AssetConfig, Uint128), ContractError> {
+) -> Result<(AssetConfigRuntime, Uint128), ContractError> {
     let config = ASSET_CONFIG.may_load(deps.storage, asset)?;
 
     if let Some(mut config) = config {
@@ -333,7 +371,7 @@ fn _take(
         return Ok((config, available));
     }
 
-    Ok((AssetConfig::default(), total_balance))
+    Ok((AssetConfigRuntime::default(), total_balance))
 }
 
 fn unstake(
@@ -616,8 +654,12 @@ fn add_tributes_callback(
     Ok(Response::new().add_attributes(vec![("action", "add_tributes_callback")]))
 }
 
+fn assert_asset_whitelisted(deps: &DepsMut, asset: &AssetInfo) -> Result<bool, ContractError> {
+    WHITELIST.load(deps.storage, &asset).map_err(|_| ContractError::AssetNotWhitelisted {})
+}
+
 // Only governance (through a on-chain prop) can change the whitelisted assets
-fn assert_whitelist_controller(
+fn assert_asset_whitelist_controller(
     deps: &DepsMut,
     info: &MessageInfo,
     config: &Config,

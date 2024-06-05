@@ -1,14 +1,8 @@
-use std::collections::HashMap;
-
-use cosmwasm_schema::{
-    cw_serde,
-    schemars::JsonSchema,
-    serde::{Deserialize, Serialize},
-};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint128};
 use cw_asset::Asset;
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
-use ve3_shared::voting_escrow::Config;
+use ve3_shared::voting_escrow::{Config, Extension, Trait};
 
 /// This structure stores points along the checkpoint history for every vAMP staker.
 #[cw_serde]
@@ -29,27 +23,57 @@ pub struct Point {
 /// This structure stores data about the lockup position for a specific vAMP staker.
 #[cw_serde]
 pub struct Lock {
-    pub token_id: Uint128,
-    /// The total amount of ampLP tokens that were deposited in the vAMP position
+    /// The total amount of tokens that were deposited in the ve position
     pub asset: Asset,
+    /// Underlying amount of tokens during creation / update of the lock
+    pub underlying_amount: Uint128,
     /// The start period when the lock was created
     pub start: u64,
     /// The period when the lock position expires
     pub end: u64,
     /// the last period when the lock's time was increased
     pub last_extend_lock_period: u64,
+    /// owner of the lock, always synchronized with the NFT, but tracked for history purposes
+    pub owner: Addr,
+}
+
+impl Lock {
+    pub fn get_nft_extension(&self) -> Extension {
+        Extension {
+            name: None,
+            description: None,
+            image: None,
+            attributes: Some(vec![
+                Trait {
+                    display_type: None,
+                    trait_type: "asset".to_string(),
+                    value: self.asset.to_string(),
+                },
+                Trait {
+                    display_type: None,
+                    trait_type: "start".to_string(),
+                    value: self.start.to_string(),
+                },
+                Trait {
+                    display_type: None,
+                    trait_type: "end".to_string(),
+                    value: self.end.to_string(),
+                },
+            ]),
+        }
+    }
 }
 
 /// Stores the contract config at the given key
 pub const CONFIG: Item<Config> = Item::new("config");
 
 /// Stores all user lock history
-pub const LOCKED: SnapshotMap<Addr, Lock> =
+pub const LOCKED: SnapshotMap<&str, Lock> =
     SnapshotMap::new("locked", "locked__checkpoints", "locked__changelog", Strategy::EveryBlock);
 
-/// Stores the checkpoint history for every staker (addr => period)
-/// Total voting power checkpoints are stored using a (contract_addr => period) key
-pub const HISTORY: Map<(Addr, u64), Point> = Map::new("history");
+/// Stores the checkpoint history for every token (token_id => period)
+/// Total voting power checkpoints are stored using a ("0" => period) key
+pub const HISTORY: Map<(&str, u64), Point> = Map::new("history");
 
 /// Scheduled slope changes per period (week)
 pub const SLOPE_CHANGES: Map<u64, Uint128> = Map::new("slope_changes");
@@ -59,3 +83,5 @@ pub const LAST_SLOPE_CHANGE: Item<u64> = Item::new("last_slope_change");
 
 /// Contains blacklisted staker addresses
 pub const BLACKLIST: Item<Vec<Addr>> = Item::new("blacklist");
+
+pub const TOKEN_ID: Item<Uint128> = Item::new("token_id");
