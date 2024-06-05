@@ -1,8 +1,10 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, DepsMut, Uint128};
 use cw_asset::Asset;
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
-use ve3_shared::voting_escrow::{Config, Extension, Trait};
+use ve3_shared::voting_escrow::{AssetInfoConfig, Config, Extension, Trait};
+
+use crate::{contract::Operation, error::ContractError};
 
 /// This structure stores points along the checkpoint history for every vAMP staker.
 #[cw_serde]
@@ -37,6 +39,21 @@ pub struct Lock {
     pub owner: Addr,
 }
 
+// distribute -> (address, VP)
+// 
+// VOTE
+// (address, period, User VP)
+// (address, period, LP1, VP) <- distribute 1
+// (address, period, LP2, VP) <- distribute 2
+// (period, global VP)
+// claim (perid1, period2, ...)
+
+// WW:
+// User stakes more RSTK
+// DAODAO -> update user vote (100)
+// Asset Gauge -> (period 12, VP 100)
+// query period 20
+
 impl Lock {
     pub fn get_nft_extension(&self) -> Extension {
         Extension {
@@ -61,6 +78,33 @@ impl Lock {
                 },
             ]),
         }
+    }
+
+    pub fn update_underlying(
+        &mut self,
+        deps: &DepsMut,
+        asset_config: &AssetInfoConfig,
+    ) -> Result<Operation, ContractError> {
+        let new_underlying_amount =
+            asset_config.get_underlying_amount(&deps.querier, self.asset.amount)?;
+        self.update_underlying_value(deps, new_underlying_amount)
+    }
+
+    pub fn update_underlying_value(
+        &mut self,
+        deps: &DepsMut,
+        new_underlying_amount: Uint128,
+    ) -> Result<Operation, ContractError> {
+        let add_reduce_underlying = if new_underlying_amount > self.underlying_amount {
+            Operation::Add(new_underlying_amount - self.underlying_amount)
+        } else if new_underlying_amount == self.underlying_amount {
+            Operation::None
+        } else {
+            Operation::Reduce(self.underlying_amount - new_underlying_amount)
+        };
+
+        self.underlying_amount = new_underlying_amount;
+        Ok(add_reduce_underlying)
     }
 }
 

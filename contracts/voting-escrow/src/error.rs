@@ -77,4 +77,13 @@ pub enum ContractError {
 
     #[error("Contract can't be migrated: {0}")]
     MigrationError(String),
+
+    #[error("Lock has not enough funds")]
+    LockNotEnoughFunds {},
+
+    #[error("Locks need to have the same assets, tokens: {0}, {1}")]
+    LocksNeedSameAssets(String, String),
+
+    #[error("Locks need to have the same end, tokens: {0}, {1}")]
+    LocksNeedSameEnd(String, String),
 }

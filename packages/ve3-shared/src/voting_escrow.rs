@@ -49,6 +49,15 @@ pub enum ExecuteMsg {
     CreateLock {
         time: u64,
     },
+    MergeLock {
+        token_id: Uint128,
+        token_id_add: Uint128,
+    },
+    SplitLock {
+        token_id: Uint128,
+        amount: Uint128,
+        recipient: Option<String>,
+    },
     /// Extend the lockup time for your staked ampLP. For an expired lock, it will always start from the current period.
     ExtendLockTime {
         time: u64,
@@ -546,10 +555,7 @@ impl AssetInfoConfig {
         querier: &QuerierWrapper,
         amount: Uint128,
     ) -> StdResult<Uint128> {
-        match self.get_exchange_rate(querier)? {
-            Some(exchange_rate) => Ok(exchange_rate * amount),
-            None => Ok(amount),
-        }
+        Ok(self.get_exchange_rate(querier)?.map_or(amount, |e| e * amount))
     }
 }
 

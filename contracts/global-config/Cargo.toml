@@ -30,13 +30,3 @@ cw-ownable.workspace = true
 cw-ownable-derive.workspace = true
 thiserror.workspace = true
 ve3-shared.workspace = true
-
-# schemars.workspace = true
-# serde = { workspace = true, features = ["derive"] }
-# semver.workspace = true
-
-# cw2.workspace = true
-# cw20.workspace = true
-# cw20-base.workspace = true
-# cw-utils.workspace = true
-# terra-proto-rs = {version = "3.0.2", default-features = false}
