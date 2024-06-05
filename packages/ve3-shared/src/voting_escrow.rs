@@ -82,7 +82,6 @@ pub enum ExecuteMsg {
     },
 
     /// CW721 standard message
-
     /// Transfer is a base message to move a token to another account without triggering actions
     TransferNft {
         recipient: String,
@@ -95,6 +94,11 @@ pub enum ExecuteMsg {
         token_id: String,
         msg: Binary,
     },
+    /// Burn an NFT the sender has access to
+    Burn {
+        token_id: String,
+    },
+
     /// Allows operator to transfer / send the token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit
     Approve {
@@ -116,10 +120,6 @@ pub enum ExecuteMsg {
     /// Remove previously granted ApproveAll permission
     RevokeAll {
         operator: String,
-    },
-    /// Burn an NFT the sender has access to
-    Burn {
-        token_id: String,
     },
 }
 
@@ -151,22 +151,6 @@ pub struct Metadata {
 impl From<ExecuteMsg> for CW721ExecuteMsg<Metadata, Empty> {
     fn from(msg: ExecuteMsg) -> CW721ExecuteMsg<Metadata, Empty> {
         match msg {
-            ExecuteMsg::TransferNft {
-                recipient,
-                token_id,
-            } => CW721ExecuteMsg::TransferNft {
-                recipient,
-                token_id,
-            },
-            ExecuteMsg::SendNft {
-                contract,
-                token_id,
-                msg,
-            } => CW721ExecuteMsg::SendNft {
-                contract,
-                token_id,
-                msg,
-            },
             ExecuteMsg::Approve {
                 spender,
                 token_id,

@@ -175,6 +175,7 @@ pub fn execute(
             token_id,
         } => withdraw(deps, env, nft, info.sender, Uint128::from_str(&token_id)?),
 
+        // Approve, Revoke, ApproveAll, RevokeAll
         _ => Ok(nft.execute(deps, env, info, msg.into())?),
     }
 }
@@ -451,7 +452,7 @@ fn create_lock(
 
     Ok(Response::default()
         .add_attributes(mint_response.attributes)
-        .add_attribute("action", "veamp/create_lock")
+        .add_attribute("action", "ve/create_lock")
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
@@ -523,7 +524,7 @@ fn deposit_for(
     let lock_info = get_token_lock_info(deps.as_ref(), &env, token_id.to_string(), None)?;
 
     Ok(Response::default()
-        .add_attribute("action", "veamp/deposit_for")
+        .add_attribute("action", "ve/deposit_for")
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
@@ -578,8 +579,9 @@ fn change_lock_owner(
     };
 
     Ok(resp
-        .add_attribute("action", "veamp/change_lock_owner")
+        .add_attribute("action", "ve/change_lock_owner")
         .add_attribute("old_owner", old_owner.to_string())
+        .add_attribute("new_owner", lock.owner.to_string())
         .add_messages(get_push_update_msgs(
             config,
             token_id.to_string(),
@@ -661,7 +663,7 @@ fn extend_lock_time(
     let lock_info = get_token_lock_info(deps.as_ref(), &env, token_id.to_string(), None)?;
 
     Ok(Response::default()
-        .add_attribute("action", "veamp/extend_lock_time")
+        .add_attribute("action", "ve/extend_lock_time")
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
@@ -783,7 +785,7 @@ fn withdraw(
             .add_message(transfer_msg)
             .add_messages(msgs)
             .add_attributes(attrs)
-            .add_attribute("action", "veamp/withdraw"))
+            .add_attribute("action", "ve/withdraw"))
     }
 }
 
@@ -981,7 +983,7 @@ fn update_blacklist(
         Ok(updated_blacklist)
     })?;
 
-    let mut attrs = vec![attr("action", "veamp/update_blacklist")];
+    let mut attrs = vec![attr("action", "ve/update_blacklist")];
     if !append_addrs.is_empty() {
         attrs.push(attr("added_addresses", append_addrs.join(",")))
     }
@@ -1042,7 +1044,7 @@ fn execute_update_config(
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::default().add_attribute("action", "veamp/execute_update_config"))
+    Ok(Response::default().add_attribute("action", "ve/execute_update_config"))
 }
 
 /// Manages contract migration.
@@ -1059,6 +1061,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     }
 
     Ok(Response::new()
+        .add_attribute("action", "ve/migrate")
         .add_attribute("previous_contract_name", &contract_version.contract)
         .add_attribute("previous_contract_version", &contract_version.version)
         .add_attribute("new_contract_name", CONTRACT_NAME)
