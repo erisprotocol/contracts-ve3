@@ -215,6 +215,7 @@ pub enum PushExecuteMsg {
     UpdateVote {
         token_id: String,
         lock_info: LockInfoResponse,
+        old_owner: Option<Addr>,
     },
 }
 

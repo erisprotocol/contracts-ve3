@@ -1,5 +1,5 @@
 use cosmwasm_schema::write_api;
-use eris::voting_escrow::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use ve3_shared::voting_escrow::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
 fn main() {
     write_api! {

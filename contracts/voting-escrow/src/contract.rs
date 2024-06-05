@@ -3,16 +3,16 @@ use crate::error::ContractError;
 use crate::query::get_token_lock_info;
 use crate::state::{Lock, Point, BLACKLIST, CONFIG, HISTORY, LAST_SLOPE_CHANGE, LOCKED, TOKEN_ID};
 use crate::utils::{
-    assert_asset_allowed, assert_not_blacklisted, assert_not_decommissioned,
-    assert_periods_remaining, assert_time_limits, calc_voting_power, cancel_scheduled_slope,
-    fetch_last_checkpoint, fetch_slope_changes, message_info, schedule_slope_change,
-    validate_received_cw20, validate_received_funds,
+    assert_asset_allowed, assert_not_blacklisted, assert_not_blacklisted_all,
+    assert_not_decommissioned, assert_periods_remaining, assert_time_limits, calc_voting_power,
+    cancel_scheduled_slope, fetch_last_checkpoint, fetch_slope_changes, message_info,
+    schedule_slope_change, validate_received_cw20, validate_received_funds,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Storage, Uint128, WasmMsg,
+    attr, from_json, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ReceiveMsg;
@@ -153,6 +153,27 @@ pub fn execute(
         },
 
         ExecuteMsg::Receive(cw20_msg) => receive(deps, env, info, cw20_msg),
+
+        ExecuteMsg::TransferNft {
+            recipient,
+            token_id,
+        } => {
+            let recipient = deps.api.addr_validate(&recipient)?;
+            change_lock_owner(deps, env, nft, info, recipient, token_id, None)
+        },
+        ExecuteMsg::SendNft {
+            contract,
+            token_id,
+            msg,
+        } => {
+            let recipient = deps.api.addr_validate(&contract)?;
+            change_lock_owner(deps, env, nft, info, recipient, token_id, Some(msg))
+        },
+
+        // same as withdraw
+        ExecuteMsg::Burn {
+            token_id,
+        } => withdraw(deps, env, nft, info.sender, Uint128::from_str(&token_id)?),
 
         _ => Ok(nft.execute(deps, env, info, msg.into())?),
     }
@@ -434,7 +455,7 @@ fn create_lock(
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info))?))
+        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?))
 }
 
 /// Deposits an 'amount' of ampLP tokens into 'user''s lock.
@@ -506,9 +527,66 @@ fn deposit_for(
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info))?))
+        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?))
 }
 
+fn change_lock_owner(
+    deps: DepsMut,
+    env: Env,
+    nft: VeNftCollection,
+    info: MessageInfo,
+    recipient: Addr,
+    token_id: String,
+    msg: Option<Binary>,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    assert_not_blacklisted_all(deps.storage, vec![info.sender.clone(), recipient.clone()])?;
+    let token_id_str = &token_id;
+    let mut lock = LOCKED
+        .load(deps.storage, token_id_str)
+        .map_err(|_| ContractError::LockDoesNotExist(token_id.to_string()))?;
+
+    let old_owner = lock.owner;
+    lock.owner = recipient.clone();
+
+    // save lock & keep NFT data in sync
+    LOCKED.save(deps.storage, token_id_str, &lock, env.block.height)?;
+
+    let lock_info = get_token_lock_info(deps.as_ref(), &env, token_id.to_string(), None)?;
+
+    let resp = if let Some(msg) = msg {
+        nft.execute(
+            deps,
+            env,
+            info,
+            cw721_base::ExecuteMsg::SendNft {
+                contract: recipient.to_string(),
+                token_id: token_id.clone(),
+                msg,
+            },
+        )?
+    } else {
+        nft.execute(
+            deps,
+            env,
+            info,
+            cw721_base::ExecuteMsg::TransferNft {
+                recipient: recipient.to_string(),
+                token_id: token_id.clone(),
+            },
+        )?
+    };
+
+    Ok(resp
+        .add_attribute("action", "veamp/change_lock_owner")
+        .add_attribute("old_owner", old_owner.to_string())
+        .add_messages(get_push_update_msgs(
+            config,
+            token_id.to_string(),
+            Ok(lock_info),
+            Some(old_owner),
+        )?))
+}
 /// Increase the current lock time for a staker by a specified time period.
 /// Evaluates that the `time` is within [`WEEK`]..[`MAX_LOCK_TIME`]
 /// and then it triggers a [`checkpoint`].
@@ -587,7 +665,7 @@ fn extend_lock_time(
         .add_attribute("voting_power", lock_info.voting_power.to_string())
         .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
         .add_attribute("lock_end", lock_info.end.to_string())
-        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info))?))
+        .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?))
 }
 
 /// Withdraws the whole amount of locked ampLP from a specific user lock.
@@ -699,7 +777,7 @@ fn withdraw(
         }
 
         let lock_info = get_token_lock_info(deps.as_ref(), &env, token_id.to_string(), None);
-        let msgs = get_push_update_msgs(config, token_id.to_string(), lock_info)?;
+        let msgs = get_push_update_msgs(config, token_id.to_string(), lock_info, None)?;
 
         Ok(Response::default()
             .add_message(transfer_msg)
@@ -719,7 +797,7 @@ fn get_push_update_msgs_multi(
         .into_iter()
         .map(|token_id| {
             let lock_info = get_token_lock_info(deps, &env, token_id.to_string(), None);
-            get_push_update_msgs(config.clone(), token_id, lock_info)
+            get_push_update_msgs(config.clone(), token_id, lock_info, None)
         })
         .collect::<StdResult<Vec<_>>>()?
         .into_iter()
@@ -733,6 +811,7 @@ fn get_push_update_msgs(
     config: Config,
     token_id: String,
     lock_info: Result<LockInfoResponse, ContractError>,
+    old_owner: Option<Addr>,
 ) -> StdResult<Vec<CosmosMsg>> {
     // only send update if lock info is available. LOCK info is never removed for any user that locked anything.
     if let Ok(lock_info) = lock_info {
@@ -745,6 +824,7 @@ fn get_push_update_msgs(
                     msg: to_json_binary(&PushExecuteMsg::UpdateVote {
                         token_id: token_id.clone(),
                         lock_info: lock_info.clone(),
+                        old_owner: old_owner.clone(),
                     })?,
                     funds: vec![],
                 }))

@@ -64,6 +64,20 @@ pub(crate) fn assert_not_blacklisted(
     }
 }
 
+/// Checks if the blacklist contains a specific address.
+pub(crate) fn assert_not_blacklisted_all(
+    storage: &dyn Storage,
+    addrs: Vec<Addr>,
+) -> Result<(), ContractError> {
+    let blacklist = BLACKLIST.load(storage)?;
+    for addr in addrs {
+        if blacklist.contains(&addr) {
+            return Err(ContractError::AddressBlacklisted(addr.to_string()));
+        }
+    }
+    Ok(())
+}
+
 /// Find the amount of a denom sent along a message, assert it is non-zero, and no other denom were
 /// sent together
 pub fn validate_received_funds(
