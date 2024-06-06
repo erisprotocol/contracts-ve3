@@ -1,37 +1,40 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{OverflowError, StdError};
 use thiserror::Error;
 use ve3_shared::error::SharedError;
 
 /// This enum describes contract errors
 #[derive(Error, Debug)]
 pub enum ContractError {
-    #[error("{0}")]
-    Std(#[from] StdError),
+  #[error("{0}")]
+  Std(#[from] StdError),
 
-    #[error("{0}")]
-    SharedError(#[from] SharedError),
+  #[error("{0}")]
+  SharedError(#[from] SharedError),
 
-    #[error("Unauthorized")]
-    Unauthorized {},
+  #[error("{0}")]
+  OverflowError(#[from] OverflowError),
 
-    #[error("You can't vote with zero voting power")]
-    ZeroVotingPower {},
+  #[error("Unauthorized")]
+  Unauthorized {},
 
-    #[error("Invalid validator address: {0}")]
-    InvalidValidatorAddress(String),
+  #[error("You can't vote with zero voting power")]
+  ZeroVotingPower {},
 
-    #[error("Votes contain duplicated values")]
-    DuplicatedVotes {},
+  #[error("Invalid validator address: {0}")]
+  InvalidValidatorAddress(String),
 
-    #[error("There are no validators to tune")]
-    TuneNoValidators {},
+  #[error("Votes contain duplicated values")]
+  DuplicatedVotes {},
 
-    #[error("Contract can't be migrated!")]
-    MigrationError {},
+  #[error("There are no validators to tune")]
+  TuneNoValidators {},
 
-    #[error("Cannot clear gauge that exists.")]
-    CannotClearExistingGauge {},
+  #[error("Contract can't be migrated!")]
+  MigrationError {},
 
-    #[error("Gauge does not exist.")]
-    GaugeDoesNotExist {},
+  #[error("Cannot clear gauge that exists.")]
+  CannotClearExistingGauge {},
+
+  #[error("Gauge does not exist.")]
+  GaugeDoesNotExist {},
 }

@@ -1,49 +1,34 @@
 use std::fmt::Debug;
 
-use cosmwasm_schema::{
-  cw_serde,
-  serde::{de::DeserializeOwned, Serialize},
-};
-use cosmwasm_std::{Order, StdError, StdResult, Storage, Uint128};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{Order, OverflowError, StdError, StdResult, Storage, Uint128};
 use cw_storage_plus::{Bound, Map, Prefix};
 use ve3_shared::{
-  error::SharedError,
   helpers::{bps::BasicPoints, governance::calc_voting_power},
   voting_escrow::LockInfoResponse,
 };
 
-pub struct PeriodIndex<'a, E>
-where
-  E: Default + Serialize + DeserializeOwned + Debug,
-{
-  pub data: Map<'a, (&'a str, u64), Data<E>>,
+pub struct PeriodIndex<'a> {
+  pub data: Map<'a, (&'a str, u64), Data>,
   pub slope_changes: Map<'a, (&'a str, u64), Uint128>,
   pub keys: Map<'a, &'a str, ()>,
 }
 
 #[cw_serde]
 #[derive(Default)]
-pub struct Data<E>
-where
-  E: Default + Debug,
-{
+pub struct Data {
   pub voting_power: Uint128,
   pub slope: Uint128,
   pub fixed_amount: Uint128,
-
-  pub extension: E,
 }
 
-impl<E> Data<E>
-where
-  E: Default + Debug,
-{
+impl Data {
   pub fn has_vp(&self) -> bool {
     !self.fixed_amount.is_zero() || !self.voting_power.is_zero()
   }
 
-  pub fn total_vp(&self) -> Result<Uint128, SharedError> {
-    self.fixed_amount.checked_add(self.voting_power).map_err(SharedError::OverflowError)
+  pub fn total_vp(&self) -> Result<Uint128, OverflowError> {
+    self.fixed_amount.checked_add(self.voting_power)
   }
 }
 
@@ -54,12 +39,9 @@ pub struct UserExtension {
 
 /// Enum wraps [`VotedPoolInfo`] so the contract can leverage storage operations efficiently.
 #[derive(Debug)]
-pub enum VoteResult<E>
-where
-  E: Default + Debug,
-{
-  Unchanged(Data<E>),
-  New(Data<E>),
+pub enum VoteResult {
+  Unchanged(Data),
+  New(Data),
 }
 
 /// The enum defines math operations with voting power and slope.
@@ -99,10 +81,7 @@ impl Into<Line> for &LockInfoResponse {
   }
 }
 
-impl<'a, E> PeriodIndex<'a, E>
-where
-  E: Default + Serialize + DeserializeOwned + Clone + Debug,
-{
+impl<'a> PeriodIndex<'a> {
   pub fn new(data_key: &'a str, slope_key: &'a str, keys_key: &'a str) -> Self {
     Self {
       data: Map::new(data_key),
@@ -113,7 +92,7 @@ where
 
   pub fn clear(&self, storage: &mut dyn Storage, limit: Option<usize>) {
     Prefix::<Vec<u8>, (), &str>::new(self.keys.namespace(), &[]).clear(storage, limit);
-    Prefix::<Vec<u8>, Data<E>, (&str, u64)>::new(self.data.namespace(), &[]).clear(storage, limit);
+    Prefix::<Vec<u8>, Data, (&str, u64)>::new(self.data.namespace(), &[]).clear(storage, limit);
     Prefix::<Vec<u8>, Uint128, (&str, u64)>::new(self.slope_changes.namespace(), &[])
       .clear(storage, limit);
   }
@@ -128,8 +107,7 @@ where
     key: &str,
     bps: BasicPoints,
     line: Line,
-    ext: Option<E>,
-  ) -> StdResult<Data<E>> {
+  ) -> StdResult<Data> {
     let vp = line.vp;
     let slope = line.slope;
     let fixed_amount = line.fixed;
@@ -154,20 +132,8 @@ where
       period,
       key,
       Some((bps, vp, slope, fixed_amount, Operation::Add)),
-      ext,
     )?;
 
-    Ok(data)
-  }
-
-  pub fn update_ext(
-    &self,
-    storage: &mut dyn Storage,
-    period: u64,
-    key: &str,
-    ext: E,
-  ) -> StdResult<Data<E>> {
-    let data = self.update_data(storage, period, key, None, Some(ext))?;
     Ok(data)
   }
 
@@ -179,9 +145,8 @@ where
     key: &str,
     bps: BasicPoints,
     line: Line,
-    ext: Option<E>,
-  ) -> StdResult<&PeriodIndex<'a, E>> {
-    self.add_vote(storage, period, key, bps, line, ext)?;
+  ) -> StdResult<&PeriodIndex<'a>> {
+    self.add_vote(storage, period, key, bps, line)?;
     Ok(self)
   }
 
@@ -196,7 +161,7 @@ where
     key: &str,
     old_bps: BasicPoints,
     line: Line,
-  ) -> StdResult<Data<E>> {
+  ) -> StdResult<Data> {
     let old_slope = line.slope;
     let old_fixed_amount = line.fixed;
     let old_lock_end = line.end;
@@ -236,7 +201,6 @@ where
       period,
       key,
       Some((old_bps, vp_to_reduce, slope_to_reduce, old_fixed_amount, Operation::Sub)),
-      None,
     )?;
 
     if result.fixed_amount.is_zero() && !result.voting_power.is_zero() {
@@ -255,12 +219,12 @@ where
     key: &str,
     old_bps: BasicPoints,
     line: Line,
-  ) -> StdResult<&PeriodIndex<'a, E>> {
+  ) -> StdResult<&PeriodIndex<'a>> {
     self.remove_vote(storage, period, key, old_bps, line)?;
     Ok(self)
   }
 
-  pub(crate) fn change_vote<X>(
+  pub(crate) fn change_vote(
     &self,
     storage: &mut dyn Storage,
     // block +1
@@ -269,18 +233,15 @@ where
     old_bps: BasicPoints,
     new_bps: BasicPoints,
 
-    current: &Data<X>,
+    current: &Data,
     slopes: &Vec<(u64, Uint128)>,
-  ) -> StdResult<Data<E>>
-  where
-    X: Default + Debug,
-  {
+  ) -> StdResult<Data> {
     let slope = current.slope;
     let vp = current.voting_power;
     let fixed = current.fixed_amount;
     let period_key = period;
 
-    let result = match self.get_asset_info_mut(storage, period, key, None)? {
+    let result = match self.get_asset_info_mut(storage, period, key)? {
       VoteResult::Unchanged(mut validator_info) | VoteResult::New(mut validator_info)
         if (!old_bps.is_zero() || !new_bps.is_zero()) && old_bps != new_bps =>
       {
@@ -341,7 +302,7 @@ where
   }
 
   #[cfg(test)]
-  pub(crate) fn change_0<X>(
+  pub(crate) fn change_0(
     &self,
     storage: &mut dyn Storage,
     // block +1
@@ -350,12 +311,9 @@ where
     old_bps: BasicPoints,
     new_bps: BasicPoints,
 
-    current: &Data<X>,
+    current: &Data,
     slopes: &Vec<(u64, Uint128)>,
-  ) -> StdResult<&PeriodIndex<'a, E>>
-  where
-    X: Default + Debug,
-  {
+  ) -> StdResult<&PeriodIndex<'a>> {
     self.change_vote(storage, period, key, old_bps, new_bps, current, slopes)?;
     Ok(self)
   }
@@ -370,21 +328,16 @@ where
     period: u64,
     key: &str,
     changes: Option<(BasicPoints, Uint128, Uint128, Uint128, Operation)>,
-    ext: Option<E>,
-  ) -> StdResult<Data<E>> {
+  ) -> StdResult<Data> {
     let period_key = period;
-    let validator_info = match self.get_asset_info_mut(storage, period, key, ext.clone())? {
+    let validator_info = match self.get_asset_info_mut(storage, period, key)? {
       VoteResult::Unchanged(mut validator_info) | VoteResult::New(mut validator_info)
-        if changes.is_some() || ext.is_some() =>
+        if changes.is_some() =>
       {
         if let Some((bps, vp, slope, fixed, op)) = changes {
           validator_info.slope = op.calc(validator_info.slope, slope, bps);
           validator_info.voting_power = op.calc(validator_info.voting_power, vp, bps);
           validator_info.fixed_amount = op.calc(validator_info.fixed_amount, fixed, bps)
-        }
-
-        if let Some(ext) = ext {
-          validator_info.extension = ext;
         }
 
         self.data.save(storage, (key, period_key), &validator_info)?;
@@ -406,8 +359,7 @@ where
     storage: &mut dyn Storage,
     period: u64,
     key: &str,
-    ext: Option<E>,
-  ) -> StdResult<VoteResult<E>> {
+  ) -> StdResult<VoteResult> {
     let validator_info_result =
       if let Some(validator_info) = self.data.may_load(storage, (key, period))? {
         VoteResult::Unchanged(validator_info)
@@ -429,7 +381,6 @@ where
               ),
               slope: validator_info.slope.saturating_sub(scheduled_change),
               fixed_amount: validator_info.fixed_amount,
-              extension: validator_info.extension,
             };
             // Save intermediate result
             let recalc_period_key = recalc_period;
@@ -451,7 +402,6 @@ where
             voting_power: Uint128::zero(),
             slope: Uint128::zero(),
             fixed_amount: Uint128::zero(),
-            extension: ext.unwrap_or_default(),
           }
         };
 
@@ -461,12 +411,7 @@ where
     Ok(validator_info_result)
   }
 
-  pub fn get_latest_data(
-    &self,
-    storage: &dyn Storage,
-    period: u64,
-    key: &str,
-  ) -> StdResult<Data<E>> {
+  pub fn get_latest_data(&self, storage: &dyn Storage, period: u64, key: &str) -> StdResult<Data> {
     // let fixed_amount = fetch_last_validator_fixed_vamp_value(storage, period, validator_addr)?;
 
     let validator_info = if let Some(validator_info) = self.data.may_load(storage, (key, period))? {
@@ -486,7 +431,6 @@ where
           ),
           slope: validator_info.slope.saturating_sub(scheduled_change),
           fixed_amount: validator_info.fixed_amount,
-          extension: validator_info.extension,
         };
         prev_period = recalc_period
       }
@@ -500,7 +444,6 @@ where
         ),
         fixed_amount: validator_info.fixed_amount,
         slope: validator_info.slope,
-        extension: validator_info.extension,
       }
     } else {
       Data::default()
@@ -546,7 +489,7 @@ where
     storage: &dyn Storage,
     period: u64,
     key: &str,
-  ) -> StdResult<Option<(u64, Data<E>)>> {
+  ) -> StdResult<Option<(u64, Data)>> {
     let period_opt = self.data
             .prefix(key)
             .range(storage, None, Some(Bound::exclusive(period)), Order::Descending)
@@ -557,7 +500,7 @@ where
     Ok(period_opt)
   }
 
-  pub fn print(&self, storage: &mut dyn Storage, text: &str) -> &PeriodIndex<'a, E> {
+  pub fn print(&self, storage: &mut dyn Storage, text: &str) -> &PeriodIndex<'a> {
     println!("Points {text}");
     for element in self.data.range(storage, None, None, Order::Ascending).into_iter() {
       let ((key, period), data) = element.unwrap();
@@ -586,15 +529,13 @@ mod test {
   use cosmwasm_std::{testing::mock_dependencies, StdResult, Uint128};
   use ve3_shared::helpers::bps::BasicPoints;
 
-  use crate::state::UserVotes;
-
   use super::{Line, PeriodIndex};
 
   #[test]
   pub fn test_index() -> StdResult<()> {
     let mut mock = mock_dependencies();
     let deps = mock.as_mut();
-    let index: PeriodIndex<UserVotes> = PeriodIndex::new("data", "slope", "keys");
+    let index = PeriodIndex::new("data", "slope", "keys");
 
     let vp = Uint128::new(100_000000u128);
     let fixed = Uint128::new(10_000000u128);
@@ -625,27 +566,14 @@ mod test {
     };
 
     index
-      .add_0(deps.storage, 1, "user1", BasicPoints::one(), user_1.clone(), None)?
-      .add_0(deps.storage, 1, "lp1", BasicPoints::percent(10), user_1.clone(), None)?
-      .add_0(deps.storage, 1, "lp2", BasicPoints::percent(90), user_1.clone(), None)?
+      .add_0(deps.storage, 1, "user1", BasicPoints::one(), user_1.clone())?
+      .add_0(deps.storage, 1, "lp1", BasicPoints::percent(10), user_1.clone())?
+      .add_0(deps.storage, 1, "lp2", BasicPoints::percent(90), user_1.clone())?
       .print(deps.storage, "add user_1")
       //
-      .add_0(
-        deps.storage,
-        4,
-        "user2",
-        BasicPoints::one(),
-        user_2_vote_1.clone(),
-        Some(UserVotes {
-          period: 4,
-          votes: vec![
-            ("lp2".to_string(), BasicPoints::percent(80)),
-            ("lp3".to_string(), BasicPoints::percent(20)),
-          ],
-        }),
-      )?
-      .add_0(deps.storage, 4, "lp2", BasicPoints::percent(80), user_2_vote_1.clone(), None)?
-      .add_0(deps.storage, 4, "lp3", BasicPoints::percent(20), user_2_vote_1.clone(), None)?
+      .add_0(deps.storage, 4, "user2", BasicPoints::one(), user_2_vote_1.clone())?
+      .add_0(deps.storage, 4, "lp2", BasicPoints::percent(80), user_2_vote_1.clone())?
+      .add_0(deps.storage, 4, "lp3", BasicPoints::percent(20), user_2_vote_1.clone())?
       .print(deps.storage, "add user_2_vote_1")
       //
       .remove_vote_0(deps.storage, 5, "user1", BasicPoints::one(), user_1.clone())?
@@ -653,9 +581,9 @@ mod test {
       .remove_vote_0(deps.storage, 5, "lp2", BasicPoints::percent(90), user_1.clone())?
       .print(deps.storage, "remove user_1")
       //
-      .add_0(deps.storage, 10, "user2", BasicPoints::one(), user_2_vote_2.clone(), None)?
-      .add_0(deps.storage, 10, "lp2", BasicPoints::percent(80), user_2_vote_2.clone(), None)?
-      .add_0(deps.storage, 10, "lp3", BasicPoints::percent(20), user_2_vote_2.clone(), None)?
+      .add_0(deps.storage, 10, "user2", BasicPoints::one(), user_2_vote_2.clone())?
+      .add_0(deps.storage, 10, "lp2", BasicPoints::percent(80), user_2_vote_2.clone())?
+      .add_0(deps.storage, 10, "lp3", BasicPoints::percent(20), user_2_vote_2.clone())?
       .print(deps.storage, "add user_2_vote_2");
 
     // let result = index
@@ -669,7 +597,7 @@ mod test {
   pub fn test_index_2() -> StdResult<()> {
     let mut mock = mock_dependencies();
     let deps = mock.as_mut();
-    let index: PeriodIndex<UserVotes> = PeriodIndex::new("data", "slope", "keys");
+    let index = PeriodIndex::new("data", "slope", "keys");
 
     let vp = Uint128::new(100_000000u128);
     let fixed = Uint128::new(10_000000u128);
@@ -691,13 +619,13 @@ mod test {
     };
 
     index
-      .add_0(deps.storage, 1, "user1", BasicPoints::one(), user_1_vote_1.clone(), None)?
-      .add_0(deps.storage, 1, "lp1", BasicPoints::percent(10), user_1_vote_1.clone(), None)?
-      .add_0(deps.storage, 1, "lp2", BasicPoints::percent(90), user_1_vote_1.clone(), None)?
+      .add_0(deps.storage, 1, "user1", BasicPoints::one(), user_1_vote_1.clone())?
+      .add_0(deps.storage, 1, "lp1", BasicPoints::percent(10), user_1_vote_1.clone())?
+      .add_0(deps.storage, 1, "lp2", BasicPoints::percent(90), user_1_vote_1.clone())?
       .print(deps.storage, "add user_1_vote_1")
-      .add_0(deps.storage, 4, "user1", BasicPoints::one(), user_1_vote_2.clone(), None)?
-      .add_0(deps.storage, 4, "lp1", BasicPoints::percent(10), user_1_vote_2.clone(), None)?
-      .add_0(deps.storage, 4, "lp2", BasicPoints::percent(90), user_1_vote_2.clone(), None)?
+      .add_0(deps.storage, 4, "user1", BasicPoints::one(), user_1_vote_2.clone())?
+      .add_0(deps.storage, 4, "lp1", BasicPoints::percent(10), user_1_vote_2.clone())?
+      .add_0(deps.storage, 4, "lp2", BasicPoints::percent(90), user_1_vote_2.clone())?
       .print(deps.storage, "add user_1_vote_2");
 
     let period = 5;

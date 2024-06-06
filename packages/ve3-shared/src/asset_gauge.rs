@@ -1,6 +1,8 @@
-use crate::{error::SharedError, voting_escrow::LockInfoResponse};
+use crate::{
+  adapters::ve3_asset_staking::Ve3AssetStaking, error::SharedError, voting_escrow::LockInfoResponse,
+};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, QuerierWrapper, Uint128};
 
 /// This structure describes the basic settings for creating a contract.
 #[cw_serde]
@@ -43,6 +45,21 @@ pub struct GaugeConfig {
   pub name: String,
   pub min_gauge_percentage: Decimal,
   pub target: Addr,
+}
+
+impl GaugeConfig {
+  pub fn query_whitelisted_assets_str(
+    &self,
+    querier: &QuerierWrapper,
+  ) -> Result<Vec<String>, SharedError> {
+    Ok(
+      Ve3AssetStaking(self.target.clone())
+        .query_whitelisted_assets(querier)?
+        .into_iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<_>>(),
+    )
+  }
 }
 
 /// This structure describes the query messages available in the contract.

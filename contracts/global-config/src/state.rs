@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, QuerierWrapper};
+use cosmwasm_std::Addr;
 use cw_ownable::Ownership;
 use cw_storage_plus::{Item, Map};
 

@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use crate::state::{
-  fetch_last_asset_distribution, user_idx, AssetIndex, GaugeDistributionPeriod, UserVotes, CONFIG,
-  GAUGE_DISTRIBUTION, LOCK_INFO,
+  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex,
+  GaugeDistributionPeriod, UserVotes, CONFIG, GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -61,6 +61,7 @@ pub fn execute(
       gauge,
       votes,
     } => handle_vote(deps, env, info, gauge, votes),
+
     ExecuteMsg::UpdateVote {
       token_id,
       lock_info,
@@ -111,26 +112,25 @@ fn handle_vote(
   votes: Vec<(String, u16)>,
 ) -> Result<Response, ContractError> {
   let sender = info.sender;
+  let gauge = &gauge;
   let block_period = get_period(env.block.time.seconds())?;
   let config = CONFIG.load(deps.storage)?;
-  let gauge = config.assert_gauge(&gauge)?;
+  let gauge_config = config.assert_gauge(gauge)?;
 
   let user_index = user_idx();
-  let asset_index = AssetIndex::new(&gauge.name).idx();
+  let asset_index = AssetIndex::new(gauge);
+  let asset_index = asset_index.idx();
 
   let current_user = user_index.get_latest_data(deps.storage, block_period + 1, sender.as_str())?;
-  let current_vp = current_user.total_vp()?;
-  let old_votes = current_user.extension.clone();
-
-  if current_vp.is_zero() {
+  if !current_user.has_vp() {
     return Err(ContractError::ZeroVotingPower {});
   }
 
-  let allowed = Ve3AssetStaking(gauge.target.clone())
-    .query_whitelisted_assets(&deps.querier)?
-    .into_iter()
-    .map(|a| a.to_string())
-    .collect::<Vec<_>>();
+  let (_, old_votes) =
+    fetch_last_gauge_vote(deps.storage, gauge, sender.as_str(), block_period + 1)?
+      .unwrap_or_default();
+
+  let allowed = gauge_config.query_whitelisted_assets_str(&deps.querier)?;
 
   let mut values_set: HashSet<_> = HashSet::new();
   let mut changes =
@@ -174,67 +174,73 @@ fn handle_vote(
     )?;
   }
 
-  user_index.update_ext(
+  GAUGE_VOTE.save(
     deps.storage,
-    block_period + 1,
-    sender.as_str(),
-    UserVotes {
-      period: block_period + 1,
+    (&gauge, sender.as_str(), block_period + 1),
+    &UserVotes {
       votes,
     },
   )?;
 
-  Ok(Response::new().add_attribute("action", "vegauge/vote").add_attribute("vp", current_vp))
-}
-
-fn apply_votes_of_user(
-  deps: DepsMut,
-  votes: Vec<(String, BasicPoints)>,
-  block_period: u64,
-  token_id: String,
-  new_lock: LockInfoResponse,
-) -> Result<(), ContractError> {
-  let user_index = user_idx();
-
-  LOCK_INFO.save(deps.storage, token_id.as_ref(), &new_lock)?;
-  let owner = new_lock.owner.as_str();
-
-  user_index.add_vote(
-    deps.storage,
-    block_period + 1,
-    owner,
-    BasicPoints::max(),
-    (&new_lock).into(),
-    Some(UserVotes {
-      period: block_period,
-      votes: votes.clone(),
-    }),
-  )?;
-
-  Ok(())
+  Ok(
+    Response::new()
+      .add_attribute("action", "vegauge/vote")
+      .add_attribute("vp", current_user.total_vp()?),
+  )
 }
 
 fn remove_votes_of_user(
   storage: &mut dyn Storage,
-  old_lock: &LockInfoResponse,
+  config: &Config,
   block_period: u64,
+  old_lock: &LockInfoResponse,
 ) -> Result<(), ContractError> {
-  let user_index = user_idx();
+  let user = old_lock.owner.as_str();
 
-  let vote = user_index.remove_vote(
-    storage,
-    block_period + 1,
-    old_lock.owner.as_str(),
-    BasicPoints::max(),
-    old_lock.into(),
-  )?;
+  user_idx().remove_vote(storage, block_period + 1, user, BasicPoints::max(), old_lock.into())?;
 
-  let asset_index = asset_idx("xx");
   // Cancel changes applied by previous votes
-  vote.extension.votes.iter().try_for_each(|(key, bps)| -> StdResult<()> {
-    asset_index.remove_vote(storage, block_period + 1, key, *bps, old_lock.into())?;
-    Ok(())
-  })?;
+  for gauge_config in config.gauges.iter() {
+    let gauge = &gauge_config.name;
+    let vote = fetch_last_gauge_vote(storage, gauge, user, block_period + 1)?;
+
+    if let Some((_, votes)) = vote {
+      let asset_index = AssetIndex::new(gauge);
+      let asset_index = asset_index.idx();
+
+      for (key, bps) in votes.votes {
+        asset_index.remove_vote(storage, block_period + 1, &key, bps, old_lock.into())?;
+      }
+    }
+  }
+
+  Ok(())
+}
+
+fn apply_votes_of_user(
+  storage: &mut dyn Storage,
+  config: &Config,
+  block_period: u64,
+  new_lock: LockInfoResponse,
+) -> Result<(), ContractError> {
+  let user = new_lock.owner.as_str();
+
+  user_idx().add_vote(storage, block_period + 1, user, BasicPoints::max(), (&new_lock).into())?;
+
+  // Cancel changes applied by previous votes
+  for gauge_config in config.gauges.iter() {
+    let gauge = &gauge_config.name;
+    let vote = fetch_last_gauge_vote(storage, gauge, user, block_period + 1)?;
+
+    if let Some((_, votes)) = vote {
+      let asset_index = AssetIndex::new(gauge);
+      let asset_index = asset_index.idx();
+
+      for (key, bps) in votes.votes {
+        asset_index.add_vote(storage, block_period + 1, &key, bps, (&new_lock).into())?;
+      }
+    }
+  }
 
   Ok(())
 }
@@ -244,7 +250,7 @@ fn update_vote(
   env: Env,
   sender: Addr,
   token_id: String,
-  lock: LockInfoResponse,
+  new_lock: LockInfoResponse,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   config.global_config().assert_has_access(&deps.querier, AT_VOTING_ESCROW, &sender)?;
@@ -252,15 +258,13 @@ fn update_vote(
   let block_period = get_period(env.block.time.seconds())?;
 
   let old_lock = LOCK_INFO.may_load(deps.storage, &token_id)?;
-  LOCK_INFO.save(deps.storage, &token_id, &lock)?;
+  LOCK_INFO.save(deps.storage, &token_id, &new_lock)?;
 
   if let Some(old_lock) = old_lock {
-    remove_votes_of_user(deps.storage, &old_lock, block_period)?;
+    remove_votes_of_user(deps.storage, &config, block_period, &old_lock)?;
   }
-
-  if !(lock.fixed_amount + lock.voting_power).is_zero() {
-    let user_info = user_idx().get_latest_data(deps.storage, block_period, lock.owner.as_str())?;
-    apply_votes_of_user(deps, user_info.extension.votes, block_period, token_id, lock)?;
+  if new_lock.has_vp() {
+    apply_votes_of_user(deps.storage, &config, block_period, new_lock)?;
   }
 
   Ok(Response::new().add_attribute("action", "gauge/update_vote"))
@@ -285,12 +289,12 @@ fn set_distribution(
   for gauge_config in config.gauges {
     let asset_staking = Ve3AssetStaking(gauge_config.target.clone());
     let assets = asset_staking.query_whitelisted_assets(&deps.branch().querier)?;
+    let gauge = &gauge_config.name;
     let mut periods = vec![];
 
     let distribution =
-      match fetch_last_asset_distribution(deps.branch().storage, &gauge_config.name, block_period)?
-      {
-        Some((mut last_period, _)) if last_period == block_period => None,
+      match fetch_last_gauge_distribution(deps.branch().storage, gauge, block_period)? {
+        Some((last_period, _)) if last_period == block_period => None,
 
         Some((mut last_period, _)) => {
           while last_period < block_period {
@@ -332,16 +336,18 @@ fn _set_distribution(
   assets: &Vec<AssetInfo>,
   period: u64,
 ) -> Result<Vec<AssetDistribution>, ContractError> {
-  let asset_index = AssetIndex::new(&gauge_config.name).idx();
+  let gauge = &gauge_config.name;
+  let asset_index = AssetIndex::new(gauge);
+  let asset_index = asset_index.idx();
 
   let allowed_votes: Vec<_> = assets
     .iter()
     .map(|key| {
       let key_raw = &key.to_string();
-      let vote_info = asset_index.update_data(deps.storage, period, key_raw, None, None)?;
-      let asset_vp = vote_info.fixed_amount.checked_add(vote_info.voting_power)?;
+      let vote_info = asset_index.update_data(deps.storage, period, key_raw, None)?;
+      let vp = vote_info.total_vp()?;
 
-      Ok((key.clone(), asset_vp))
+      Ok((key.clone(), vp))
     })
     .collect::<StdResult<Vec<_>>>()?
     .into_iter()
@@ -349,7 +355,7 @@ fn _set_distribution(
     .sorted_by(|(_, a), (_, b)| b.cmp(a)) // Sort in descending order
     .collect();
 
-  let total_voting_power: Uint128 = allowed_votes.iter().map(|(a, b)| b).sum();
+  let total_voting_power: Uint128 = allowed_votes.iter().map(|(_, b)| b).sum();
   let min_voting_power = gauge_config.min_gauge_percentage * total_voting_power;
 
   let relevant_votes =
@@ -380,7 +386,7 @@ fn _set_distribution(
 
   GAUGE_DISTRIBUTION.save(
     deps.storage,
-    (&gauge_config.name, period),
+    (&gauge, period),
     &GaugeDistributionPeriod {
       assets: save_distribution.clone(),
     },

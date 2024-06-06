@@ -28,9 +28,9 @@ This repository is based on multiple open source contracts available in Cosmos:
 - Enterprise Protocol V1.1.0: <https://github.com/terra-money/enterprise-contracts/tree/version/1.1.0?tab=License-1-ov-file>
 
 - Alliance Protocol: <https://github.com/terra-money/alliance-protocol/>
--
+
 - White Whale Modifications on Alliance Protocol: <https://github.com/White-Whale-Defi-Platform/cw-alliance-hub>
 
-- Global Config: https://github.com/mars-protocol/contracts/blob/master/contracts/address-provider/src/contract.rs
+- Global Config: <https://github.com/mars-protocol/contracts/blob/master/contracts/address-provider/src/contract.rs>
 
 - ERIS Amp Extractor
