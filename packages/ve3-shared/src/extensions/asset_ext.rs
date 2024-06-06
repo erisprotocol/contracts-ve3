@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use cosmwasm_std::{coin, Coin, MessageInfo};
+use cosmwasm_std::{Coin, MessageInfo};
 use cw_asset::Asset;
 
 use crate::error::SharedError;
@@ -11,13 +11,7 @@ pub trait AssetExt {
 
 impl AssetExt for Asset {
   fn assert_sent(&self, info: &MessageInfo) -> Result<(), SharedError> {
-    if info.funds.len() != 1 {
-      Err(SharedError::WrongDeposit("expect only one coin".to_string()))
-    } else if Asset::from(info.funds[0].clone()) == *self {
-      Ok(())
-    } else {
-      Err(SharedError::WrongDeposit("assets do not match".to_string()))
-    }
+    vec![self].assert_sent(info)
   }
 }
 

@@ -8,11 +8,12 @@ use crate::{
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
-use cw_asset::{Asset, AssetInfo};
+use cw_asset::{Asset, AssetInfo, AssetInfoBase};
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
-  constants::{AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR},
+  constants::{AT_ASSET_STAKING, AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR},
   contract_bribe_manager::{BribeDistribution, Config, ExecuteMsg, InstantiateMsg},
+  error::SharedError,
   extensions::{
     asset_ext::{AssetExt, AssetsExt},
     asset_info_ext::AssetInfoExt,
@@ -88,33 +89,56 @@ fn add_bribe(
   distribution: BribeDistribution,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
-  assert_asset_whitelisted(&config, &asset.info)?;
 
   let block_period = get_period(env.block.time.seconds())?;
   let user = &info.sender;
   let mut msgs = vec![];
 
-  if asset.info == config.fee.info {
-    // deposit and fee same (fee always native, so just add both)
-    let expected_deposit = asset.info.with_balance(asset.amount.checked_add(config.fee.amount)?);
-    expected_deposit.assert_sent(&info)?
-  } else if let AssetInfo::Native(_) = &asset.info {
-    // if it is not the same, expect both to be sent
-    vec![&asset, &config.fee].assert_sent(&info)?;
-  } else if let AssetInfo::Cw20(_) = &asset.info {
-    // if cw20, expect fee to be sent (fee always native)
-    config.fee.assert_sent(&info)?;
-    msgs.push(asset.transfer_from_msg(user, env.contract.address)?)
+  if asset.amount.is_zero() {
+    Err(SharedError::NotSupported("bribes required".to_string()))?;
   }
 
-  // if fee charged, transfer to fee collector
-  if !config.fee.amount.is_zero() {
+  let has_fee = !config.fee.amount.is_zero()
+    && user != config.global_config().get_address(&deps.querier, AT_ASSET_STAKING)?;
+
+  let contract = env.contract.address;
+
+  match (has_fee, &asset.info) {
+    (false, AssetInfo::Native(_)) => {
+      // no fee and native bribe
+      asset.assert_sent(&info)?
+    },
+    (false, AssetInfo::Cw20(_)) => {
+      // no fee and cw20 bribe
+      msgs.push(asset.transfer_from_msg(user, contract)?)
+    },
+    (true, AssetInfo::Native(_)) if asset.info == config.fee.info => {
+      // fee and native bribe same asset
+      let expected_amount = asset.amount.checked_add(config.fee.amount)?;
+      let expected_deposit = asset.info.with_balance(expected_amount);
+      expected_deposit.assert_sent(&info)?
+    },
+    (true, AssetInfo::Native(_)) => {
+      // fee and native bribe different asset
+      vec![&asset, &config.fee].assert_sent(&info)?
+    },
+    (true, AssetInfo::Cw20(_)) => {
+      // fee and cw20 bribe
+      config.fee.assert_sent(&info)?;
+      msgs.push(asset.transfer_from_msg(user, contract)?)
+    },
+
+    _ => Err(SharedError::WrongDeposit("combination not supported".to_string()))?,
+  }
+
+  if has_fee {
     let fee_collector = config.global_config().get_address(&deps.querier, AT_FEE_COLLECTOR)?;
     msgs.push(config.fee.transfer_msg(fee_collector)?)
   }
 
   let bribes: Vec<(u64, Uint128)> = distribution.create_distribution(block_period, asset.amount)?;
 
+  assert_asset_whitelisted(&config, &asset.info)?;
   asset_sum_equal(&asset, &bribes)?;
   asset_future_only(block_period, &bribes)?;
 
@@ -136,7 +160,7 @@ fn add_bribe(
 }
 
 fn asset_sum_equal(asset: &Asset, bribes: &Vec<(u64, Uint128)>) -> Result<(), ContractError> {
-  let sum: Uint128 = bribes.iter().map(|(a, b)| b).sum();
+  let sum: Uint128 = bribes.iter().map(|(_, b)| b).sum();
   if sum == asset.amount {
     Ok(())
   } else {
@@ -171,18 +195,18 @@ fn withdraw_bribes(
     return Err(ContractError::NoBribes {});
   }
 
-  let mut bucket = BRIBE_BUCKETS.load(deps.storage, period)?;
+  let mut global_bucket = BRIBE_BUCKETS.load(deps.storage, period)?;
 
   let mut transfer_msgs = vec![];
   for bribe in user_bucket.assets {
-    bucket.withdraw(&bribe)?;
+    global_bucket.withdraw(&bribe)?;
     transfer_msgs.push(bribe.transfer_msg(user)?)
   }
 
-  if bucket.is_empty() {
+  if global_bucket.is_empty() {
     BRIBE_BUCKETS.remove(deps.storage, period);
   } else {
-    BRIBE_BUCKETS.save(deps.storage, period, &bucket)?;
+    BRIBE_BUCKETS.save(deps.storage, period, &global_bucket)?;
   }
   BRIBE_CREATOR.remove(deps.storage, (user.as_str(), period));
 
