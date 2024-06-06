@@ -3,6 +3,7 @@ name = "ve3-shared"
 version = "1.0.0"
 authors = ["devs@erisprotocol.com"]
 edition = "2018"
+license.workspace = true
 
 exclude = []
 
