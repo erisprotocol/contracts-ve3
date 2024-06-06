@@ -8,6 +8,7 @@ pub const AT_ASSET_STAKING: &str = "ASSET_STAKING";
 pub const AT_TAKE_RECIPIENT: &str = "TAKE_RECIPIENT";
 pub const AT_VE_GUARDIAN: &str = "VE_GUARDIAN";
 pub const AT_VOTING_ESCROW: &str = "VOTING_ESCROW";
+pub const AT_FEE_COLLECTOR: &str = "FEE_COLLECTOR";
 
 pub const DEFAULT_LIMIT: u32 = 10;
 pub const DEFAULT_PERIODS_LIMIT: u64 = 20;

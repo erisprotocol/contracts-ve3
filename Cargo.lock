@@ -1120,7 +1120,6 @@ dependencies = [
  "cw20",
  "itertools",
  "thiserror",
- "ve3-global-config",
  "ve3-shared",
 ]
 
@@ -1140,7 +1139,20 @@ dependencies = [
  "semver",
  "serde",
  "thiserror",
- "ve3-global-config",
+ "ve3-shared",
+]
+
+[[package]]
+name = "ve3-bribe-manager"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-asset",
+ "cw-storage-plus 1.2.0",
+ "cw2 1.1.2",
+ "cw20",
+ "thiserror",
  "ve3-shared",
 ]
 
@@ -1161,7 +1173,6 @@ dependencies = [
  "serde",
  "terra-proto-rs",
  "thiserror",
- "ve3-global-config",
  "ve3-shared",
 ]
 
@@ -1175,6 +1186,7 @@ dependencies = [
  "cw-ownable",
  "cw-ownable-derive",
  "cw-storage-plus 1.2.0",
+ "cw2 1.1.2",
  "thiserror",
  "ve3-shared",
 ]
@@ -1213,7 +1225,6 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
- "ve3-global-config",
  "ve3-shared",
 ]
 

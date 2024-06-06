@@ -28,7 +28,6 @@ cw-storage-plus.workspace = true
 cw-asset.workspace = true
 thiserror.workspace = true
 cosmwasm-schema.workspace = true
-
 ve3-shared.workspace = true
-ve3-global-config.workspace = true
+
 itertools = "0.10"

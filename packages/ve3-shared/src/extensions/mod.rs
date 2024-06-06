@@ -1,3 +1,4 @@
+pub mod asset_ext;
 pub mod asset_info_ext;
 pub mod asset_infos_ext;
 pub mod decimal_ext;

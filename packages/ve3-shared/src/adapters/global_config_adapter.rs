@@ -1,9 +1,8 @@
-use crate::{constants::AT_CONNECTOR, error::SharedError};
-use cosmwasm_std::{Addr, DepsMut, QuerierWrapper};
+use cosmwasm_std::{Addr, QuerierWrapper};
 use cw_ownable::Ownership;
 use cw_storage_plus::{Item, Map};
 
-use super::connector::Connector;
+use crate::error::SharedError;
 
 pub struct GlobalConfig(pub Addr);
 
@@ -105,12 +104,6 @@ impl ConfigExt for crate::contract_asset_staking::Config {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
-impl crate::contract_asset_staking::Config {
-  pub fn get_connector(&self, deps: &DepsMut) -> Result<Connector, SharedError> {
-    Ok(Connector(self.get_address(&deps.querier, AT_CONNECTOR)?))
-  }
-}
-
 impl ConfigExt for crate::voting_escrow::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
@@ -131,9 +124,17 @@ impl ConfigExt for crate::asset_gauge::Config {
   }
 }
 
-impl crate::asset_gauge::Config {}
-
 impl ConfigExt for crate::contract_connector_alliance::Config {
+  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
+    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+  }
+
+  fn global_config(&self) -> GlobalConfig {
+    GlobalConfig(self.global_config_addr.clone())
+  }
+}
+
+impl ConfigExt for crate::contract_bribe_manager::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
   }

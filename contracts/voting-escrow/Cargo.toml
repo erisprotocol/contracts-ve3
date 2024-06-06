@@ -33,6 +33,4 @@ cosmwasm-schema.workspace = true
 serde.workspace = true
 schemars.workspace = true
 thiserror.workspace = true
-
 ve3-shared.workspace = true
-ve3-global-config.workspace = true

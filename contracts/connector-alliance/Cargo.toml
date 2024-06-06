@@ -30,7 +30,6 @@ schemars.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 ve3-shared.workspace = true
-ve3-global-config.workspace = true
 semver.workspace = true
 
 cw2.workspace = true
