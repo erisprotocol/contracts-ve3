@@ -1,8 +1,10 @@
 use crate::{
-    contract_asset_staking::{Cw20HookMsg, ExecuteMsg},
+    contract_asset_staking::{
+        AssetDistribution, Cw20HookMsg, ExecuteMsg, QueryMsg, WhitelistedAssetsResponse,
+    },
     error::SharedError,
 };
-use cosmwasm_std::{coins, to_json_binary, Addr, CosmosMsg, WasmMsg};
+use cosmwasm_std::{coins, to_json_binary, Addr, CosmosMsg, QuerierWrapper, WasmMsg};
 use cw20::Cw20ExecuteMsg;
 use cw_asset::{Asset, AssetInfo};
 
@@ -17,7 +19,7 @@ impl Ve3AssetStaking {
         }))
     }
 
-    pub fn deposit(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
+    pub fn deposit_msg(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
         match asset.info {
             cw_asset::AssetInfoBase::Native(native) => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: self.0.to_string(),
@@ -41,11 +43,31 @@ impl Ve3AssetStaking {
         }
     }
 
-    pub fn withdraw(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
+    pub fn withdraw_msg(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
         Ok(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: self.0.to_string(),
             msg: to_json_binary(&ExecuteMsg::Unstake(asset))?,
             funds: vec![],
         }))
+    }
+
+    pub fn set_reward_distribution_msg(
+        &self,
+        distribution: Vec<AssetDistribution>,
+    ) -> Result<CosmosMsg, SharedError> {
+        Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: self.0.to_string(),
+            msg: to_json_binary(&ExecuteMsg::SetAssetRewardDistribution(distribution))?,
+            funds: vec![],
+        }))
+    }
+
+    pub fn query_whitelisted_assets(
+        &self,
+        querier: &QuerierWrapper,
+    ) -> Result<WhitelistedAssetsResponse, SharedError> {
+        let assets: WhitelistedAssetsResponse =
+            querier.query_wasm_smart(self.0.clone(), &QueryMsg::WhitelistedAssets {})?;
+        Ok(assets)
     }
 }

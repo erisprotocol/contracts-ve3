@@ -1114,10 +1114,14 @@ version = "1.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-asset",
  "cw-storage-plus 1.2.0",
  "cw2 1.1.2",
  "cw20",
+ "itertools",
  "thiserror",
+ "ve3-global-config",
+ "ve3-shared",
 ]
 
 [[package]]
@@ -1182,6 +1186,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
+ "cw-ownable",
  "cw-storage-plus 1.2.0",
  "cw20",
  "cw721 0.18.0",

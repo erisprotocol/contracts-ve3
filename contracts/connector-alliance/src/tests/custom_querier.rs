@@ -6,8 +6,8 @@ use cosmwasm_std::{
     from_json, to_json_binary, Addr, Binary, Coin, ContractResult, Empty, Querier, QuerierResult,
     QueryRequest, SystemError, SystemResult, WasmQuery,
 };
-use ve3_global_config::global_config_adapter::ADDRESSES;
-use ve3_shared::constants::{AT_DELEGATION_CONTROLLER, AT_LP_STAKING};
+use ve3_global_config::state::ADDRESSES;
+use ve3_shared::constants::{AT_DELEGATION_CONTROLLER, AT_ASSET_STAKING};
 
 #[derive(Default)]
 pub(super) struct CustomQuerier {
@@ -48,7 +48,7 @@ impl CustomQuerier {
                 if contract_addr == "global_config" {
                     let mut allowed = HashMap::new();
                     right(&mut allowed, AT_DELEGATION_CONTROLLER, "controller");
-                    right(&mut allowed, AT_LP_STAKING, "lp_staking");
+                    right(&mut allowed, AT_ASSET_STAKING, "lp_staking");
 
                     match allowed.get(key) {
                         Some(result) => {

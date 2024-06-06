@@ -1,7 +1,7 @@
 use crate::{
     error::ContractResult,
-    global_config_adapter::{ADDRESSES, ADDRESS_LIST},
     msg::{AddressListResponse, AddressResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    state::{ADDRESSES, ADDRESS_LIST},
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;

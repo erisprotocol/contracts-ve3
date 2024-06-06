@@ -1,382 +1,269 @@
-use std::collections::HashSet;
-use std::convert::TryInto;
-
-use astroport::common::{claim_ownership, drop_ownership_proposal, propose_new_owner};
+use crate::error::ContractError;
+use crate::state::{
+  fetch_last_asset_distribution, user_idx, AssetIndex, GaugeDistributionPeriod, UserVotes, CONFIG,
+  GAUGE_DISTRIBUTION, LOCK_INFO,
+};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Attribute, Binary, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdError, StdResult, Storage, Uint128,
+  attr, Addr, Decimal, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, Uint128,
 };
 use cw2::{get_contract_version, set_contract_version};
-use cw_storage_plus::Bound;
-use eris::hub::get_hub_validators;
+use cw_asset::AssetInfo;
 use itertools::Itertools;
+use std::collections::HashSet;
+use std::convert::TryInto;
+use ve3_shared::adapters::global_config_adapter::ConfigExt;
+use ve3_shared::adapters::ve3_asset_staking::Ve3AssetStaking;
+use ve3_shared::asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, MigrateMsg};
+use ve3_shared::constants::{AT_GAUGE_CONTROLLER, AT_VOTING_ESCROW};
+use ve3_shared::contract_asset_staking::AssetDistribution;
+use ve3_shared::helpers::bps::BasicPoints;
+use ve3_shared::helpers::governance::get_period;
+use ve3_shared::voting_escrow::LockInfoResponse;
 
-use eris::amp_gauges::{
-    ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, UserInfoResponse, UserInfosResponse,
-    VotedValidatorInfoResponse,
-};
-use eris::governance_helper::{calc_voting_power, get_period};
-use eris::helpers::bps::BasicPoints;
-use eris::voting_escrow::{get_lock_info, LockInfoResponse, DEFAULT_LIMIT, MAX_LIMIT};
-
-use crate::error::ContractError;
-use crate::state::{
-    Config, TuneInfo, UserInfo, CONFIG, OWNERSHIP_PROPOSAL, TUNE_INFO, USER_INFO, VALIDATORS,
-};
-use crate::utils::{
-    add_fixed_vamp, cancel_user_changes, fetch_last_validator_fixed_vamp_value, filter_validators,
-    get_validator_info, remove_fixed_vamp, update_validator_info, vote_for_validator,
-};
-
-/// Contract name that is used for migration.
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
-/// Contract version that is used for migration.
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// const DAY: u64 = 86400;
-/// It is possible to tune pools once every 14 days
-// const TUNE_COOLDOWN: u64 = WEEK * 3;
-
-type ExecuteResult = Result<Response, ContractError>;
-
-/// Creates a new contract with the specified parameters in the [`InstantiateMsg`].
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
-    msg: InstantiateMsg,
-) -> ExecuteResult {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+  deps: DepsMut,
+  _env: Env,
+  _info: MessageInfo,
+  msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
+  set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    CONFIG.save(
-        deps.storage,
-        &Config {
-            owner: deps.api.addr_validate(&msg.owner)?,
-            escrow_addr: deps.api.addr_validate(&msg.escrow_addr)?,
-            hub_addr: deps.api.addr_validate(&msg.hub_addr)?,
-            validators_limit: msg.validators_limit,
-        },
-    )?;
+  for gauge in msg.gauges.iter() {
+    deps.api.addr_validate(gauge.target.as_str())?;
+  }
 
-    // Set tune_ts just for safety so the first tuning could happen in 2 weeks
-    TUNE_INFO.save(
-        deps.storage,
-        &TuneInfo {
-            tune_ts: env.block.time.seconds(),
-            vamp_points: vec![],
-        },
-    )?;
+  CONFIG.save(
+    deps.storage,
+    &Config {
+      global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
+      gauges: msg.gauges,
+    },
+  )?;
 
-    Ok(Response::default())
+  Ok(Response::default())
 }
 
-/// Exposes all the execute functions available in the contract.
-///
-/// ## Execute messages
-/// * **ExecuteMsg::Vote { votes }** Casts votes for pools
-///
-/// * **ExecuteMsg::TunePools** Launches pool tuning
-///
-/// * **ExecuteMsg::ChangePoolsLimit { limit }** Changes the number of pools which are eligible
-/// to receive allocation points
-///
-/// * **ExecuteMsg::UpdateConfig { blacklisted_voters_limit }** Changes the number of blacklisted
-/// voters that can be kicked at once
-///
-/// * **ExecuteMsg::ProposeNewOwner { owner, expires_in }** Creates a new request to change
-/// contract ownership.
-///
-/// * **ExecuteMsg::DropOwnershipProposal {}** Removes a request to change contract ownership.
-///
-/// * **ExecuteMsg::ClaimOwnership {}** Claims contract ownership.
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> ExecuteResult {
-    match msg {
-        ExecuteMsg::Vote {
-            votes,
-        } => handle_vote(deps, env, info, votes),
-        ExecuteMsg::UpdateVote {
-            user,
-            lock_info,
-        } => update_vote(deps, env, info, user, lock_info),
-        ExecuteMsg::RemoveUser {
-            user,
-        } => remove_user(deps, env, info, user),
-        ExecuteMsg::TuneVamp {} => tune_vamp(deps, env, info),
-        ExecuteMsg::UpdateConfig {
-            validators_limit,
-        } => update_config(deps, info, validators_limit),
-        ExecuteMsg::ProposeNewOwner {
-            new_owner,
-            expires_in,
-        } => {
-            let config: Config = CONFIG.load(deps.storage)?;
+pub fn execute(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
+  match msg {
+    ExecuteMsg::Vote {
+      gauge,
+      votes,
+    } => handle_vote(deps, env, info, gauge, votes),
+    ExecuteMsg::UpdateVote {
+      token_id,
+      lock_info,
+    } => update_vote(deps, env, info.sender, token_id, lock_info),
 
-            propose_new_owner(
-                deps,
-                info,
-                env,
-                new_owner,
-                expires_in,
-                config.owner,
-                OWNERSHIP_PROPOSAL,
-            )
-            .map_err(Into::into)
-        },
-        ExecuteMsg::DropOwnershipProposal {} => {
-            let config: Config = CONFIG.load(deps.storage)?;
+    ExecuteMsg::ClearGaugeState {
+      gauge,
+      limit,
+    } => {
+      let config = CONFIG.load(deps.storage)?;
+      if config.gauges.iter().any(|a| a.name == gauge) {
+        return Err(ContractError::CannotClearExistingGauge {});
+      }
+      AssetIndex::new(&gauge).idx().clear(deps.storage, limit);
+      Ok(Response::default().add_attribute("action", "gauge/clear_gauge_state"))
+    },
 
-            drop_ownership_proposal(deps, info, config.owner, OWNERSHIP_PROPOSAL)
-                .map_err(Into::into)
-        },
-        ExecuteMsg::ClaimOwnership {} => {
-            claim_ownership(deps, info, env, OWNERSHIP_PROPOSAL, |deps, new_owner| {
-                CONFIG
-                    .update::<_, StdError>(deps.storage, |mut v| {
-                        v.owner = new_owner;
-                        Ok(v)
-                    })
-                    .map(|_| ())
-            })
-            .map_err(Into::into)
-        },
-    }
+    ExecuteMsg::SetDistribution {} => set_distribution(deps, env, info),
+
+    ExecuteMsg::UpdateConfig {
+      update_gauge,
+      remove_gauge,
+    } => {
+      let mut config = CONFIG.load(deps.storage)?;
+      config.global_config().assert_owner(&deps.querier, &info.sender)?;
+
+      if let Some(gauge) = update_gauge {
+        deps.api.addr_validate(gauge.target.as_str())?;
+        config.gauges.retain(|a| a.name != gauge.name);
+        config.gauges.push(gauge);
+      }
+
+      if let Some(name) = remove_gauge {
+        config.gauges.retain(|a| a.name != name);
+      }
+
+      CONFIG.save(deps.storage, &config)?;
+      Ok(Response::default().add_attribute("action", "gauge/update_config"))
+    },
+  }
 }
 
-/// The function checks that:
-/// * the user voting power is > 0,
-/// * all pool addresses are valid LP token addresses,
-/// * 'votes' vector doesn't contain duplicated pool addresses,
-/// * sum of all BPS values <= 10000.
-///
-/// The function cancels changes applied by previous votes and apply new votes for the next period.
-/// New vote parameters are saved in [`USER_INFO`].
-///
-/// The function returns [`Response`] in case of success or [`ContractError`] in case of errors.
-///
-/// * **votes** is a vector of pairs ([`String`], [`u16`]).
-/// Tuple consists of pool address and percentage of user's voting power for a given pool.
-/// Percentage should be in BPS form.
 fn handle_vote(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    votes: Vec<(String, u16)>,
-) -> ExecuteResult {
-    let user = info.sender;
-    let block_period = get_period(env.block.time.seconds())?;
-    let config = CONFIG.load(deps.storage)?;
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  gauge: String,
+  votes: Vec<(String, u16)>,
+) -> Result<Response, ContractError> {
+  let sender = info.sender;
+  let block_period = get_period(env.block.time.seconds())?;
+  let config = CONFIG.load(deps.storage)?;
+  let gauge = config.assert_gauge(&gauge)?;
 
-    let ve_lock_info = get_lock_info(&deps.querier, &config.escrow_addr, &user)?;
-    let vamp = ve_lock_info.voting_power + ve_lock_info.fixed_amount;
-    if vamp.is_zero() {
-        return Err(ContractError::ZeroVotingPower {});
-    }
+  let user_index = user_idx();
+  let asset_index = AssetIndex::new(&gauge.name).idx();
 
-    let user_info = USER_INFO.may_load(deps.storage, &user)?.unwrap_or_default();
+  let current_user = user_index.get_latest_data(deps.storage, block_period + 1, sender.as_str())?;
+  let current_vp = current_user.total_vp()?;
+  let old_votes = current_user.extension.clone();
 
-    // Check duplicated votes
-    let addrs_set = votes.iter().cloned().map(|(addr, _)| addr).collect::<HashSet<_>>();
-    if votes.len() != addrs_set.len() {
-        return Err(ContractError::DuplicatedValidators {});
-    }
+  if current_vp.is_zero() {
+    return Err(ContractError::ZeroVotingPower {});
+  }
 
-    let allowed_validators = get_hub_validators(&deps.querier, config.hub_addr)?;
+  let allowed = Ve3AssetStaking(gauge.target.clone())
+    .query_whitelisted_assets(&deps.querier)?
+    .into_iter()
+    .map(|a| a.to_string())
+    .collect::<Vec<_>>();
 
-    // Validating addrs and bps
-    let votes = votes
-        .into_iter()
-        .map(|(addr, bps)| {
-            if !allowed_validators.contains(&addr) {
-                return Err(ContractError::InvalidValidatorAddress(addr));
-            }
-            let bps: BasicPoints = bps.try_into()?;
-            Ok((addr, bps))
-        })
-        .collect::<Result<Vec<_>, ContractError>>()?;
+  let mut values_set: HashSet<_> = HashSet::new();
+  let mut changes =
+    old_votes.votes.into_iter().map(|a| (a.0, a.1, BasicPoints::zero())).collect::<Vec<_>>();
 
-    // Check the bps sum is within the limit
-    votes.iter().try_fold(BasicPoints::default(), |acc, (_, bps)| acc.checked_add(*bps))?;
+  let votes = votes
+    .into_iter()
+    .map(|(addr, bps)| {
+      if !values_set.insert(addr.clone()) {
+        return Err(ContractError::DuplicatedVotes {});
+      }
+      if !allowed.contains(&addr) {
+        return Err(ContractError::InvalidValidatorAddress(addr));
+      }
 
-    remove_votes_of_user(&user_info, block_period, deps.storage)?;
+      let bps: BasicPoints = bps.try_into()?;
+      let old_vote = changes.iter_mut().find(|a| a.0 == addr);
+      match old_vote {
+        Some(found) => found.2 = bps,
+        None => changes.push((addr.clone(), BasicPoints::zero(), bps)),
+      }
+      Ok((addr, bps))
+    })
+    .collect::<Result<Vec<_>, ContractError>>()?;
 
-    apply_votest_of_user(
-        votes,
-        deps,
-        block_period,
-        ve_lock_info.voting_power,
-        ve_lock_info,
-        env,
-        user,
+  // Check the bps sum is within the limit
+  votes.iter().try_fold(BasicPoints::default(), |acc, (_, bps)| acc.checked_add(*bps))?;
+
+  let slope_changes: Vec<(u64, Uint128)> =
+    user_index.fetch_future_slope_changes(deps.storage, sender.as_str(), block_period + 1)?;
+
+  for (asset, old, new) in changes {
+    asset_index.change_vote(
+      deps.storage,
+      block_period + 1,
+      &asset,
+      old,
+      new,
+      &current_user,
+      &slope_changes,
     )?;
+  }
 
-    Ok(Response::new().add_attribute("action", "vamp/vote").add_attribute("vAMP", vamp))
+  user_index.update_ext(
+    deps.storage,
+    block_period + 1,
+    sender.as_str(),
+    UserVotes {
+      period: block_period + 1,
+      votes,
+    },
+  )?;
+
+  Ok(Response::new().add_attribute("action", "vegauge/vote").add_attribute("vp", current_vp))
 }
 
-fn apply_votest_of_user(
-    votes: Vec<(String, BasicPoints)>,
-    deps: DepsMut,
-    block_period: u64,
-    user_vp: Uint128,
-    ve_lock_info: LockInfoResponse,
-    env: Env,
-    user: Addr,
+fn apply_votes_of_user(
+  deps: DepsMut,
+  votes: Vec<(String, BasicPoints)>,
+  block_period: u64,
+  token_id: String,
+  new_lock: LockInfoResponse,
 ) -> Result<(), ContractError> {
-    votes.iter().try_for_each(|(validator_addr, bps)| {
-        add_fixed_vamp(
-            deps.storage,
-            block_period + 1,
-            validator_addr,
-            *bps * ve_lock_info.fixed_amount,
-        )?;
-        vote_for_validator(
-            deps.storage,
-            block_period + 1,
-            validator_addr,
-            *bps,
-            user_vp,
-            ve_lock_info.slope,
-            ve_lock_info.end,
-        )
-    })?;
-    let user_info = UserInfo {
-        vote_ts: env.block.time.seconds(),
-        voting_power: user_vp,
-        slope: ve_lock_info.slope,
-        lock_end: ve_lock_info.end,
-        fixed_amount: ve_lock_info.fixed_amount,
-        votes,
-    };
-    USER_INFO.save(deps.storage, &user, &user_info)?;
-    Ok(())
+  let user_index = user_idx();
+
+  LOCK_INFO.save(deps.storage, token_id.as_ref(), &new_lock)?;
+  let owner = new_lock.owner.as_str();
+
+  user_index.add_vote(
+    deps.storage,
+    block_period + 1,
+    owner,
+    BasicPoints::max(),
+    (&new_lock).into(),
+    Some(UserVotes {
+      period: block_period,
+      votes: votes.clone(),
+    }),
+  )?;
+
+  Ok(())
 }
 
 fn remove_votes_of_user(
-    user_info: &UserInfo,
-    block_period: u64,
-    storage: &mut dyn Storage,
+  storage: &mut dyn Storage,
+  old_lock: &LockInfoResponse,
+  block_period: u64,
 ) -> Result<(), ContractError> {
-    if user_info.lock_end > block_period {
-        let user_last_vote_period = get_period(user_info.vote_ts)?;
-        // Calculate voting power before changes
-        let old_vp_at_period = calc_voting_power(
-            user_info.slope,
-            user_info.voting_power,
-            user_last_vote_period,
-            block_period,
-        );
+  let user_index = user_idx();
 
-        // Cancel changes applied by previous votes
-        user_info.votes.iter().try_for_each(|(validator_addr, bps)| {
-            remove_fixed_vamp(
-                storage,
-                block_period + 1,
-                validator_addr,
-                *bps * user_info.fixed_amount,
-            )?;
-            cancel_user_changes(
-                storage,
-                block_period + 1,
-                validator_addr,
-                *bps,
-                old_vp_at_period,
-                user_info.slope,
-                user_info.lock_end,
-            )
-        })?;
-    } else {
-        // still need to remove fixed vamp on remove
-        user_info.votes.iter().try_for_each(|(validator_addr, bps)| {
-            remove_fixed_vamp(
-                storage,
-                block_period + 1,
-                validator_addr,
-                *bps * user_info.fixed_amount,
-            )
-        })?;
-    };
+  let vote = user_index.remove_vote(
+    storage,
+    block_period + 1,
+    old_lock.owner.as_str(),
+    BasicPoints::max(),
+    old_lock.into(),
+  )?;
+
+  let asset_index = asset_idx("xx");
+  // Cancel changes applied by previous votes
+  vote.extension.votes.iter().try_for_each(|(key, bps)| -> StdResult<()> {
+    asset_index.remove_vote(storage, block_period + 1, key, *bps, old_lock.into())?;
     Ok(())
+  })?;
+
+  Ok(())
 }
 
 fn update_vote(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    user: String,
-    lock: LockInfoResponse,
-) -> ExecuteResult {
-    let block_period = get_period(env.block.time.seconds())?;
-    let config = CONFIG.load(deps.storage)?;
+  deps: DepsMut,
+  env: Env,
+  sender: Addr,
+  token_id: String,
+  lock: LockInfoResponse,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  config.global_config().assert_has_access(&deps.querier, AT_VOTING_ESCROW, &sender)?;
 
-    if info.sender != config.escrow_addr {
-        return Err(ContractError::Unauthorized {});
-    }
+  let block_period = get_period(env.block.time.seconds())?;
 
-    let user = deps.api.addr_validate(&user)?;
-    let user_info = USER_INFO.may_load(deps.storage, &user)?;
+  let old_lock = LOCK_INFO.may_load(deps.storage, &token_id)?;
+  LOCK_INFO.save(deps.storage, &token_id, &lock)?;
 
-    if let Some(user_info) = user_info {
-        remove_votes_of_user(&user_info, block_period, deps.storage)?;
+  if let Some(old_lock) = old_lock {
+    remove_votes_of_user(deps.storage, &old_lock, block_period)?;
+  }
 
-        if lock.voting_power.is_zero() && lock.fixed_amount.is_zero() {
-            let user_info = UserInfo {
-                vote_ts: env.block.time.seconds(),
-                voting_power: Uint128::zero(),
-                slope: lock.slope,
-                lock_end: lock.end,
-                fixed_amount: lock.fixed_amount,
-                votes: user_info.votes,
-            };
-            USER_INFO.save(deps.storage, &user, &user_info)?;
+  if !(lock.fixed_amount + lock.voting_power).is_zero() {
+    let user_info = user_idx().get_latest_data(deps.storage, block_period, lock.owner.as_str())?;
+    apply_votes_of_user(deps, user_info.extension.votes, block_period, token_id, lock)?;
+  }
 
-            return Ok(Response::new().add_attribute("action", "vamp/update_vote_removed"));
-        }
-
-        let vamp = lock.voting_power + lock.fixed_amount;
-        apply_votest_of_user(
-            user_info.votes,
-            deps,
-            block_period,
-            lock.voting_power,
-            lock,
-            env,
-            user,
-        )?;
-
-        return Ok(Response::new()
-            .add_attribute("action", "vamp/update_vote_changed")
-            .add_attribute("vAMP", vamp));
-    }
-
-    Ok(Response::new().add_attribute("action", "vamp/update_vote_noop"))
-}
-
-fn remove_user(deps: DepsMut, env: Env, info: MessageInfo, user: String) -> ExecuteResult {
-    let config = CONFIG.load(deps.storage)?;
-    config.assert_owner(&info.sender)?;
-
-    let user = deps.api.addr_validate(&user)?;
-    let user_info = USER_INFO.may_load(deps.storage, &user)?;
-
-    if let Some(user_info) = user_info {
-        let block_period = get_period(env.block.time.seconds())?;
-        USER_INFO.remove(deps.storage, &user);
-
-        let result = remove_votes_of_user(&user_info, block_period, deps.storage);
-        let msg = if let Err(err) = result {
-            err.to_string()
-        } else {
-            "ok".to_string()
-        };
-        return Ok(Response::new()
-            .add_attribute("action", "vamp/remove_user")
-            .add_attribute("remove_votes", msg));
-    }
-
-    Ok(Response::new().add_attribute("action", "vamp/remove_user_noop"))
+  Ok(Response::new().add_attribute("action", "gauge/update_vote"))
 }
 
 /// The function checks that the last pools tuning happened >= 14 days ago.
@@ -384,232 +271,145 @@ fn remove_user(deps: DepsMut, env: Env, info: MessageInfo, user: String) -> Exec
 /// are not eligible to receive allocation points,
 /// takes top X pools by voting power, where X is 'config.pools_limit', calculates allocation points
 /// for these pools and applies allocation points in generator contract.
-fn tune_vamp(deps: DepsMut, env: Env, info: MessageInfo) -> ExecuteResult {
-    let config = CONFIG.load(deps.storage)?;
-    config.assert_owner(&info.sender)?;
+fn set_distribution(
+  mut deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  config.global_config().assert_has_access(&deps.querier, AT_GAUGE_CONTROLLER, &info.sender)?;
+  let block_period = get_period(env.block.time.seconds())?;
 
-    let block_period = get_period(env.block.time.seconds())?;
+  let mut attrs = vec![];
+  let mut msgs = vec![];
+  for gauge_config in config.gauges {
+    let asset_staking = Ve3AssetStaking(gauge_config.target.clone());
+    let assets = asset_staking.query_whitelisted_assets(&deps.branch().querier)?;
+    let mut periods = vec![];
 
-    let validator_votes: Vec<_> = VALIDATORS
-        .keys(deps.as_ref().storage, None, None, Order::Ascending)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .map(|validator_addr| {
-            let validator_addr = validator_addr?;
+    let distribution =
+      match fetch_last_asset_distribution(deps.branch().storage, &gauge_config.name, block_period)?
+      {
+        Some((mut last_period, _)) if last_period == block_period => None,
 
-            let validator_info =
-                update_validator_info(deps.storage, block_period, &validator_addr, None)?;
+        Some((mut last_period, _)) => {
+          while last_period < block_period {
+            _set_distribution(deps.branch(), &env, &gauge_config, &assets, last_period)?;
+            periods.push(last_period);
+            last_period += 1;
+          }
 
-            let vamp = validator_info.voting_power.checked_add(
-                fetch_last_validator_fixed_vamp_value(deps.storage, block_period, &validator_addr)?,
-            )?;
+          periods.push(block_period);
+          Some(_set_distribution(deps.branch(), &env, &gauge_config, &assets, block_period)?)
+        },
 
-            // Remove pools with zero voting power so we won't iterate over them in future
-            if vamp.is_zero()
-            // and the next period is also unset
-                && fetch_last_validator_fixed_vamp_value(
-                    deps.storage,
-                    block_period + 1,
-                    &validator_addr,
-                )?
-                .is_zero()
-            {
-                VALIDATORS.remove(deps.storage, &validator_addr)
-            }
-            Ok((validator_addr, vamp))
-        })
-        .collect::<StdResult<Vec<_>>>()?
-        .into_iter()
-        .filter(|(_, vamp_amount)| !vamp_amount.is_zero())
-        .sorted_by(|(_, a), (_, b)| b.cmp(a)) // Sort in descending order
-        .collect();
+        None => {
+          periods.push(block_period);
+          Some(_set_distribution(deps.branch(), &env, &gauge_config, &assets, block_period)?)
+        },
+      };
 
-    let mut tune_info = TUNE_INFO.load(deps.storage)?;
-    tune_info.vamp_points = filter_validators(
-        &deps.querier,
-        &config.hub_addr,
-        validator_votes,
-        config.validators_limit, // +1 additional pool if we will need to remove the main pool
-    )?;
+    attrs.push(attr("gauge", gauge_config.name));
+    attrs.push(attr("periods", periods.iter().join(",")));
 
-    if tune_info.vamp_points.is_empty() {
-        return Err(ContractError::TuneNoValidators {});
+    if let Some(new_distribution) = distribution {
+      msgs.push(asset_staking.set_reward_distribution_msg(new_distribution)?)
     }
+  }
 
-    tune_info.tune_ts = env.block.time.seconds();
-    TUNE_INFO.save(deps.storage, &tune_info)?;
-
-    let attributes: Vec<Attribute> =
-        tune_info.vamp_points.iter().map(|a| attr("vamp", format!("{0}={1}", a.0, a.1))).collect();
-
-    Ok(Response::new().add_attribute("action", "vamp/tune_vamp").add_attributes(attributes))
+  Ok(
+    Response::new()
+      .add_attribute("action", "gauge/set_distribution")
+      .add_attributes(attrs)
+      .add_messages(msgs),
+  )
 }
 
-/// Only contract owner can call this function.  
-/// The function sets a new limit of blacklisted voters that can be kicked at once.
-///
-/// * **blacklisted_voters_limit** is a new limit of blacklisted voters which can be kicked at once
-///
-/// * **main_pool** is a main pool address
-///
-/// * **main_pool_min_alloc** is a minimum percentage of ASTRO emissions that this pool should get every block
-///
-/// * **remove_main_pool** should the main pool be removed or not
-fn update_config(deps: DepsMut, info: MessageInfo, validators_limit: Option<u64>) -> ExecuteResult {
-    let mut config = CONFIG.load(deps.storage)?;
+fn _set_distribution(
+  deps: DepsMut,
+  _env: &Env,
+  gauge_config: &GaugeConfig,
+  assets: &Vec<AssetInfo>,
+  period: u64,
+) -> Result<Vec<AssetDistribution>, ContractError> {
+  let asset_index = AssetIndex::new(&gauge_config.name).idx();
 
-    config.assert_owner(&info.sender)?;
+  let allowed_votes: Vec<_> = assets
+    .iter()
+    .map(|key| {
+      let key_raw = &key.to_string();
+      let vote_info = asset_index.update_data(deps.storage, period, key_raw, None, None)?;
+      let asset_vp = vote_info.fixed_amount.checked_add(vote_info.voting_power)?;
 
-    if let Some(validators_limit) = validators_limit {
-        config.validators_limit = validators_limit;
-    }
-
-    CONFIG.save(deps.storage, &config)?;
-
-    Ok(Response::default().add_attribute("action", "vamp/update_config"))
-}
-
-/// Expose available contract queries.
-///
-/// ## Queries
-/// * **QueryMsg::UserInfo { user }** Fetch user information
-///
-/// * **QueryMsg::TuneInfo** Fetch last tuning information
-///
-/// * **QueryMsg::Config** Fetch contract config
-///
-/// * **QueryMsg::PoolInfo { pool_addr }** Fetch pool's voting information at the current period.
-///
-/// * **QueryMsg::PoolInfoAtPeriod { pool_addr, period }** Fetch pool's voting information at a specified period.
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::UserInfo {
-            user,
-        } => to_json_binary(&user_info(deps, env, user)?),
-        QueryMsg::UserInfos {
-            start_after,
-            limit,
-        } => to_json_binary(&user_infos(deps, env, start_after, limit)?),
-        QueryMsg::TuneInfo {} => to_json_binary(&TUNE_INFO.load(deps.storage)?),
-        QueryMsg::Config {} => to_json_binary(&CONFIG.load(deps.storage)?),
-        QueryMsg::ValidatorInfo {
-            validator_addr,
-        } => to_json_binary(&validator_info(deps, env, validator_addr, None)?),
-        QueryMsg::ValidatorInfos {
-            period,
-            validator_addrs,
-        } => to_json_binary(&validator_infos(deps, env, validator_addrs, period)?),
-        QueryMsg::ValidatorInfoAtPeriod {
-            validator_addr,
-            period,
-        } => to_json_binary(&validator_info(deps, env, validator_addr, Some(period))?),
-    }
-}
-
-/// Returns user information.
-fn user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
-    let user_addr = deps.api.addr_validate(&user)?;
-    let user = USER_INFO
-        .may_load(deps.storage, &user_addr)?
-        .ok_or_else(|| StdError::generic_err("User not found"))?;
-
-    let block_period = get_period(env.block.time.seconds())?;
-    UserInfo::into_response(user, block_period)
-}
-
-// returns all user votes
-fn user_infos(
-    deps: Deps,
-    env: Env,
-    start_after: Option<String>,
-    limit: Option<u32>,
-) -> StdResult<UserInfosResponse> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-
-    let mut start: Option<Bound<&Addr>> = None;
-    let addr: Addr;
-    if let Some(start_after) = start_after {
-        if let Ok(start_after_addr) = deps.api.addr_validate(&start_after) {
-            addr = start_after_addr;
-            start = Some(Bound::exclusive(&addr));
-        }
-    }
-
-    let block_period = get_period(env.block.time.seconds())?;
-
-    let users = USER_INFO
-        .range(deps.storage, start, None, Order::Ascending)
-        .take(limit)
-        .map(|item| {
-            let (user, v) = item?;
-            Ok((user, UserInfo::into_response(v, block_period)?))
-        })
-        .collect::<StdResult<Vec<(Addr, UserInfoResponse)>>>()?;
-
-    Ok(UserInfosResponse {
-        users,
+      Ok((key.clone(), asset_vp))
     })
-}
+    .collect::<StdResult<Vec<_>>>()?
+    .into_iter()
+    .filter(|(_, vp)| !vp.is_zero())
+    .sorted_by(|(_, a), (_, b)| b.cmp(a)) // Sort in descending order
+    .collect();
 
-/// Returns all active validators info at a specified period.
-fn validator_infos(
-    deps: Deps,
-    env: Env,
-    validator_addrs: Option<Vec<String>>,
-    period: Option<u64>,
-) -> StdResult<Vec<(String, VotedValidatorInfoResponse)>> {
-    let period = period.unwrap_or(get_period(env.block.time.seconds())?);
+  let total_voting_power: Uint128 = allowed_votes.iter().map(|(a, b)| b).sum();
+  let min_voting_power = gauge_config.min_gauge_percentage * total_voting_power;
 
-    // use active validators as fallback
-    let validator_addrs = validator_addrs.unwrap_or_else(|| {
-        let active_validators = VALIDATORS
-            .keys(deps.storage, None, None, Order::Ascending)
-            .collect::<StdResult<Vec<_>>>();
+  let relevant_votes =
+    allowed_votes.into_iter().filter(|(_, amount)| *amount > min_voting_power).collect_vec();
 
-        active_validators.unwrap_or_default()
-    });
+  let sum_relevant: Uint128 = relevant_votes.iter().map(|(_, amount)| amount).sum();
 
-    let validator_infos: Vec<_> = validator_addrs
-        .into_iter()
-        .map(|validator_addr| {
-            let validator_info = get_validator_info(deps.storage, period, &validator_addr)?;
-            Ok((validator_addr, validator_info))
-        })
-        .collect::<StdResult<Vec<_>>>()?;
+  let mut save_distribution = relevant_votes
+    .into_iter()
+    .map(|(asset, vp)| {
+      Ok(AssetDistribution {
+        asset,
+        vp,
+        distribution: Decimal::from_ratio(vp, sum_relevant),
+      })
+    })
+    .collect::<StdResult<Vec<_>>>()?;
 
-    Ok(validator_infos)
-}
+  let total: Decimal = save_distribution.iter().map(|a| a.distribution).sum();
 
-/// Returns pool's voting information at a specified period.
-fn validator_info(
-    deps: Deps,
-    env: Env,
-    validator_addr: String,
-    period: Option<u64>,
-) -> StdResult<VotedValidatorInfoResponse> {
-    let block_period = get_period(env.block.time.seconds())?;
-    let period = period.unwrap_or(block_period);
-    get_validator_info(deps.storage, period, &validator_addr)
+  if total > Decimal::percent(100) {
+    let remove = total - Decimal::percent(100);
+    save_distribution[0].distribution -= remove;
+  } else {
+    let add = Decimal::percent(100) - total;
+    save_distribution[0].distribution += add;
+  }
+
+  GAUGE_DISTRIBUTION.save(
+    deps.storage,
+    (&gauge_config.name, period),
+    &GaugeDistributionPeriod {
+      assets: save_distribution.clone(),
+    },
+  )?;
+
+  Ok(save_distribution)
 }
 
 /// Manages contract migration
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let contract_version = get_contract_version(deps.storage)?;
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+  let contract_version = get_contract_version(deps.storage)?;
+  set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    if contract_version.contract != CONTRACT_NAME {
-        return Err(StdError::generic_err(format!(
-            "contract_name does not match: prev: {0}, new: {1}",
-            contract_version.contract, CONTRACT_VERSION
-        ))
-        .into());
-    }
+  if contract_version.contract != CONTRACT_NAME {
+    return Err(
+      StdError::generic_err(format!(
+        "contract_name does not match: prev: {0}, new: {1}",
+        contract_version.contract, CONTRACT_VERSION
+      ))
+      .into(),
+    );
+  }
 
-    Ok(Response::new()
-        .add_attribute("previous_contract_name", &contract_version.contract)
-        .add_attribute("previous_contract_version", &contract_version.version)
-        .add_attribute("new_contract_name", CONTRACT_NAME)
-        .add_attribute("new_contract_version", CONTRACT_VERSION))
+  Ok(
+    Response::new()
+      .add_attribute("previous_contract_name", &contract_version.contract)
+      .add_attribute("previous_contract_version", &contract_version.version)
+      .add_attribute("new_contract_name", CONTRACT_NAME)
+      .add_attribute("new_contract_version", CONTRACT_VERSION),
+  )
 }

@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{OverflowError, StdError};
 use cw_asset::AssetError;
 use thiserror::Error;
 
@@ -9,6 +9,9 @@ pub enum SharedError {
 
     #[error("{0}")]
     AssetError(#[from] AssetError),
+
+    #[error("{0}")]
+    OverflowError(#[from] OverflowError),
 
     #[error("Unauthorized")]
     Unauthorized {},

@@ -1,4 +1,4 @@
-use cosmwasm_std::{Response, StdError};
+use cosmwasm_std::{OverflowError, Response, StdError};
 use cw_ownable::OwnershipError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;

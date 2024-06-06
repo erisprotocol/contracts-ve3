@@ -14,6 +14,7 @@ pub struct Config {
 pub struct AssetDistribution {
     pub asset: AssetInfo,
     pub distribution: Decimal,
+    pub vp: Uint128,
 }
 
 #[cw_serde]

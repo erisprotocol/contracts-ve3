@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod asset_gauge;
 pub mod constants;
 pub mod contract_asset_staking;
 pub mod contract_connector_alliance;

@@ -501,6 +501,8 @@ pub struct VotingPowerResponse {
 pub struct LockInfoResponse {
     pub owner: Addr,
 
+    pub period: u64,
+
     pub asset: Asset,
     /// The underlying_amount locked in the position
     pub underlying_amount: Uint128,
@@ -660,12 +662,12 @@ pub fn get_total_voting_power_at_by_period(
 pub fn get_lock_info(
     querier: &QuerierWrapper,
     escrow_addr: impl Into<String>,
-    user: impl Into<String>,
+    token_id: impl Into<String>,
 ) -> StdResult<LockInfoResponse> {
     let lock_info: LockInfoResponse = querier.query_wasm_smart(
         escrow_addr,
         &LockInfo {
-            token_id: user.into(),
+            token_id: token_id.into(),
             time: None,
         },
     )?;

@@ -1,7 +1,13 @@
-use cosmwasm_std::{Addr, QuerierWrapper};
+use crate::{
+    adapters::ve3_asset_staking::Ve3AssetStaking,
+    constants::{AT_ASSET_STAKING, AT_CONNECTOR},
+    error::SharedError,
+};
+use cosmwasm_std::{Addr, DepsMut, QuerierWrapper};
 use cw_ownable::Ownership;
 use cw_storage_plus::{Item, Map};
-use ve3_shared::error::SharedError;
+
+use super::connector::Connector;
 
 pub struct GlobalConfig(pub Addr);
 
@@ -98,7 +104,26 @@ pub trait ConfigExt {
     fn global_config(&self) -> GlobalConfig;
 }
 
-impl ConfigExt for ve3_shared::contract_asset_staking::Config {
+impl ConfigExt for crate::contract_asset_staking::Config {
+    fn get_address(
+        &self,
+        querier: &QuerierWrapper,
+        address_type: &str,
+    ) -> Result<Addr, SharedError> {
+        GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+    }
+
+    fn global_config(&self) -> GlobalConfig {
+        GlobalConfig(self.global_config_addr.clone())
+    }
+}
+impl crate::contract_asset_staking::Config {
+    pub fn get_connector(&self, deps: &DepsMut) -> Result<Connector, SharedError> {
+        Ok(Connector(self.get_address(&deps.querier, AT_CONNECTOR)?))
+    }
+}
+
+impl ConfigExt for crate::voting_escrow::Config {
     fn get_address(
         &self,
         querier: &QuerierWrapper,
@@ -112,7 +137,23 @@ impl ConfigExt for ve3_shared::contract_asset_staking::Config {
     }
 }
 
-impl ConfigExt for ve3_shared::voting_escrow::Config {
+impl ConfigExt for crate::asset_gauge::Config {
+    fn get_address(
+        &self,
+        querier: &QuerierWrapper,
+        address_type: &str,
+    ) -> Result<Addr, SharedError> {
+        GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+    }
+
+    fn global_config(&self) -> GlobalConfig {
+        GlobalConfig(self.global_config_addr.clone())
+    }
+}
+
+impl crate::asset_gauge::Config {}
+
+impl ConfigExt for crate::contract_connector_alliance::Config {
     fn get_address(
         &self,
         querier: &QuerierWrapper,

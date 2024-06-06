@@ -19,7 +19,7 @@ use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfoUnchecked};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use ve3_global_config::global_config_adapter::ConfigExt;
+use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{AT_VE_GUARDIAN, EPOCH_START, MIN_LOCK_PERIODS, WEEK};
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;

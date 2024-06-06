@@ -17,12 +17,12 @@ use terra_proto_rs::alliance::alliance::{
 };
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
-use ve3_global_config::global_config_adapter::GlobalConfig;
+use ve3_shared::adapters::global_config_adapter::ConfigExt;
+use ve3_shared::constants::{AT_ASSET_STAKING, AT_DELEGATION_CONTROLLER};
 use ve3_shared::contract_connector_alliance::{
     AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
     ExecuteMsg, InstantiateMsg, MigrateMsg,
 };
-use ve3_shared::constants::{AT_DELEGATION_CONTROLLER, AT_LP_STAKING};
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
@@ -329,11 +329,7 @@ fn assert_is_staking(
     info: &MessageInfo,
     config: &Config,
 ) -> Result<(), ContractError> {
-    GlobalConfig(config.global_config_addr.clone()).assert_has_access(
-        &deps.querier,
-        AT_LP_STAKING,
-        &info.sender,
-    )?;
+    config.global_config().assert_has_access(&deps.querier, AT_ASSET_STAKING, &info.sender)?;
     Ok(())
 }
 
@@ -344,7 +340,7 @@ fn assert_controller(
     info: &MessageInfo,
     config: &Config,
 ) -> Result<(), ContractError> {
-    GlobalConfig(config.global_config_addr.clone()).assert_has_access(
+    config.global_config().assert_has_access(
         &deps.querier,
         AT_DELEGATION_CONTROLLER,
         &info.sender,

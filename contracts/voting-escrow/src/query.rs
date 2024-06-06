@@ -122,12 +122,15 @@ pub fn get_token_lock_info(
         let coefficient = calc_coefficient(lock.end - lock.last_extend_lock_period);
 
         let resp = LockInfoResponse {
+            period,
+
             owner: lock.owner,
             asset: lock.asset,
             underlying_amount: lock.underlying_amount,
-            coefficient,
             start: lock.start,
             end: lock.end,
+
+            coefficient,
             voting_power,
             fixed_amount,
             slope,

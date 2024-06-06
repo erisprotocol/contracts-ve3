@@ -41,7 +41,7 @@ cw721 = { version = "0.18.0" }
 cw721-base = { version = "0.18.0", features = ["library"] }
 cosmwasm-std = "1.5"
 cosmwasm-schema = "1.5"
-cw-storage-plus = "1.2"
+cw-storage-plus = { version = "1.2", features = ["iterator"]}
 cw-asset = "3.1"
 cw-ownable = "0.5"
 cw-ownable-derive = "0.5"

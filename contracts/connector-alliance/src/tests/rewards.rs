@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::MsgClaimDelegationRewards;
 use terra_proto_rs::traits::Message;
 use ve3_shared::contract_connector_alliance::{CallbackMsg, ExecuteMsg};
-use ve3_shared::constants::AT_LP_STAKING;
+use ve3_shared::constants::AT_ASSET_STAKING;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 
 #[test]
@@ -29,7 +29,7 @@ fn test_update_rewards() {
     assert_eq!(
         res,
         ContractError::SharedError(ve3_shared::error::SharedError::UnauthorizedMissingRight(
-            AT_LP_STAKING.to_string(),
+            AT_ASSET_STAKING.to_string(),
             "user".to_string()
         ))
     );

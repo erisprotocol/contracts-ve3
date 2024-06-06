@@ -14,11 +14,10 @@ use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo};
 use semver::Version;
-use ve3_global_config::global_config_adapter::{ConfigExt, GlobalConfig};
-use ve3_shared::adapters::connector::Connector;
+use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{
-    AT_ASSET_WHITELIST_CONTROLLER, AT_CONNECTOR, AT_REWARD_DISTRIBUTION_CONTROLLER,
-    AT_TAKE_RECIPIENT, SECONDS_PER_YEAR,
+    AT_ASSET_WHITELIST_CONTROLLER, AT_REWARD_DISTRIBUTION_CONTROLLER, AT_TAKE_RECIPIENT,
+    SECONDS_PER_YEAR,
 };
 use ve3_shared::contract_asset_staking::{
     AssetConfigRuntime, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg,
@@ -562,14 +561,13 @@ fn update_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let connector_addr =
-        GlobalConfig(config.global_config_addr).get_address(&deps.querier, AT_CONNECTOR)?;
+    let connector = config.get_connector(&deps)?;
 
     let initial_balance: cw_asset::AssetBase<Addr> = AssetInfo::native(config.reward_denom)
         .with_balance_query(&deps.querier, &env.contract.address)?;
 
     let msgs = vec![
-        Connector(connector_addr).claim_rewards_msg()?,
+        connector.claim_rewards_msg()?,
         env.callback_msg(ExecuteMsg::Callback(CallbackMsg::UpdateRewards {
             initial_balance,
         }))?,
@@ -664,7 +662,7 @@ fn assert_asset_whitelist_controller(
     info: &MessageInfo,
     config: &Config,
 ) -> Result<(), ContractError> {
-    GlobalConfig(config.global_config_addr.clone()).assert_has_access(
+    config.global_config().assert_has_access(
         &deps.querier,
         AT_ASSET_WHITELIST_CONTROLLER,
         &info.sender,
@@ -678,7 +676,7 @@ fn assert_distribution_controller(
     info: &MessageInfo,
     config: &Config,
 ) -> Result<(), ContractError> {
-    GlobalConfig(config.global_config_addr.clone()).assert_has_access(
+    config.global_config().assert_has_access(
         &deps.querier,
         AT_REWARD_DISTRIBUTION_CONTROLLER,
         &info.sender,
