@@ -6,7 +6,7 @@ use cosmwasm_std::{
 use std::collections::HashMap;
 use std::ops::Deref;
 use ve3_shared::adapters::global_config_adapter::ADDRESSES;
-use ve3_shared::constants::{addresstype_asset_staking, AT_DELEGATION_CONTROLLER};
+use ve3_shared::constants::{at_asset_staking, AT_DELEGATION_CONTROLLER};
 
 #[derive(Default)]
 pub(super) struct CustomQuerier {
@@ -47,7 +47,7 @@ impl CustomQuerier {
         if contract_addr == "global_config" {
           let mut allowed = HashMap::new();
           right(&mut allowed, AT_DELEGATION_CONTROLLER, "controller");
-          right(&mut allowed, &addresstype_asset_staking("test"), "lp_staking");
+          right(&mut allowed, &at_asset_staking("test"), "lp_staking");
 
           match allowed.get(key) {
             Some(result) => SystemResult::Ok(ContractResult::Ok(to_json_binary(result).unwrap())),

@@ -1,8 +1,8 @@
 use crate::contract::{execute, instantiate};
 use crate::state::CONFIG;
-use crate::token_factory::CustomExecuteMsg;
 use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockStorage};
 use cosmwasm_std::{DepsMut, Empty, OwnedDeps, Response, StdResult, Uint128};
+use ve3_shared::helpers::token_factory::CustomExecuteMsg;
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceDelegation, AllianceRedelegateMsg, AllianceRedelegation,
   AllianceUndelegateMsg, Config, ExecuteMsg, InstantiateMsg,
@@ -46,7 +46,10 @@ pub fn set_alliance_asset(deps: DepsMut) {
     .unwrap();
 }
 
-pub fn alliance_delegate(deps: DepsMut, delegations: Vec<(&str, u128)>) -> Response {
+pub fn alliance_delegate(
+  deps: DepsMut,
+  delegations: Vec<(&str, u128)>,
+) -> Response<CustomExecuteMsg> {
   let info = mock_info("controller", &[]);
   let env = mock_env();
   let delegations: Vec<AllianceDelegation> = delegations
@@ -62,7 +65,10 @@ pub fn alliance_delegate(deps: DepsMut, delegations: Vec<(&str, u128)>) -> Respo
   execute(deps, env, info, msg).unwrap()
 }
 
-pub fn alliance_undelegate(deps: DepsMut, delegations: Vec<(&str, u128)>) -> Response {
+pub fn alliance_undelegate(
+  deps: DepsMut,
+  delegations: Vec<(&str, u128)>,
+) -> Response<CustomExecuteMsg> {
   let info = mock_info("controller", &[]);
   let env = mock_env();
   let delegations: Vec<AllianceDelegation> = delegations
@@ -78,7 +84,10 @@ pub fn alliance_undelegate(deps: DepsMut, delegations: Vec<(&str, u128)>) -> Res
   execute(deps, env, info, msg).unwrap()
 }
 
-pub fn alliance_redelegate(deps: DepsMut, redelegations: Vec<(&str, &str, u128)>) -> Response {
+pub fn alliance_redelegate(
+  deps: DepsMut,
+  redelegations: Vec<(&str, &str, u128)>,
+) -> Response<CustomExecuteMsg> {
   let info = mock_info("controller", &[]);
   let env = mock_env();
   let redelegations: Vec<AllianceRedelegation> = redelegations

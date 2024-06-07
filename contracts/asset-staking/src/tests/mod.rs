@@ -1,6 +1,6 @@
-mod alliance;
-mod assets;
-mod helpers;
-mod instantiate;
-mod rewards;
-mod stake_unstake;
+// mod alliance;
+// mod assets;
+// mod helpers;
+// mod instantiate;
+// mod rewards;
+// mod stake_unstake;

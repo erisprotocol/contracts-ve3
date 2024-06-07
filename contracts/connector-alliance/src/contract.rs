@@ -3,17 +3,14 @@ use crate::constants::{
 };
 use crate::error::ContractError;
 use crate::state::{CONFIG, VALIDATORS};
-use crate::token_factory::{CustomExecuteMsg, DenomUnit, Metadata, TokenExecuteMsg};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  ensure, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, Reply, Response, StdError, SubMsg,
-  Uint128,
+  Binary, CosmosMsg, DepsMut, Env, MessageInfo, Reply, Response, StdError, SubMsg, Uint128,
 };
-use cw2::{get_contract_version, set_contract_version};
+use cw2::set_contract_version;
 use cw_asset::AssetInfoBase;
 use cw_utils::parse_instantiate_response_data;
-use semver::Version;
 use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::{
   MsgClaimDelegationRewards, MsgDelegate, MsgRedelegate, MsgUndelegate,
@@ -21,25 +18,16 @@ use terra_proto_rs::alliance::alliance::{
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
-use ve3_shared::constants::{addresstype_asset_staking, AT_DELEGATION_CONTROLLER};
+use ve3_shared::constants::{at_asset_staking, AT_DELEGATION_CONTROLLER};
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
+use ve3_shared::extensions::cosmosmsg_ext::CosmosMsgExt;
 use ve3_shared::extensions::env_ext::EnvExt;
+use ve3_shared::helpers::token_factory::{CustomExecuteMsg, DenomUnit, Metadata, TokenExecuteMsg};
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
-  ExecuteMsg, InstantiateMsg, MigrateMsg,
+  ExecuteMsg, InstantiateMsg,
 };
-
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-  let version: Version = CONTRACT_VERSION.parse()?;
-  let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;
-
-  ensure!(storage_version < version, StdError::generic_err("Invalid contract version"));
-
-  set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-  Ok(Response::default())
-}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -76,7 +64,7 @@ pub fn execute(
   env: Env,
   info: MessageInfo,
   msg: ExecuteMsg,
-) -> Result<Response, ContractError> {
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   match msg {
     ExecuteMsg::ClaimRewards {} => claim_rewards(deps, env, info),
     ExecuteMsg::AllianceDelegate(msg) => alliance_delegate(deps, env, info, msg),
@@ -94,7 +82,7 @@ fn callback(
   env: Env,
   info: MessageInfo,
   msg: CallbackMsg,
-) -> Result<Response, ContractError> {
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   if env.contract.address != info.sender {
     Err(SharedError::UnauthorizedCallbackOnlyCallableByContract {})?
   }
@@ -108,9 +96,9 @@ fn callback(
         asset.with_balance_query(&deps.querier, &env.contract.address)?.transfer_msg(receiver)?;
 
       Ok(
-        Response::new()
+        Response::<CustomExecuteMsg>::new()
           .add_attributes(vec![("action", "claim_rewards_callback")])
-          .add_message(transfer_msg),
+          .add_message(transfer_msg.to_specific()?),
       )
     },
   }
@@ -121,7 +109,7 @@ fn remove_validator(
   _env: Env,
   info: MessageInfo,
   validator: String,
-) -> Result<Response, ContractError> {
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
 
@@ -136,14 +124,14 @@ fn alliance_delegate(
   env: Env,
   info: MessageInfo,
   msg: AllianceDelegateMsg,
-) -> Result<Response, ContractError> {
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
   if msg.delegations.is_empty() {
     return Err(ContractError::EmptyDelegation {});
   }
   let mut validators = VALIDATORS.load(deps.storage)?;
-  let mut msgs: Vec<CosmosMsg<Empty>> = vec![];
+  let mut msgs: Vec<CosmosMsg<CustomExecuteMsg>> = vec![];
   for delegation in msg.delegations {
     let delegate_msg = MsgDelegate {
       amount: Some(Coin {
@@ -160,7 +148,11 @@ fn alliance_delegate(
     validators.insert(delegation.validator);
   }
   VALIDATORS.save(deps.storage, &validators)?;
-  Ok(Response::new().add_attributes(vec![("action", "alliance_delegate")]).add_messages(msgs))
+  Ok(
+    Response::<CustomExecuteMsg>::new()
+      .add_attributes(vec![("action", "alliance_delegate")])
+      .add_messages(msgs),
+  )
 }
 
 fn alliance_undelegate(
@@ -168,7 +160,7 @@ fn alliance_undelegate(
   env: Env,
   info: MessageInfo,
   msg: AllianceUndelegateMsg,
-) -> Result<Response, ContractError> {
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
   if msg.undelegations.is_empty() {
@@ -198,7 +190,7 @@ fn alliance_redelegate(
   env: Env,
   info: MessageInfo,
   msg: AllianceRedelegateMsg,
-) -> Result<Response, ContractError> {
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
   if msg.redelegations.is_empty() {
@@ -229,13 +221,17 @@ fn alliance_redelegate(
   Ok(Response::new().add_attributes(vec![("action", "alliance_redelegate")]).add_messages(msgs))
 }
 
-fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn claim_rewards(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   let config = CONFIG.load(deps.storage)?;
 
   assert_is_staking(&deps, &info, &config)?;
 
   let validators = VALIDATORS.load(deps.storage)?;
-  let sub_msgs: Vec<SubMsg> = validators
+  let sub_msgs: Vec<SubMsg<CustomExecuteMsg>> = validators
     .iter()
     .map(|v| {
       let msg = MsgClaimDelegationRewards {
@@ -253,13 +249,17 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
     .collect();
 
   Ok(
-    Response::new()
+    Response::<CustomExecuteMsg>::new()
       .add_attributes(vec![("action", "claim_rewards")])
       .add_submessages(sub_msgs)
-      .add_message(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::ClaimRewardsCallback {
-        asset: AssetInfoBase::Native(config.reward_denom),
-        receiver: info.sender,
-      }))?),
+      .add_message(
+        env
+          .callback_msg(ExecuteMsg::Callback(CallbackMsg::ClaimRewardsCallback {
+            asset: AssetInfoBase::Native(config.reward_denom),
+            receiver: info.sender,
+          }))?
+          .to_specific()?,
+      ),
   )
 }
 
@@ -330,7 +330,7 @@ fn assert_is_staking(
 ) -> Result<(), ContractError> {
   config.global_config().assert_has_access(
     &deps.querier,
-    &addresstype_asset_staking(&config.gauge),
+    &at_asset_staking(&config.gauge),
     &info.sender,
   )?;
   Ok(())

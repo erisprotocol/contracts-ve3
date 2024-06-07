@@ -1,13 +1,13 @@
 use crate::contract::reply;
 use crate::query::query;
 use crate::tests::helpers::{mock_dependencies, setup_contract};
-use crate::token_factory::{CustomExecuteMsg, DenomUnit, Metadata, TokenExecuteMsg};
 use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{
   from_json, Addr, Binary, CosmosMsg, Reply, Response, SubMsg, SubMsgResponse, SubMsgResult,
   Uint128,
 };
 use terra_proto_rs::traits::MessageExt;
+use ve3_shared::helpers::token_factory::{CustomExecuteMsg, DenomUnit, Metadata, TokenExecuteMsg};
 use ve3_shared::msgs_connector_alliance::{Config, QueryMsg};
 
 #[test]

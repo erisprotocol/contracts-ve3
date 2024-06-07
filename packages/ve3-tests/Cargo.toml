@@ -1,0 +1,47 @@
+[package]
+name = "ve3-tests"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+
+[dependencies]
+
+cosmwasm-std = { workspace = true, features = ["stargate"] }
+cosmwasm-schema.workspace = true
+cw-storage-plus.workspace = true
+cw-asset.workspace = true
+schemars.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+semver.workspace = true
+cw2.workspace = true
+cw-utils.workspace = true
+ve3-shared.workspace = true
+cw-ownable.workspace = true
+
+
+cw20.workspace = true
+cw20-base.workspace = true
+cw-multi-test = { version = "1.1.0", default-features = false }
+
+ve3-asset-gauge = {path = "../../contracts/asset-gauge"}
+ve3-asset-staking = {path = "../../contracts/asset-staking"}
+ve3-bribe-manager = {path = "../../contracts/bribe-manager"}
+ve3-connector-alliance = {path = "../../contracts/connector-alliance"}
+ve3-global-config = {path = "../../contracts/global-config"}
+ve3-voting-escrow = {path = "../../contracts/voting-escrow"}
+
+# astroport = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "bc68bb65cc2f7d5916c1f0ea41de3b19b5b63b62" }
+# stader = { git = "https://github.com/stader-labs/lunax.git", package="staking", default-features = false, rev = "20143548e2dea807b343fe6ad60375086af35ea9"}
+
+eris-staking-token = { git = "https://github.com/erisprotocol/contracts-terra.git", default-features = false, rev = "dbcaa4db951f2bec6e239ccf94f25c85f3bed80a"}
+
+anyhow = "1"

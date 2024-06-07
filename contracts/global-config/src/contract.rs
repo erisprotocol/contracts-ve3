@@ -5,7 +5,7 @@ use crate::{
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 use cw_ownable::update_ownership;
 use ve3_shared::msgs_global_config::{ExecuteMsg, InstantiateMsg};
@@ -31,15 +31,17 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
     },
     ExecuteMsg::SetAddresses {
       addresses,
-    } => set_addresses(deps, info.sender, addresses),
-    ExecuteMsg::SetAdressList {
-      address_type,
-      addresses,
-    } => set_address_list(deps, info.sender, address_type, addresses),
+      lists,
+    } => set_addresses(deps, info.sender, addresses, lists),
   }
 }
 
-fn set_addresses(deps: DepsMut, sender: Addr, addresses: Vec<(String, String)>) -> ContractResult {
+fn set_addresses(
+  mut deps: DepsMut,
+  sender: Addr,
+  addresses: Vec<(String, String)>,
+  lists: Vec<(String, Vec<String>)>,
+) -> ContractResult {
   cw_ownable::assert_owner(deps.storage, &sender)?;
 
   for (address_type, address) in addresses {
@@ -50,23 +52,19 @@ fn set_addresses(deps: DepsMut, sender: Addr, addresses: Vec<(String, String)>) 
     }
   }
 
+  for (address_type, list) in lists {
+    set_address_list(&mut deps, address_type, list)?;
+  }
+
   Ok(Response::new().add_attribute("action", "set_addresses"))
 }
 
-fn set_address_list(
-  deps: DepsMut,
-  sender: Addr,
-  address_type: String,
-  addresses: Vec<String>,
-) -> ContractResult {
-  cw_ownable::assert_owner(deps.storage, &sender)?;
-
+fn set_address_list(deps: &mut DepsMut, address_type: String, list: Vec<String>) -> StdResult<()> {
   let mut addresses_addr = vec![];
-  for address in addresses {
+  for address in list {
     addresses_addr.push(deps.api.addr_validate(&address)?);
   }
 
   ADDRESS_LIST.save(deps.storage, address_type, &addresses_addr)?;
-
-  Ok(Response::new().add_attribute("action", "set_address_list"))
+  Ok(())
 }

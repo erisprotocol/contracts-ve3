@@ -20,3 +20,4 @@ schemars.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 semver.workspace = true
+cw-address-like.workspace = true

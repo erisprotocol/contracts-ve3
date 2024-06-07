@@ -19,7 +19,7 @@ use ve3_shared::{
   constants::{AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES},
   error::SharedError,
   extensions::{
-    asset_ext::{AssetExt, AssetsExt},
+    asset_ext::{AssetExt, AssetsExt, AssetsUncheckedExt},
     asset_info_ext::AssetInfoExt,
   },
   helpers::{assets::Assets, governance::get_period, time::Times},
@@ -36,14 +36,17 @@ pub fn instantiate(
 ) -> ContractResult {
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-  msg.fee.info.assert_native()?;
+  let fee = msg.fee.check(deps.api, None)?;
+  fee.info.assert_native()?;
+
+  let whitelist = msg.whitelist.check(deps.api)?;
 
   CONFIG.save(
     deps.storage,
     &Config {
       global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
-      whitelist: msg.whitelisted,
-      fee: msg.fee,
+      whitelist,
+      fee,
       allow_any: false,
     },
   )?;
@@ -59,7 +62,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       distribution,
       gauge,
       for_info,
-    } => add_bribe(deps, info, env, bribe, gauge, for_info, distribution),
+    } => {
+      let bribe = bribe.check(deps.api, None)?;
+      let for_info = for_info.check(deps.api, None)?;
+
+      add_bribe(deps, info, env, bribe, gauge, for_info, distribution)
+    },
     ExecuteMsg::WithdrawBribes {
       period,
     } => withdraw_bribes(deps, info, env, period),
@@ -68,8 +76,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
     } => claim_bribes(deps, env, info, periods),
 
     // controller
-    ExecuteMsg::WhitelistAssets(assets) => whitelist_assets(deps, info, assets),
-    ExecuteMsg::RemoveAssets(assets) => remove_assets(deps, info, assets),
+    ExecuteMsg::WhitelistAssets(assets) => {
+      let assets = assets.check(deps.api)?;
+      whitelist_assets(deps, info, assets)
+    },
+    ExecuteMsg::RemoveAssets(assets) => {
+      let assets = assets.check(deps.api)?;
+      remove_assets(deps, info, assets)
+    },
     ExecuteMsg::UpdateConfig {
       fee,
       allow_any,
@@ -78,6 +92,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       config.global_config().assert_owner(&deps.querier, &info.sender)?;
 
       if let Some(fee) = fee {
+        let fee = fee.check(deps.api, None)?;
         fee.info.assert_native()?;
         config.fee = fee;
       }

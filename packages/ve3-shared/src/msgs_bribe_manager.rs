@@ -6,22 +6,21 @@ use crate::{
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, QuerierWrapper, Uint128};
-use cw_asset::{Asset, AssetInfo};
+use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked, AssetUnchecked};
 
 #[cw_serde]
 pub struct InstantiateMsg {
   pub global_config_addr: String,
-  pub whitelisted: Vec<AssetInfo>,
-  pub fee: Asset,
-  pub fee_recipient: Option<String>,
+  pub whitelist: Vec<AssetInfoUnchecked>,
+  pub fee: AssetUnchecked,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
   AddBribe {
-    bribe: Asset,
+    bribe: AssetUnchecked,
     gauge: String,
-    for_info: AssetInfo,
+    for_info: AssetInfoUnchecked,
     distribution: BribeDistribution,
   },
 
@@ -34,11 +33,11 @@ pub enum ExecuteMsg {
   },
 
   // controller
-  WhitelistAssets(Vec<AssetInfo>),
-  RemoveAssets(Vec<AssetInfo>),
+  WhitelistAssets(Vec<AssetInfoUnchecked>),
+  RemoveAssets(Vec<AssetInfoUnchecked>),
 
   UpdateConfig {
-    fee: Option<Asset>,
+    fee: Option<AssetUnchecked>,
     allow_any: Option<bool>,
   },
 }

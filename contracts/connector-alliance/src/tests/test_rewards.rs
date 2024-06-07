@@ -8,8 +8,9 @@ use cw_asset::AssetInfo;
 use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::MsgClaimDelegationRewards;
 use terra_proto_rs::traits::Message;
-use ve3_shared::constants::addresstype_asset_staking;
+use ve3_shared::constants::at_asset_staking;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
+use ve3_shared::extensions::cosmosmsg_ext::CosmosMsgExt;
 use ve3_shared::msgs_connector_alliance::{CallbackMsg, ExecuteMsg};
 
 #[test]
@@ -28,7 +29,7 @@ fn test_update_rewards() {
   assert_eq!(
     res,
     ContractError::SharedError(ve3_shared::error::SharedError::UnauthorizedMissingRight(
-      addresstype_asset_staking("test"),
+      at_asset_staking("test"),
       "user".to_string()
     ))
   );
@@ -51,7 +52,9 @@ fn test_update_rewards() {
             }
             .encode_to_vec()
           ),
-        },
+        }
+        .to_specific()
+        .unwrap(),
         2,
       ),
       SubMsg::new(
@@ -60,6 +63,8 @@ fn test_update_rewards() {
           receiver: Addr::unchecked("lp_staking")
         }
         .into_cosmos_msg(&Addr::unchecked("cosmos2contract"))
+        .unwrap()
+        .to_specific()
         .unwrap()
       ),
     ]
@@ -89,6 +94,8 @@ fn update_reward_callback() {
       AssetInfo::native("uluna")
         .with_balance_u128(2000000u128)
         .transfer_msg("user".to_string())
+        .unwrap()
+        .to_specific()
         .unwrap()
     )
   );

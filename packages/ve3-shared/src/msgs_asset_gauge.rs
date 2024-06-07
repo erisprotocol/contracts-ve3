@@ -1,6 +1,6 @@
 use crate::{
   adapters::{asset_staking::AssetStaking, global_config_adapter::ConfigExt},
-  constants::{addresstype_asset_staking, AT_GAUGE_CONTROLLER},
+  constants::{at_asset_staking, AT_GAUGE_CONTROLLER},
   error::SharedError,
   helpers::time::Times,
   msgs_voting_escrow::LockInfoResponse,
@@ -147,7 +147,7 @@ impl Config {
   ) -> Result<AssetStaking, SharedError> {
     self
       .global_config()
-      .get_address(&deps.querier, &addresstype_asset_staking(gauge))
+      .get_address(&deps.querier, &at_asset_staking(gauge))
       .map(AssetStaking)
   }
 }

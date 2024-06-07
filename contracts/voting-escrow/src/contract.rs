@@ -16,8 +16,8 @@ use cosmwasm_std::{
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ReceiveMsg;
-use cw_asset::{Asset, AssetInfoUnchecked};
-use std::collections::{HashMap, HashSet};
+use cw_asset::Asset;
+use std::collections::HashSet;
 use std::str::FromStr;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{AT_VE_GUARDIAN, EPOCH_START, MIN_LOCK_PERIODS, WEEK};
@@ -28,7 +28,7 @@ use ve3_shared::helpers::general::{addr_opt_fallback, validate_addresses};
 use ve3_shared::helpers::governance::{get_period, get_periods_count};
 use ve3_shared::helpers::slope::{adjust_vp_and_slope, calc_coefficient};
 use ve3_shared::msgs_voting_escrow::{
-  AssetInfoConfig, Config, ExecuteMsg, InstantiateMsg, LockInfoResponse, MigrateMsg,
+  AssetInfoConfig, Config, DepositAsset, ExecuteMsg, InstantiateMsg, LockInfoResponse, MigrateMsg,
   PushExecuteMsg, ReceiveMsg, VeNftCollection,
 };
 
@@ -42,21 +42,13 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-  let validated = msg
-    .deposit_assets
-    .into_iter()
-    .map(|(asset, config)| -> Result<_, ContractError> {
-      let asset = AssetInfoUnchecked::from_str(&asset)?.check(deps.api, None)?;
-
-      Ok((asset, config))
-    })
-    .collect::<Result<HashMap<_, _>, ContractError>>()?;
+  let deposit_assets = validate_deposit_assets(&deps, msg.deposit_assets)?;
 
   let config = Config {
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
     push_update_contracts: vec![],
     decommissioned: None,
-    allowed_deposit_assets: validated,
+    deposit_assets,
   };
   CONFIG.save(deps.storage, &config)?;
 
@@ -86,6 +78,21 @@ pub fn instantiate(
   )?;
 
   Ok(Response::default())
+}
+
+fn validate_deposit_assets(
+  deps: &DepsMut,
+  assets: Vec<DepositAsset<String>>,
+) -> Result<Vec<DepositAsset<Addr>>, ContractError> {
+  assets
+    .into_iter()
+    .map(|asset| -> Result<_, ContractError> {
+      Ok(DepositAsset {
+        config: asset.config,
+        info: asset.info.check(deps.api, None)?,
+      })
+    })
+    .collect()
 }
 
 /// Exposes all the execute functions available in the contract.
@@ -137,7 +144,7 @@ pub fn execute(
       time,
     } => {
       let config = CONFIG.load(deps.storage)?;
-      let asset = validate_received_funds(&info.funds, &config.allowed_deposit_assets)?;
+      let asset = validate_received_funds(&info.funds, &config.deposit_assets)?;
       create_lock(deps, env, nft, config, info.sender, asset, time)
     },
     ExecuteMsg::ExtendLockTime {
@@ -148,7 +155,7 @@ pub fn execute(
       token_id,
     } => {
       let config = CONFIG.load(deps.storage)?;
-      let asset = validate_received_funds(&info.funds, &config.allowed_deposit_assets)?;
+      let asset = validate_received_funds(&info.funds, &config.deposit_assets)?;
       deposit_for(deps, env, nft, config, info.sender, asset, token_id)
     },
 
@@ -208,14 +215,14 @@ fn receive(
       time,
     } => {
       let config = CONFIG.load(deps.storage)?;
-      let asset_validated = validate_received_cw20(received, &config.allowed_deposit_assets)?;
+      let asset_validated = validate_received_cw20(received, &config.deposit_assets)?;
       create_lock(deps, env, nft, config, sender, asset_validated, time)
     },
     ReceiveMsg::ExtendLockAmount {
       token_id,
     } => {
       let config = CONFIG.load(deps.storage)?;
-      let asset = validate_received_cw20(received, &config.allowed_deposit_assets)?;
+      let asset = validate_received_cw20(received, &config.deposit_assets)?;
       deposit_for(deps, env, nft, config, sender, asset, token_id)
     },
   }
@@ -582,11 +589,11 @@ fn merge_lock(
     return Err(ContractError::LocksNeedSameEnd(token_id_1.to_string(), token_id_2.to_string()));
   }
 
-  let asset_config = &config.allowed_deposit_assets[&lock1.asset.info];
+  let asset_config = assert_asset_allowed(&config, &lock1.asset)?;
 
   // update existing lock that is reduced by new_lock_amount
   lock1.asset.amount = lock1.asset.amount.checked_add(lock2.asset.amount)?;
-  let underlying_change = lock1.update_underlying(&deps, asset_config)?;
+  let underlying_change = lock1.update_underlying(&deps, &asset_config)?;
 
   // save lock & keep NFT data in sync
   LOCKED.save(deps.storage, token_id_1_str, &lock1, env.block.height)?;
@@ -637,7 +644,7 @@ fn split_lock(
     .tokens
     .load(deps.storage, token_id_str)
     .map_err(|_| ContractError::LockDoesNotExist(token_id.to_string()))?;
-  let asset_config = &config.allowed_deposit_assets[&lock.asset.info];
+  let asset_config = assert_asset_allowed(&config, &lock.asset)?;
 
   // only allow editing of locks by approvals
   nft.check_can_send(deps.as_ref(), &env, &message_info(sender), &token)?;
@@ -841,7 +848,7 @@ fn extend_lock_time(
     .tokens
     .load(deps.storage, token_id_str)
     .map_err(|_| ContractError::LockDoesNotExist(token_id.to_string()))?;
-  let asset_config = &config.allowed_deposit_assets[&lock.asset.info];
+  let asset_config = assert_asset_allowed(&config, &lock.asset)?;
 
   // only allow editing of locks by approvals
   nft.check_can_send(deps.as_ref(), &env, &message_info(sender), &token)?;
@@ -856,7 +863,7 @@ fn extend_lock_time(
   };
 
   lock.end += get_periods_count(time);
-  let underlying_change = lock.update_underlying(&deps, asset_config)?;
+  let underlying_change = lock.update_underlying(&deps, &asset_config)?;
 
   let periods = lock.end - block_period;
   assert_periods_remaining(periods)?;
@@ -1232,7 +1239,7 @@ fn execute_update_config(
   info: MessageInfo,
   push_update_contracts: Option<Vec<String>>,
   decommissioned: Option<bool>,
-  append_deposit_assets: Option<HashMap<String, AssetInfoConfig>>,
+  append_deposit_assets: Option<Vec<DepositAsset<String>>>,
 ) -> Result<Response, ContractError> {
   let mut config = CONFIG.load(deps.storage)?;
 
@@ -1252,8 +1259,10 @@ fn execute_update_config(
   }
 
   if let Some(append_deposit_assets) = append_deposit_assets {
-    for (asset, asset_config) in append_deposit_assets.into_iter() {
-      match &asset_config {
+    let deposit_assets = validate_deposit_assets(&deps, append_deposit_assets)?;
+
+    for deposit_asset in deposit_assets.into_iter() {
+      match &deposit_asset.config {
         AssetInfoConfig::Default => (),
         AssetInfoConfig::ExchangeRate {
           contract,
@@ -1262,9 +1271,8 @@ fn execute_update_config(
         },
       }
 
-      // we override existing asset config if it exists.
-      let asset_info = AssetInfoUnchecked::from_str(&asset)?.check(deps.api, None)?;
-      config.allowed_deposit_assets.insert(asset_info, asset_config);
+      config.deposit_assets.retain(|a| a.info != deposit_asset.info);
+      config.deposit_assets.push(deposit_asset);
     }
   }
 

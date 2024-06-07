@@ -1,6 +1,6 @@
 use crate::{
   adapters::{bribe_manager::BribeManager, connector::Connector, global_config_adapter::ConfigExt},
-  constants::{AT_BRIBE_MANAGER, AT_CONNECTOR},
+  constants::{at_connector, AT_BRIBE_MANAGER},
   error::SharedError,
   stake_config::StakeConfig,
 };
@@ -18,8 +18,8 @@ pub struct Config {
 }
 
 impl Config {
-  pub fn get_connector(&self, deps: &DepsMut) -> Result<Connector, SharedError> {
-    Ok(Connector(self.get_address(&deps.querier, AT_CONNECTOR)?))
+  pub fn get_connector(&self, deps: &DepsMut, gauge: &str) -> Result<Connector, SharedError> {
+    Ok(Connector(self.get_address(&deps.querier, &at_connector(gauge))?))
   }
   pub fn get_bribe_manager(&self, deps: &DepsMut) -> Result<BribeManager, SharedError> {
     Ok(BribeManager(self.get_address(&deps.querier, AT_BRIBE_MANAGER)?))

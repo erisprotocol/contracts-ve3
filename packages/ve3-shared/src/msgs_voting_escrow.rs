@@ -16,8 +16,9 @@ use cw721::{
 use cw721_base::ExecuteMsg as CW721ExecuteMsg;
 use cw721_base::MinterResponse;
 use cw721_base::QueryMsg as CW721QueryMsg;
-use cw_asset::{Asset, AssetInfo};
-use std::{collections::HashMap, fmt};
+use cw_address_like::AddressLike;
+use cw_asset::{Asset, AssetInfoBase};
+use std::fmt;
 
 /// This structure stores marketing information for voting escrow.
 #[cw_serde]
@@ -38,7 +39,13 @@ pub struct InstantiateMsg {
   // global address config
   pub global_config_addr: String,
   // assets that are allowed to be locked including a config of how to calculate base power
-  pub deposit_assets: HashMap<String, AssetInfoConfig>,
+  pub deposit_assets: Vec<DepositAsset<String>>,
+}
+
+#[cw_serde]
+pub struct DepositAsset<T: AddressLike> {
+  pub info: AssetInfoBase<T>,
+  pub config: AssetInfoConfig,
 }
 
 /// This structure describes the execute functions in the contract.
@@ -83,7 +90,7 @@ pub enum ExecuteMsg {
   UpdateConfig {
     // assets that are allowed to be locked including a config of how to calculate base power
     // for now removal is not supported
-    append_deposit_assets: Option<HashMap<String, AssetInfoConfig>>,
+    append_deposit_assets: Option<Vec<DepositAsset<String>>>,
 
     push_update_contracts: Option<Vec<String>>,
     // allows withdrawals of tokens.
@@ -508,7 +515,7 @@ pub struct Config {
   // global address config
   pub global_config_addr: Addr,
   // assets that are allowed to be locked including a config of how to calculate base power
-  pub allowed_deposit_assets: HashMap<AssetInfo, AssetInfoConfig>,
+  pub deposit_assets: Vec<DepositAsset<Addr>>,
   /// The list of contracts to receive updates on user's lock info changes
   pub push_update_contracts: Vec<Addr>,
   /// Address that can only blacklist vAMP stakers and remove their governance power

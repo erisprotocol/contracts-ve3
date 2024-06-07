@@ -1,8 +1,8 @@
 use std::convert::TryInto;
 
-use cosmwasm_std::{to_json_binary, Coin, CosmosMsg, MessageInfo, WasmMsg};
+use cosmwasm_std::{to_json_binary, Api, Coin, CosmosMsg, MessageInfo, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Expiration};
-use cw_asset::{Asset, AssetInfoBase};
+use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 
 use crate::error::SharedError;
 
@@ -59,5 +59,15 @@ impl AssetsExt for Vec<&Asset> {
       }
       Ok(())
     }
+  }
+}
+
+pub trait AssetsUncheckedExt {
+  fn check(self, api: &dyn Api) -> Result<Vec<AssetInfo>, AssetError>;
+}
+
+impl AssetsUncheckedExt for Vec<AssetInfoUnchecked> {
+  fn check(self, api: &dyn Api) -> Result<Vec<AssetInfo>, AssetError> {
+    self.into_iter().map(|a| a.check(api, None)).collect::<Result<Vec<AssetInfo>, AssetError>>()
   }
 }

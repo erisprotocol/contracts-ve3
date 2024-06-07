@@ -4,7 +4,6 @@ use crate::state::{
   ASSET_BRIBES, ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, BALANCES, CONFIG,
   TOTAL_BALANCES, UNCLAIMED_REWARDS, USER_ASSET_REWARD_RATE, WHITELIST,
 };
-use crate::token_factory::CustomExecuteMsg;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -16,8 +15,7 @@ use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo};
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{
-  AT_ASSET_WHITELIST_CONTROLLER, AT_REWARD_DISTRIBUTION_CONTROLLER, AT_TAKE_RECIPIENT,
-  SECONDS_PER_YEAR,
+  AT_ASSET_GAUGE, AT_ASSET_WHITELIST_CONTROLLER, AT_TAKE_RECIPIENT, SECONDS_PER_YEAR,
 };
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
@@ -34,7 +32,7 @@ pub fn instantiate(
   _env: Env,
   _info: MessageInfo,
   msg: InstantiateMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
   let config = Config {
@@ -634,7 +632,7 @@ fn update_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
   }
 
   let config = CONFIG.load(deps.storage)?;
-  let connector = config.get_connector(&deps)?;
+  let connector = config.get_connector(&deps, &config.gauge)?;
 
   let initial_balance =
     config.reward_info.with_balance_query(&deps.querier, &env.contract.address)?;
@@ -741,10 +739,6 @@ fn assert_distribution_controller(
   info: &MessageInfo,
   config: &Config,
 ) -> Result<(), ContractError> {
-  config.global_config().assert_has_access(
-    &deps.querier,
-    AT_REWARD_DISTRIBUTION_CONTROLLER,
-    &info.sender,
-  )?;
+  config.global_config().assert_has_access(&deps.querier, AT_ASSET_GAUGE, &info.sender)?;
   Ok(())
 }

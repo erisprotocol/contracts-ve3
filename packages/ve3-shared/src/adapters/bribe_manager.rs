@@ -22,9 +22,9 @@ impl BribeManager {
         vec![CosmosMsg::Wasm(WasmMsg::Execute {
           contract_addr: self.0.to_string(),
           msg: to_json_binary(&ExecuteMsg::AddBribe {
-            bribe: bribe.clone(),
+            bribe: bribe.clone().into(),
             gauge,
-            for_info,
+            for_info: for_info.into(),
             distribution: BribeDistribution::Next,
           })?,
           funds: vec![coin(bribe.amount.u128(), denom)],
@@ -40,9 +40,9 @@ impl BribeManager {
         CosmosMsg::Wasm(WasmMsg::Execute {
           contract_addr: self.0.to_string(),
           msg: to_json_binary(&ExecuteMsg::AddBribe {
-            bribe,
+            bribe: bribe.into(),
             gauge,
-            for_info,
+            for_info: for_info.into(),
             distribution: BribeDistribution::Next,
           })?,
           funds: vec![],

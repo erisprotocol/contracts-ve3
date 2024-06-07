@@ -6,11 +6,15 @@ use crate::{
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, Response};
 use cw2::{get_contract_version, set_contract_version};
-use ve3_shared::{msgs_global_config::MigrateMsg, error::SharedError};
+use ve3_shared::{error::SharedError, helpers::token_factory::CustomExecuteMsg, msgs_connector_alliance::MigrateMsg};
 
 /// Manages contract migration
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(
+  deps: DepsMut,
+  _env: Env,
+  _msg: MigrateMsg,
+) -> Result<Response<CustomExecuteMsg>, ContractError> {
   let contract_version = get_contract_version(deps.storage)?;
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
