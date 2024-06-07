@@ -21,14 +21,14 @@ use terra_proto_rs::alliance::alliance::{
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
-use ve3_shared::constants::{AT_ASSET_STAKING, AT_DELEGATION_CONTROLLER};
+use ve3_shared::constants::{addresstype_asset_staking, AT_DELEGATION_CONTROLLER};
+use ve3_shared::error::SharedError;
+use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
+use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
   ExecuteMsg, InstantiateMsg, MigrateMsg,
 };
-use ve3_shared::error::SharedError;
-use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
-use ve3_shared::extensions::env_ext::EnvExt;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
@@ -62,6 +62,7 @@ pub fn instantiate(
     alliance_token_supply: Uint128::zero(),
     reward_denom: msg.reward_denom,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
+    gauge: msg.gauge,
   };
   CONFIG.save(deps.storage, &config)?;
 
@@ -327,7 +328,11 @@ fn assert_is_staking(
   info: &MessageInfo,
   config: &Config,
 ) -> Result<(), ContractError> {
-  config.global_config().assert_has_access(&deps.querier, AT_ASSET_STAKING, &info.sender)?;
+  config.global_config().assert_has_access(
+    &deps.querier,
+    &addresstype_asset_staking(&config.gauge),
+    &info.sender,
+  )?;
   Ok(())
 }
 

@@ -14,12 +14,11 @@ use itertools::Itertools;
 use std::collections::HashSet;
 use std::convert::TryInto;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
-use ve3_shared::adapters::ve3_asset_staking::Ve3AssetStaking;
-use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, MigrateMsg};
-use ve3_shared::constants::{AT_GAUGE_CONTROLLER, AT_VOTING_ESCROW};
-use ve3_shared::msgs_asset_staking::AssetDistribution;
+use ve3_shared::constants::AT_VOTING_ESCROW;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
+use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, MigrateMsg};
+use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::msgs_voting_escrow::LockInfoResponse;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
@@ -33,10 +32,6 @@ pub fn instantiate(
   msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-  for gauge in msg.gauges.iter() {
-    deps.api.addr_validate(gauge.target.as_str())?;
-  }
 
   CONFIG.save(
     deps.storage,
@@ -89,7 +84,6 @@ pub fn execute(
       config.global_config().assert_owner(&deps.querier, &info.sender)?;
 
       if let Some(gauge) = update_gauge {
-        deps.api.addr_validate(gauge.target.as_str())?;
         config.gauges.retain(|a| a.name != gauge.name);
         config.gauges.push(gauge);
       }
@@ -115,7 +109,7 @@ fn handle_vote(
   let gauge = &gauge;
   let block_period = get_period(env.block.time.seconds())?;
   let config = CONFIG.load(deps.storage)?;
-  let gauge_config = config.assert_gauge(gauge)?;
+  config.assert_gauge(gauge)?;
 
   let user_index = user_idx();
   let asset_index = AssetIndex::new(gauge);
@@ -130,7 +124,8 @@ fn handle_vote(
     fetch_last_gauge_vote(deps.storage, gauge, sender.as_str(), block_period + 1)?
       .unwrap_or_default();
 
-  let allowed = gauge_config.query_whitelisted_assets_str(&deps.querier)?;
+  let allowed =
+    config.get_asset_staking(&deps, gauge)?.query_whitelisted_assets_str(&deps.querier)?;
 
   let mut values_set: HashSet<_> = HashSet::new();
   let mut changes =
@@ -281,15 +276,15 @@ fn set_distribution(
   info: MessageInfo,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
-  config.global_config().assert_has_access(&deps.querier, AT_GAUGE_CONTROLLER, &info.sender)?;
+  config.assert_gauge_controller(&deps, &info.sender)?;
   let block_period = get_period(env.block.time.seconds())?;
 
   let mut attrs = vec![];
   let mut msgs = vec![];
-  for gauge_config in config.gauges {
-    let asset_staking = Ve3AssetStaking(gauge_config.target.clone());
-    let assets = asset_staking.query_whitelisted_assets(&deps.branch().querier)?;
+  for gauge_config in config.gauges.iter() {
     let gauge = &gauge_config.name;
+    let asset_staking = config.get_asset_staking(&deps, gauge)?;
+    let assets = asset_staking.query_whitelisted_assets(&deps.branch().querier)?;
     let mut periods = vec![];
 
     let distribution =
@@ -298,22 +293,22 @@ fn set_distribution(
 
         Some((mut last_period, _)) => {
           while last_period < block_period {
-            _set_distribution(deps.branch(), &env, &gauge_config, &assets, last_period)?;
+            _set_distribution(deps.branch(), &env, gauge_config, &assets, last_period)?;
             periods.push(last_period);
             last_period += 1;
           }
 
           periods.push(block_period);
-          Some(_set_distribution(deps.branch(), &env, &gauge_config, &assets, block_period)?)
+          Some(_set_distribution(deps.branch(), &env, gauge_config, &assets, block_period)?)
         },
 
         None => {
           periods.push(block_period);
-          Some(_set_distribution(deps.branch(), &env, &gauge_config, &assets, block_period)?)
+          Some(_set_distribution(deps.branch(), &env, gauge_config, &assets, block_period)?)
         },
       };
 
-    attrs.push(attr("gauge", gauge_config.name));
+    attrs.push(attr("gauge", gauge_config.name.clone()));
     attrs.push(attr("periods", periods.iter().join(",")));
 
     if let Some(new_distribution) = distribution {

@@ -55,6 +55,22 @@ impl GlobalConfig {
     }
   }
 
+  pub fn is_in_list(
+    &self,
+    querier: &QuerierWrapper,
+    address_type: &str,
+    sender: &Addr,
+  ) -> Result<bool, SharedError> {
+    let address_list = ADDRESS_LIST.query(querier, self.0.clone(), address_type.to_string())?;
+    if let Some(allowed) = address_list {
+      if allowed.contains(sender) {
+        return Ok(true);
+      }
+    }
+
+    Ok(false)
+  }
+
   pub fn assert_has_access(
     &self,
     querier: &QuerierWrapper,

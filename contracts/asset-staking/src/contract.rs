@@ -1,7 +1,7 @@
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::state::{
-  ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, ASSET_TRIBUTES, BALANCES, CONFIG,
+  ASSET_BRIBES, ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, BALANCES, CONFIG,
   TOTAL_BALANCES, UNCLAIMED_REWARDS, USER_ASSET_REWARD_RATE, WHITELIST,
 };
 use crate::token_factory::CustomExecuteMsg;
@@ -19,14 +19,14 @@ use ve3_shared::constants::{
   AT_ASSET_WHITELIST_CONTROLLER, AT_REWARD_DISTRIBUTION_CONTROLLER, AT_TAKE_RECIPIENT,
   SECONDS_PER_YEAR,
 };
-use ve3_shared::msgs_asset_staking::{
-  AssetConfigRuntime, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg,
-  InstantiateMsg, UpdateAssetConfig,
-};
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::general::addr_opt_fallback;
+use ve3_shared::msgs_asset_staking::{
+  AssetConfigRuntime, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg,
+  InstantiateMsg, UpdateAssetConfig,
+};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -38,8 +38,10 @@ pub fn instantiate(
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
   let config = Config {
-    reward_denom: msg.reward_denom,
+    reward_info: msg.reward_info,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
+    default_yearly_take_rate: msg.default_yearly_take_rate,
+    gauge: msg.gauge,
   };
   CONFIG.save(deps.storage, &config)?;
   Ok(Response::new().add_attributes(vec![("action", "instantiate")]))
@@ -78,6 +80,11 @@ pub fn execute(
       assets,
     } => distribute_take_rate(deps, env, info, update, assets),
 
+    ExecuteMsg::DistributeBribes {
+      update,
+      assets,
+    } => distribute_bribes(deps, env, info, update, assets),
+
     // controller
     ExecuteMsg::WhitelistAssets(assets) => whitelist_assets(deps, info, assets),
     ExecuteMsg::RemoveAssets(assets) => remove_assets(deps, info, assets),
@@ -107,10 +114,13 @@ fn callback(
     CallbackMsg::UpdateRewards {
       initial_balance,
     } => update_reward_callback(deps, env, info, initial_balance),
-    CallbackMsg::AddTributes {
-      asset,
+    CallbackMsg::TrackBribes {
+      for_asset: asset,
       initial_balances,
-    } => add_tributes_callback(deps, env, info, asset, initial_balances),
+    } => track_bribes_callback(deps, env, info, asset, initial_balances),
+    CallbackMsg::DistributeBribes {
+      assets,
+    } => distribute_bribes_callback(deps, env, info, assets),
   }
 }
 
@@ -203,19 +213,31 @@ fn update_asset_config(
 fn whitelist_assets(
   deps: DepsMut,
   info: MessageInfo,
-  assets: Vec<AssetInfo>,
+  infos: Vec<AssetInfo>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_asset_whitelist_controller(&deps, &info, &config)?;
 
-  for asset in &assets {
-    WHITELIST.save(deps.storage, asset, &true)?;
-    ASSET_REWARD_RATE.update(deps.storage, asset, |rate| -> StdResult<_> {
-      Ok(rate.unwrap_or(Decimal::zero()))
-    })?;
+  for info in &infos {
+    if info == &config.reward_info {
+      return Err(ContractError::AssetInfoCannotEqualReward {});
+    }
+
+    WHITELIST.save(deps.storage, info, &true)?;
+    ASSET_REWARD_RATE
+      .update(deps.storage, info, |rate| -> StdResult<_> { Ok(rate.unwrap_or(Decimal::zero())) })?;
+
+    ASSET_CONFIG.save(
+      deps.storage,
+      info,
+      &AssetConfigRuntime {
+        yearly_take_rate: config.default_yearly_take_rate,
+        ..Default::default()
+      },
+    )?;
   }
 
-  let assets_str = assets.iter().map(|asset| asset.to_string()).collect::<Vec<String>>().join(",");
+  let assets_str = infos.iter().map(|asset| asset.to_string()).collect::<Vec<String>>().join(",");
 
   Ok(Response::new().add_attributes(vec![("action", "whitelist_assets"), ("assets", &assets_str)]))
 }
@@ -450,10 +472,7 @@ fn claim_rewards(
     ("reward_amount", &final_rewards.to_string()),
   ]);
   if !final_rewards.is_zero() {
-    let rewards_asset = Asset {
-      info: AssetInfo::Native(config.reward_denom),
-      amount: final_rewards,
-    };
+    let rewards_asset = config.reward_info.with_balance(final_rewards);
     Ok(response.add_message(rewards_asset.transfer_msg(&user)?))
   } else {
     Ok(response)
@@ -503,7 +522,7 @@ fn distribute_take_rate(
   let mut response = Response::new().add_attributes(vec![("action", "distribute_take_rate")]);
   let recipient = config.get_address(&deps.querier, AT_TAKE_RECIPIENT)?;
   for asset in assets {
-    let mut config = if let Some(true) = update {
+    let mut config = if update == Some(true) {
       // if it should also update extraction, take the asset config from the result.
       let (balance, _) = TOTAL_BALANCES.may_load(deps.storage, &asset)?.unwrap_or_default();
       // no need to save, as we will save it anyways
@@ -511,7 +530,7 @@ fn distribute_take_rate(
       config
     } else {
       // otherwise just load it.
-      ASSET_CONFIG.load(deps.storage, &asset)?
+      ASSET_CONFIG.may_load(deps.storage, &asset)?.unwrap_or_default()
     };
 
     let take_amount = config.taken.checked_sub(config.harvested)?;
@@ -539,6 +558,76 @@ fn distribute_take_rate(
   Ok(response)
 }
 
+fn distribute_bribes(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  update: Option<bool>,
+  assets: Option<Vec<AssetInfo>>,
+) -> Result<Response, ContractError> {
+  let assets = if let Some(assets) = assets {
+    assets
+  } else {
+    WHITELIST.keys(deps.storage, None, None, Order::Ascending).collect::<StdResult<_>>()?
+  };
+
+  if update == Some(true) {
+    let mut msgs = vec![];
+    for asset in assets.iter() {
+      let asset_config = ASSET_CONFIG.may_load(deps.storage, asset)?.unwrap_or_default();
+      let claim_msgs =
+        asset_config.stake_config.claim_check_received_msg(&deps, &env, asset.clone())?;
+      msgs.extend(claim_msgs)
+    }
+
+    msgs.push(env.callback_msg(CallbackMsg::DistributeBribes {
+      assets: Some(assets),
+    })?);
+    Ok(Response::new().add_attributes(vec![("action", "distribute_bribes")]).add_messages(msgs))
+  } else {
+    distribute_bribes_callback(deps, env, info, Some(assets))
+  }
+}
+
+fn distribute_bribes_callback(
+  deps: DepsMut,
+  env: Env,
+  _info: MessageInfo,
+  assets: Option<Vec<AssetInfo>>,
+) -> Result<Response, ContractError> {
+  let assets = if let Some(assets) = assets {
+    assets
+  } else {
+    WHITELIST.keys(deps.storage, None, None, Order::Ascending).collect::<StdResult<_>>()?
+  };
+
+  let config = CONFIG.load(deps.storage)?;
+  let bribe_manager = config.get_bribe_manager(&deps)?;
+
+  let mut msgs = vec![];
+
+  for asset in assets {
+    if let Some(bribes) = ASSET_BRIBES.may_load(deps.storage, &asset)? {
+      for bribe in bribes {
+        let bribe_msgs = bribe_manager.add_bribe_msgs(
+          bribe,
+          config.gauge.clone(),
+          asset.clone(),
+          env.block.height,
+        )?;
+
+        msgs.extend(bribe_msgs);
+      }
+    }
+  }
+
+  Ok(
+    Response::new()
+      .add_attributes(vec![("action", "distribute_bribes_callback")])
+      .add_messages(msgs),
+  )
+}
+
 fn update_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
   if !info.funds.is_empty() {
     Err(SharedError::NoFundsAllowed {})?;
@@ -547,8 +636,8 @@ fn update_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
   let config = CONFIG.load(deps.storage)?;
   let connector = config.get_connector(&deps)?;
 
-  let initial_balance: cw_asset::AssetBase<Addr> = AssetInfo::native(config.reward_denom)
-    .with_balance_query(&deps.querier, &env.contract.address)?;
+  let initial_balance =
+    config.reward_info.with_balance_query(&deps.querier, &env.contract.address)?;
 
   let msgs = vec![
     connector.claim_rewards_msg()?,
@@ -604,34 +693,28 @@ fn update_reward_callback(
   Ok(Response::new().add_attributes(vec![("action", "update_rewards_callback")]))
 }
 
-fn add_tributes_callback(
+fn track_bribes_callback(
   deps: DepsMut,
   env: Env,
   _info: MessageInfo,
   asset: AssetInfo,
   initial_balances: Vec<Asset>,
 ) -> Result<Response, ContractError> {
-  let mut tributes = ASSET_TRIBUTES.load(deps.storage, &asset)?;
+  let mut bribes = ASSET_BRIBES.may_load(deps.storage, &asset)?.unwrap_or_default();
 
   // this just adds the newly received staking / claiming rewards to the accounting for the corresponding LP.
   for old_balance in initial_balances {
-    let reward_asset = old_balance.info;
-    let new_balance = reward_asset.query_balance(&deps.querier, env.contract.address.clone())?;
+    let bribe_info = old_balance.info;
+    let new_balance = bribe_info.query_balance(&deps.querier, env.contract.address.clone())?;
     if new_balance > old_balance.amount {
-      let added = new_balance - old_balance.amount;
-      let current_rewards = if tributes.contains_key(&reward_asset) {
-        tributes[&reward_asset]
-      } else {
-        Uint128::zero()
-      };
-
-      tributes.insert(reward_asset, current_rewards.checked_add(added)?);
+      let added_amount = new_balance - old_balance.amount;
+      bribes.add(&bribe_info.with_balance(added_amount));
     }
   }
 
-  ASSET_TRIBUTES.save(deps.storage, &asset, &tributes)?;
+  ASSET_BRIBES.save(deps.storage, &asset, &bribes)?;
 
-  Ok(Response::new().add_attributes(vec![("action", "add_tributes_callback")]))
+  Ok(Response::new().add_attributes(vec![("action", "track_bribes_callback")]))
 }
 
 fn assert_asset_whitelisted(deps: &DepsMut, asset: &AssetInfo) -> Result<bool, ContractError> {

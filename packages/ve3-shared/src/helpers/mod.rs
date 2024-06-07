@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod bps;
 pub mod general;
 pub mod governance;

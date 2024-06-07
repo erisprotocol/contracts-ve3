@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, StdError};
+use cosmwasm_std::{CheckedMultiplyRatioError, OverflowError, StdError};
 use cw_asset::AssetError;
 use thiserror::Error;
 
@@ -12,6 +12,9 @@ pub enum SharedError {
 
   #[error("{0}")]
   OverflowError(#[from] OverflowError),
+
+  #[error("{0}")]
+  CheckedMultiplyRatioError(#[from] CheckedMultiplyRatioError),
 
   #[error("Unauthorized")]
   Unauthorized {},

@@ -1,5 +1,5 @@
 use crate::adapters::astroport::AstroportIncentives;
-use crate::adapters::ve3_asset_staking::Ve3AssetStaking;
+use crate::adapters::asset_staking::AssetStaking;
 use crate::error::SharedError;
 use crate::extensions::asset_infos_ext::AssetInfosEx;
 use crate::extensions::env_ext::EnvExt;
@@ -28,14 +28,14 @@ pub enum StakeConfig {
   },
 }
 
-fn tributes_callback_msg(
+fn track_bribes_callback_msg(
   deps: &DepsMut,
   env: &Env,
   asset: AssetInfo,
   asset_infos: &Vec<AssetInfo>,
 ) -> Result<CosmosMsg, SharedError> {
-  Ok(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::AddTributes {
-    asset,
+  Ok(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::TrackBribes {
+    for_asset: asset,
     initial_balances: asset_infos.with_balance_query(&deps.querier, &env.contract.address)?,
   }))?)
 }
@@ -55,7 +55,7 @@ impl StakeConfig {
       } => {
         vec![
           AstroportIncentives(contract.clone()).deposit(asset.clone())?,
-          tributes_callback_msg(deps, env, asset.info, reward_infos)?,
+          track_bribes_callback_msg(deps, env, asset.info, reward_infos)?,
         ]
       },
       StakeConfig::Ve3 {
@@ -63,8 +63,8 @@ impl StakeConfig {
         reward_infos,
       } => {
         vec![
-          Ve3AssetStaking(contract.clone()).deposit_msg(asset.clone())?,
-          tributes_callback_msg(deps, env, asset.info, reward_infos)?,
+          AssetStaking(contract.clone()).deposit_msg(asset.clone())?,
+          track_bribes_callback_msg(deps, env, asset.info, reward_infos)?,
         ]
       },
     })
@@ -84,7 +84,7 @@ impl StakeConfig {
       } => {
         vec![
           AstroportIncentives(contract.clone()).withdraw(asset.clone())?,
-          tributes_callback_msg(deps, env, asset.info, reward_infos)?,
+          track_bribes_callback_msg(deps, env, asset.info, reward_infos)?,
         ]
       },
       StakeConfig::Ve3 {
@@ -92,8 +92,8 @@ impl StakeConfig {
         reward_infos,
       } => {
         vec![
-          Ve3AssetStaking(contract.clone()).withdraw_msg(asset.clone())?,
-          tributes_callback_msg(deps, env, asset.info, reward_infos)?,
+          AssetStaking(contract.clone()).withdraw_msg(asset.clone())?,
+          track_bribes_callback_msg(deps, env, asset.info, reward_infos)?,
         ]
       },
     })
@@ -119,7 +119,7 @@ impl StakeConfig {
 
         vec![
           AstroportIncentives(contract.clone()).claim_rewards_msg(vec![asset_string])?,
-          tributes_callback_msg(deps, env, asset, reward_infos)?,
+          track_bribes_callback_msg(deps, env, asset, reward_infos)?,
         ]
       },
       StakeConfig::Ve3 {
@@ -127,8 +127,8 @@ impl StakeConfig {
         reward_infos,
       } => {
         vec![
-          Ve3AssetStaking(contract.clone()).claim_rewards_msg(vec![asset.clone()])?,
-          tributes_callback_msg(deps, env, asset, reward_infos)?,
+          AssetStaking(contract.clone()).claim_rewards_msg(vec![asset.clone()])?,
+          track_bribes_callback_msg(deps, env, asset, reward_infos)?,
         ]
       },
     })

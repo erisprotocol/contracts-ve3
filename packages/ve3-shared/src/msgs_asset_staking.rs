@@ -1,6 +1,6 @@
 use crate::{
-  adapters::{connector::Connector, global_config_adapter::ConfigExt},
-  constants::AT_CONNECTOR,
+  adapters::{bribe_manager::BribeManager, connector::Connector, global_config_adapter::ConfigExt},
+  constants::{AT_BRIBE_MANAGER, AT_CONNECTOR},
   error::SharedError,
   stake_config::StakeConfig,
 };
@@ -11,13 +11,18 @@ use cw_asset::{Asset, AssetInfo};
 
 #[cw_serde]
 pub struct Config {
-  pub reward_denom: String,
+  pub reward_info: AssetInfo,
   pub global_config_addr: Addr,
+  pub default_yearly_take_rate: Decimal,
+  pub gauge: String,
 }
 
 impl Config {
   pub fn get_connector(&self, deps: &DepsMut) -> Result<Connector, SharedError> {
     Ok(Connector(self.get_address(&deps.querier, AT_CONNECTOR)?))
+  }
+  pub fn get_bribe_manager(&self, deps: &DepsMut) -> Result<BribeManager, SharedError> {
+    Ok(BribeManager(self.get_address(&deps.querier, AT_BRIBE_MANAGER)?))
   }
 }
 
@@ -48,7 +53,9 @@ pub struct AssetConfig {
 #[cw_serde]
 pub struct InstantiateMsg {
   pub global_config_addr: String,
-  pub reward_denom: String,
+  pub reward_info: AssetInfo,
+  pub default_yearly_take_rate: Decimal,
+  pub gauge: String,
 }
 
 #[cw_serde]
@@ -76,6 +83,10 @@ pub enum ExecuteMsg {
     update: Option<bool>,
     assets: Option<Vec<AssetInfo>>,
   },
+  DistributeBribes {
+    update: Option<bool>,
+    assets: Option<Vec<AssetInfo>>,
+  },
   Callback(CallbackMsg),
 }
 
@@ -90,9 +101,12 @@ pub enum CallbackMsg {
   UpdateRewards {
     initial_balance: Asset,
   },
-  AddTributes {
-    asset: AssetInfo,
+  TrackBribes {
+    for_asset: AssetInfo,
     initial_balances: Vec<Asset>,
+  },
+  DistributeBribes {
+    assets: Option<Vec<AssetInfo>>,
   },
 }
 

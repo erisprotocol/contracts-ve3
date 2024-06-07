@@ -29,6 +29,9 @@ pub enum ContractError {
   #[error("Only a single asset is allowed")]
   OnlySingleAssetAllowed {},
 
+  #[error("Asset can't be the same as reward")]
+  AssetInfoCannotEqualReward {},
+
   #[error("Asset not whitelisted")]
   AssetNotWhitelisted {},
 

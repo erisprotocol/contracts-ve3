@@ -1,5 +1,5 @@
-mod alliance;
 pub mod custom_querier;
 mod helpers;
-mod instantiate;
-mod rewards;
+mod test_alliance;
+mod test_instantiate;
+mod test_rewards;

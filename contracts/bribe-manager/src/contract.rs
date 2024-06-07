@@ -1,5 +1,3 @@
-use std::cmp::{max, min};
-
 use crate::{
   constants::{CONTRACT_NAME, CONTRACT_VERSION},
   easing::BribeDistributionExt,
@@ -15,19 +13,18 @@ use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetInfo};
 use itertools::Itertools;
+use std::cmp::min;
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
-  constants::{AT_ASSET_STAKING, AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR},
+  constants::{AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES},
   error::SharedError,
   extensions::{
     asset_ext::{AssetExt, AssetsExt},
     asset_info_ext::AssetInfoExt,
   },
-  helpers::{governance::get_period, time::Times},
+  helpers::{assets::Assets, governance::get_period, time::Times},
   msgs_asset_gauge::UserShare,
-  msgs_bribe_manager::{
-    BribeBucket, BribeBuckets, BribeDistribution, Config, ExecuteMsg, InstantiateMsg,
-  },
+  msgs_bribe_manager::{BribeBuckets, BribeDistribution, Config, ExecuteMsg, InstantiateMsg},
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -61,8 +58,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       bribe,
       distribution,
       gauge,
-      asset,
-    } => add_bribe(deps, info, env, bribe, gauge, asset, distribution),
+      for_info,
+    } => add_bribe(deps, info, env, bribe, gauge, for_info, distribution),
     ExecuteMsg::WithdrawBribes {
       period,
     } => withdraw_bribes(deps, info, env, period),
@@ -101,7 +98,7 @@ fn add_bribe(
   env: Env,
   bribe: Asset,
   gauge: String,
-  asset: AssetInfo,
+  for_info: AssetInfo,
   distribution: BribeDistribution,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
@@ -115,7 +112,7 @@ fn add_bribe(
   }
 
   let has_fee = !config.fee.amount.is_zero()
-    && user != config.global_config().get_address(&deps.querier, AT_ASSET_STAKING)?;
+    && config.global_config().is_in_list(&deps.querier, AT_FREE_BRIBES, user)?;
 
   let contract = env.contract.address;
 
@@ -165,8 +162,8 @@ fn add_bribe(
     let mut global_bucket = BRIBE_AVAILABLE.load(deps.storage, period).unwrap_or_default();
     let mut user_bucket = BRIBE_CREATOR.load(deps.storage, user_key).unwrap_or_default();
 
-    global_bucket.get(&gauge, &asset).add(&bribe_split);
-    user_bucket.get(&gauge, &asset).add(&bribe_split);
+    global_bucket.add(&gauge, &for_info, &bribe_split);
+    user_bucket.add(&gauge, &for_info, &bribe_split);
 
     BRIBE_AVAILABLE.save(deps.storage, period, &global_bucket)?;
     BRIBE_CREATOR.save(deps.storage, user_key, &user_bucket)?;
@@ -196,11 +193,7 @@ fn withdraw_bribes(
 
   let mut global_bucket = BRIBE_AVAILABLE.load(deps.storage, period)?;
 
-  let mut together = BribeBucket {
-    gauge: "temp".to_string(),
-    asset: None,
-    assets: vec![],
-  };
+  let mut together = Assets::default();
   for bucket in user_bucket.buckets {
     for bribe in bucket.assets {
       if let Some(asset) = &bucket.asset {
@@ -270,16 +263,13 @@ fn claim_bribes(
     asset_gauge.query_user_shares(&deps.querier, user.clone(), Some(Times::Periods(periods)))?;
 
   let mut context = ClaimContext::default();
-  let mut bribe_total = BribeBucket {
-    gauge: "temp".to_string(),
-    asset: None,
-    assets: vec![],
-  };
+  let mut bribe_total = Assets::default();
+
   for share in shares.shares {
     // shares list sorted by period, each time we find a new one, context is updated.
     // starts with 0
     if share.period != context.period {
-      context.save(deps.storage, user)?;
+      context.maybe_save(deps.storage, user)?;
 
       let bribe_available = match BRIBE_AVAILABLE.may_load(deps.storage, share.period)? {
         Some(buckets) => buckets,
@@ -331,11 +321,11 @@ fn claim_bribes(
     // see how much total bribe rewards for the asset in the gauge
     let total_bribe_bucket = context.bribe_totals.get(&gauge, &asset);
     // calculate the reward share based on the user vp compared to total vp
-    let rewards = total_bribe_bucket.calc_share_amounts(vp, total_vp)?;
+    let rewards = total_bribe_bucket.assets.calc_share_amounts(vp, total_vp)?;
     // add these rewards to the claimed bucket by the user
-    context.bribe_claimed.get(&gauge, &asset).add_multi(&rewards);
+    context.bribe_claimed.get(&gauge, &asset).assets.add_multi(&rewards);
     // remove the rewards from the available bribe bucket
-    context.bribe_available.get(&gauge, &asset).remove_multi(&rewards).map_err(|s| {
+    context.bribe_available.get(&gauge, &asset).assets.remove_multi(&rewards).map_err(|s| {
       // safety if we try to take more than what is available in the bucket for the asset, then it fails for the user
       ContractError::SharedErrorExtended(
         s,
@@ -346,7 +336,7 @@ fn claim_bribes(
     bribe_total.add_multi(&rewards);
   }
 
-  context.save(deps.storage, user)?;
+  context.maybe_save(deps.storage, user)?;
 
   let transfer_msgs = bribe_total.transfer_msgs(user)?;
   Ok(Response::new().add_attribute("action", "bribe/claim_bribes").add_messages(transfer_msgs))

@@ -2,10 +2,10 @@ use crate::{
   adapters::{asset_gauge::AssetGauge, global_config_adapter::ConfigExt},
   constants::AT_ASSET_GAUGE,
   error::SharedError,
-  extensions::asset_info_ext::AssetInfoExt,
+  helpers::assets::Assets,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, CheckedMultiplyRatioError, CosmosMsg, QuerierWrapper, Uint128};
+use cosmwasm_std::{Addr, QuerierWrapper, Uint128};
 use cw_asset::{Asset, AssetInfo};
 
 #[cw_serde]
@@ -21,7 +21,7 @@ pub enum ExecuteMsg {
   AddBribe {
     bribe: Asset,
     gauge: String,
-    asset: AssetInfo,
+    for_info: AssetInfo,
     distribution: BribeDistribution,
   },
 
@@ -83,7 +83,7 @@ impl Config {
 pub struct BribeBucket {
   pub gauge: String,
   pub asset: Option<AssetInfo>,
-  pub assets: Vec<Asset>,
+  pub assets: Assets,
 }
 
 #[cw_serde]
@@ -106,11 +106,15 @@ impl BribeBuckets {
       self.buckets.push(BribeBucket {
         gauge: gauge.to_string(),
         asset: Some(asset.clone()),
-        assets: vec![],
+        assets: Assets::default(),
       });
       let i = self.buckets.len() - 1;
       (i, &mut self.buckets[i])
     }
+  }
+
+  pub fn add(&mut self, gauge: &str, asset: &AssetInfo, bribe: &Asset) {
+    self.get(gauge, asset).assets.add(bribe);
   }
 
   pub fn remove(
@@ -120,8 +124,8 @@ impl BribeBuckets {
     bribe: &Asset,
   ) -> Result<(), SharedError> {
     let (index, bucket) = self.get_index(gauge, asset);
-    bucket.remove(bribe)?;
-    if bucket.is_empty() {
+    bucket.assets.remove(bribe)?;
+    if bucket.assets.is_empty() {
       self.buckets.remove(index);
     }
     Ok(())
@@ -129,80 +133,6 @@ impl BribeBuckets {
 
   pub fn is_empty(&self) -> bool {
     self.buckets.len() == 0
-  }
-}
-
-impl BribeBucket {
-  pub fn is_empty(&self) -> bool {
-    self.assets.len() == 0
-  }
-
-  pub fn remove(&mut self, asset: &Asset) -> Result<(), SharedError> {
-    let existing = self.assets.iter_mut().find(|a| a.info == asset.info);
-
-    match existing {
-      Some(existing) if existing.amount < asset.amount => Err(SharedError::InsufficientBalance(
-        format!("existing: {0} withdrawing: {1}", existing, asset),
-      )),
-      Some(existing) => {
-        existing.amount -= asset.amount;
-
-        if existing.amount.is_zero() {
-          self.assets.retain(|a| !a.amount.is_zero())
-        }
-        Ok(())
-      },
-      None => Err(SharedError::NotFound(format!("asset {0}", asset.info))),
-    }
-  }
-
-  pub fn remove_multi(&mut self, assets: &Vec<Asset>) -> Result<(), SharedError> {
-    for asset in assets {
-      self.remove(asset)?;
-    }
-
-    Ok(())
-  }
-
-  pub fn add(&mut self, asset: &Asset) {
-    let existing = self.assets.iter_mut().find(|a| a.info == asset.info);
-
-    match existing {
-      Some(in_bucket) => {
-        in_bucket.amount += asset.amount;
-      },
-      None => {
-        self.assets.push(asset.clone());
-      },
-    }
-  }
-
-  pub fn add_multi(&mut self, assets: &Vec<Asset>) {
-    for asset in assets {
-      self.add(asset);
-    }
-  }
-
-  pub fn calc_share_amounts(
-    &self,
-    vp: Uint128,
-    total_vp: Uint128,
-  ) -> Result<Vec<Asset>, CheckedMultiplyRatioError> {
-    self
-      .assets
-      .iter()
-      .map(|a| {
-        a.amount.checked_multiply_ratio(vp, total_vp).map(|amount| a.info.with_balance(amount))
-      })
-      .collect()
-  }
-
-  pub fn transfer_msgs(&self, to: &Addr) -> Result<Vec<CosmosMsg>, SharedError> {
-    let mut results = vec![];
-    for asset in self.assets.iter() {
-      results.push(asset.transfer_msg(to)?);
-    }
-    Ok(results)
   }
 }
 
@@ -233,13 +163,13 @@ mod test {
     let mut bucket = BribeBucket {
       asset: Some(asset.clone()),
       gauge: gauge.clone(),
-      assets: vec![],
+      assets: vec![].into(),
     };
 
-    bucket.add(&Asset::native("uluna", 1000u128));
-    bucket.add(&Asset::native("uluna", 500u128));
-    bucket.add(&Asset::cw20(Addr::unchecked("test"), 500u128));
-    bucket.remove(&Asset::native("uluna", 1000u128)).unwrap();
+    bucket.assets.add(&Asset::native("uluna", 1000u128));
+    bucket.assets.add(&Asset::native("uluna", 500u128));
+    bucket.assets.add(&Asset::cw20(Addr::unchecked("test"), 500u128));
+    bucket.assets.remove(&Asset::native("uluna", 1000u128)).unwrap();
 
     assert_eq!(
       bucket,
@@ -250,17 +180,18 @@ mod test {
           Asset::native("uluna", 500u128),
           Asset::cw20(Addr::unchecked("test"), 500u128)
         ]
+        .into()
       }
     );
 
-    bucket.remove(&Asset::native("uluna", 500u128)).unwrap();
+    bucket.assets.remove(&Asset::native("uluna", 500u128)).unwrap();
 
     assert_eq!(
       bucket,
       BribeBucket {
         asset: Some(asset.clone()),
         gauge,
-        assets: vec![Asset::cw20(Addr::unchecked("test"), 500u128)]
+        assets: vec![Asset::cw20(Addr::unchecked("test"), 500u128)].into()
       }
     );
   }
@@ -273,10 +204,10 @@ mod test {
     let mut bucket = BribeBucket {
       asset: Some(asset.clone()),
       gauge,
-      assets: vec![],
+      assets: vec![].into(),
     };
 
-    let err = bucket.remove(&Asset::native("uluna", 1000u128)).unwrap_err();
+    let err = bucket.assets.remove(&Asset::native("uluna", 1000u128)).unwrap_err();
 
     assert_eq!(
       err,
@@ -291,11 +222,11 @@ mod test {
     let mut bucket = BribeBucket {
       asset: Some(asset.clone()),
       gauge,
-      assets: vec![],
+      assets: vec![].into(),
     };
 
-    bucket.add(&Asset::native("uluna", 500u128));
-    let err = bucket.remove(&Asset::native("uluna", 1000u128)).unwrap_err();
+    bucket.assets.add(&Asset::native("uluna", 500u128));
+    let err = bucket.assets.remove(&Asset::native("uluna", 1000u128)).unwrap_err();
 
     assert_eq!(
       err,
@@ -314,10 +245,10 @@ mod test {
     let asset = AssetInfo::cw20(Addr::unchecked("ampLUNA"));
     let gauge = "test".to_string();
 
-    bucket.get(&gauge, &asset).add(&Asset::native("uluna", 1000u128));
-    bucket.get(&gauge, &asset).add(&Asset::native("uluna", 500u128));
-    bucket.get(&gauge, &asset).add(&Asset::cw20(Addr::unchecked("test"), 500u128));
-    bucket.get(&gauge, &asset).remove(&Asset::native("uluna", 1000u128)).unwrap();
+    bucket.get(&gauge, &asset).assets.add(&Asset::native("uluna", 1000u128));
+    bucket.get(&gauge, &asset).assets.add(&Asset::native("uluna", 500u128));
+    bucket.get(&gauge, &asset).assets.add(&Asset::cw20(Addr::unchecked("test"), 500u128));
+    bucket.get(&gauge, &asset).assets.remove(&Asset::native("uluna", 1000u128)).unwrap();
 
     assert_eq!(
       bucket,
@@ -329,6 +260,7 @@ mod test {
             Asset::native("uluna", 500u128),
             Asset::cw20(Addr::unchecked("test"), 500u128)
           ]
+          .into()
         }]
       }
     );
@@ -341,7 +273,7 @@ mod test {
         buckets: vec![BribeBucket {
           asset: Some(asset.clone()),
           gauge: gauge.clone(),
-          assets: vec![Asset::cw20(Addr::unchecked("test"), 500u128)]
+          assets: vec![Asset::cw20(Addr::unchecked("test"), 500u128)].into()
         }]
       }
     );

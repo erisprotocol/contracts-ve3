@@ -1,9 +1,12 @@
 use crate::{
-  adapters::ve3_asset_staking::Ve3AssetStaking, error::SharedError, helpers::time::Times,
+  adapters::{asset_staking::AssetStaking, global_config_adapter::ConfigExt},
+  constants::{addresstype_asset_staking, AT_GAUGE_CONTROLLER},
+  error::SharedError,
+  helpers::time::Times,
   msgs_voting_escrow::LockInfoResponse,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, QuerierWrapper, Uint128};
+use cosmwasm_std::{Addr, Decimal, DepsMut, Uint128};
 use cw_asset::AssetInfo;
 
 /// This structure describes the basic settings for creating a contract.
@@ -46,22 +49,6 @@ pub enum ExecuteMsg {
 pub struct GaugeConfig {
   pub name: String,
   pub min_gauge_percentage: Decimal,
-  pub target: Addr,
-}
-
-impl GaugeConfig {
-  pub fn query_whitelisted_assets_str(
-    &self,
-    querier: &QuerierWrapper,
-  ) -> Result<Vec<String>, SharedError> {
-    Ok(
-      Ve3AssetStaking(self.target.clone())
-        .query_whitelisted_assets(querier)?
-        .into_iter()
-        .map(|a| a.to_string())
-        .collect::<Vec<_>>(),
-    )
-  }
 }
 
 /// This structure describes the query messages available in the contract.
@@ -144,9 +131,24 @@ pub struct Config {
 }
 
 impl Config {
-  pub fn assert_gauge(&self, name: &str) -> Result<&GaugeConfig, SharedError> {
-    let gauge = self.gauges.iter().find(|a| a.name == name);
-    gauge.ok_or_else(|| SharedError::NotFound(format!("gauge not found: {0}", name)))
+  pub fn assert_gauge(&self, gauge: &str) -> Result<&GaugeConfig, SharedError> {
+    let gauge_config = self.gauges.iter().find(|a| a.name == gauge);
+    gauge_config.ok_or_else(|| SharedError::NotFound(format!("gauge not found: {0}", gauge)))
+  }
+
+  pub fn assert_gauge_controller(&self, deps: &DepsMut, sender: &Addr) -> Result<(), SharedError> {
+    self.global_config().assert_has_access(&deps.querier, AT_GAUGE_CONTROLLER, sender)
+  }
+
+  pub fn get_asset_staking(
+    &self,
+    deps: &DepsMut,
+    gauge: &str,
+  ) -> Result<AssetStaking, SharedError> {
+    self
+      .global_config()
+      .get_address(&deps.querier, &addresstype_asset_staking(gauge))
+      .map(AssetStaking)
   }
 }
 

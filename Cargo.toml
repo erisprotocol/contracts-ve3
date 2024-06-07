@@ -2,12 +2,11 @@
 members = [
     "contracts/voting-escrow",
     "contracts/connector-alliance",
-    "contracts/global-config",
     # "contracts/connector-emission",
+    "contracts/global-config",
     "contracts/asset-staking",
     "contracts/asset-gauge",
     "contracts/bribe-manager",
-    # "contracts/bribe-distribution",
     "packages/*",
 ]
 
@@ -54,6 +53,4 @@ semver = "1.0"
 serde = "1.0"
 itertools = "0.10"
 
-
 ve3-shared = { path = "packages/ve3-shared"}
-ve3-global-config = { path = "contracts/global-config", features = ['library']}

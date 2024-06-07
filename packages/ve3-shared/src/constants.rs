@@ -7,11 +7,18 @@ pub const AT_VE_GUARDIAN: &str = "VE_GUARDIAN";
 
 pub const AT_CONNECTOR: &str = "CONNECTOR";
 pub const AT_VOTING_ESCROW: &str = "VOTING_ESCROW";
-pub const AT_ASSET_STAKING: &str = "ASSET_STAKING";
 pub const AT_ASSET_GAUGE: &str = "ASSET_GAUGE";
+pub const AT_BRIBE_MANAGER: &str = "BRIBE_MANAGER";
 
+pub const AT_FREE_BRIBES: &str = "FREE_BRIBES";
 pub const AT_TAKE_RECIPIENT: &str = "TAKE_RECIPIENT";
 pub const AT_FEE_COLLECTOR: &str = "FEE_COLLECTOR";
+
+const AT_ASSET_STAKING: &str = "ASSET_STAKING";
+pub fn addresstype_asset_staking(gauge: &str) -> String {
+  format!("{AT_ASSET_STAKING}_{gauge}")
+}
+
 
 pub const DEFAULT_LIMIT: u32 = 10;
 pub const DEFAULT_PERIODS_LIMIT: u64 = 20;
