@@ -238,19 +238,23 @@ fn claim_bribes(
   let periods = match periods {
     Some(periods) => periods,
     None => {
+      // this queries the period when the user last claimed the bribes
       let last_claim = fetch_last_claimed(deps.storage, user.as_str(), block_period)?;
 
-      let last_claim = match last_claim {
-        Some((period, _)) => period,
+      let start = match last_claim {
+        // start claiming from the next period
+        Some((period, _)) => period + 1,
+        // if not yet claimed, it queries the period of the first participation in the gauges
         None => match asset_gauge.query_first_participation(&deps.querier, user.clone())?.period {
           Some(period) => period,
-          None => block_period - 1,
+          // if there is no participation, just start with the current block
+          None => block_period,
         },
       };
 
-      let end = min(last_claim + 101, block_period);
+      let end = min(start + 101, block_period);
       // take 10 periods
-      let numbs = (last_claim + 1)..end;
+      let numbs = (start + 1)..end;
       numbs.collect()
     },
   };
