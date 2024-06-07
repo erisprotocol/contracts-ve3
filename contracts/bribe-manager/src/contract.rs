@@ -287,6 +287,7 @@ fn claim_bribes(
           // if no bribes for the period, just skip till next period or end
           context = ClaimContext::default();
           context.period = share.period;
+          context.skip = true;
           continue;
         },
       };
@@ -306,11 +307,17 @@ fn claim_bribes(
 
       context = ClaimContext {
         should_save: true,
+        skip: false,
         period: share.period,
         bribe_available,
         bribe_totals,
         bribe_claimed: BribeBuckets::default(),
       };
+    }
+
+    if context.skip {
+      // skip until a period with bribes is found again.
+      continue;
     }
 
     let UserShare {

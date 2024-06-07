@@ -27,6 +27,7 @@ pub fn fetch_last_claimed(
 pub struct ClaimContext {
   pub period: u64,
   pub should_save: bool,
+  pub skip: bool,
 
   pub bribe_available: BribeBuckets,
   pub bribe_totals: BribeBuckets,
