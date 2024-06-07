@@ -25,10 +25,7 @@ impl AssetInfoExt for AssetInfo {
   }
 
   fn is_native(&self) -> bool {
-    match self {
-      cw_asset::AssetInfoBase::Native(_) => true,
-      _ => false,
-    }
+    matches!(self, cw_asset::AssetInfoBase::Native(_))
   }
 
   fn with_balance(&self, amount: Uint128) -> Asset {

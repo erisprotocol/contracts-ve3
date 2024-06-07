@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult, Uint128};
 use cw_asset::AssetInfo;
-use ve3_shared::contract_asset_staking::{
+use ve3_shared::msgs_asset_staking::{
     AllPendingRewardsQuery, AllStakedBalancesQuery, AssetQuery, PendingRewardsRes, QueryMsg,
     StakedBalanceRes, WhitelistedAssetsResponse,
 };
@@ -142,7 +142,7 @@ fn get_total_staked_balances(deps: Deps) -> StdResult<Binary> {
             let config = ASSET_CONFIG.load(deps.storage, &asset)?;
 
             Ok(StakedBalanceRes {
-                asset: asset,
+                asset,
                 balance,
                 shares,
                 config,

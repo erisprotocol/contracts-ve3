@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use ve3_shared::{
     constants::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, WEEK},
     extensions::asset_info_ext::AssetInfoExt,
-    voting_escrow::{AssetInfoConfig, Config},
+    msgs_voting_escrow::{AssetInfoConfig, Config},
 };
 
 use cosmwasm_std::{Addr, Coin, MessageInfo, Order, StdError, StdResult, Storage, Uint128};

@@ -1,24 +1,33 @@
+use std::cmp::{max, min};
+
 use crate::{
   constants::{CONTRACT_NAME, CONTRACT_VERSION},
   easing::BribeDistributionExt,
   error::{ContractError, ContractResult},
-  state::{BRIBE_BUCKETS, BRIBE_CREATOR, CONFIG},
+  state::{
+    fetch_last_claimed, ClaimContext, BRIBE_AVAILABLE, BRIBE_CLAIMED, BRIBE_CREATOR, BRIBE_TOTAL,
+    CONFIG,
+  },
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
-use cw_asset::{Asset, AssetInfo, AssetInfoBase};
+use cw_asset::{Asset, AssetInfo};
+use itertools::Itertools;
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
   constants::{AT_ASSET_STAKING, AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR},
-  contract_bribe_manager::{BribeDistribution, Config, ExecuteMsg, InstantiateMsg},
   error::SharedError,
   extensions::{
     asset_ext::{AssetExt, AssetsExt},
     asset_info_ext::AssetInfoExt,
   },
-  helpers::governance::get_period,
+  helpers::{governance::get_period, time::Times},
+  msgs_asset_gauge::UserShare,
+  msgs_bribe_manager::{
+    BribeBucket, BribeBuckets, BribeDistribution, Config, ExecuteMsg, InstantiateMsg,
+  },
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -49,12 +58,17 @@ pub fn instantiate(
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> ContractResult {
   match msg {
     ExecuteMsg::AddBribe {
-      asset,
+      bribe,
       distribution,
-    } => add_bribe(deps, info, env, asset, distribution),
+      gauge,
+      asset,
+    } => add_bribe(deps, info, env, bribe, gauge, asset, distribution),
     ExecuteMsg::WithdrawBribes {
       period,
     } => withdraw_bribes(deps, info, env, period),
+    ExecuteMsg::ClaimBribes {
+      periods,
+    } => claim_bribes(deps, env, info, periods),
 
     // controller
     ExecuteMsg::WhitelistAssets(assets) => whitelist_assets(deps, info, assets),
@@ -85,7 +99,9 @@ fn add_bribe(
   deps: DepsMut,
   info: MessageInfo,
   env: Env,
-  asset: Asset,
+  bribe: Asset,
+  gauge: String,
+  asset: AssetInfo,
   distribution: BribeDistribution,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
@@ -94,7 +110,7 @@ fn add_bribe(
   let user = &info.sender;
   let mut msgs = vec![];
 
-  if asset.amount.is_zero() {
+  if bribe.amount.is_zero() {
     Err(SharedError::NotSupported("bribes required".to_string()))?;
   }
 
@@ -103,29 +119,29 @@ fn add_bribe(
 
   let contract = env.contract.address;
 
-  match (has_fee, &asset.info) {
+  match (has_fee, &bribe.info) {
     (false, AssetInfo::Native(_)) => {
       // no fee and native bribe
-      asset.assert_sent(&info)?
+      bribe.assert_sent(&info)?
     },
     (false, AssetInfo::Cw20(_)) => {
       // no fee and cw20 bribe
-      msgs.push(asset.transfer_from_msg(user, contract)?)
+      msgs.push(bribe.transfer_from_msg(user, contract)?)
     },
-    (true, AssetInfo::Native(_)) if asset.info == config.fee.info => {
+    (true, AssetInfo::Native(_)) if bribe.info == config.fee.info => {
       // fee and native bribe same asset
-      let expected_amount = asset.amount.checked_add(config.fee.amount)?;
-      let expected_deposit = asset.info.with_balance(expected_amount);
+      let expected_amount = bribe.amount.checked_add(config.fee.amount)?;
+      let expected_deposit = bribe.info.with_balance(expected_amount);
       expected_deposit.assert_sent(&info)?
     },
     (true, AssetInfo::Native(_)) => {
       // fee and native bribe different asset
-      vec![&asset, &config.fee].assert_sent(&info)?
+      vec![&bribe, &config.fee].assert_sent(&info)?
     },
     (true, AssetInfo::Cw20(_)) => {
       // fee and cw20 bribe
       config.fee.assert_sent(&info)?;
-      msgs.push(asset.transfer_from_msg(user, contract)?)
+      msgs.push(bribe.transfer_from_msg(user, contract)?)
     },
 
     _ => Err(SharedError::WrongDeposit("combination not supported".to_string()))?,
@@ -136,44 +152,27 @@ fn add_bribe(
     msgs.push(config.fee.transfer_msg(fee_collector)?)
   }
 
-  let bribes: Vec<(u64, Uint128)> = distribution.create_distribution(block_period, asset.amount)?;
+  let bribes: Vec<(u64, Uint128)> = distribution.create_distribution(block_period, bribe.amount)?;
 
-  assert_asset_whitelisted(&config, &asset.info)?;
-  asset_sum_equal(&asset, &bribes)?;
+  assert_asset_whitelisted(&config, &bribe.info)?;
+  asset_sum_equal(&bribe, &bribes)?;
   asset_future_only(block_period, &bribes)?;
 
   for (period, amount) in bribes {
-    let asset = asset.info.with_balance(amount);
+    let bribe_split = bribe.info.with_balance(amount);
 
     let user_key = (user.as_str(), period);
-    let mut global_bucket = BRIBE_BUCKETS.load(deps.storage, period).unwrap_or_default();
+    let mut global_bucket = BRIBE_AVAILABLE.load(deps.storage, period).unwrap_or_default();
     let mut user_bucket = BRIBE_CREATOR.load(deps.storage, user_key).unwrap_or_default();
 
-    global_bucket.deposit(asset.clone());
-    user_bucket.deposit(asset.clone());
+    global_bucket.get(&gauge, &asset).add(&bribe_split);
+    user_bucket.get(&gauge, &asset).add(&bribe_split);
 
-    BRIBE_BUCKETS.save(deps.storage, period, &global_bucket)?;
+    BRIBE_AVAILABLE.save(deps.storage, period, &global_bucket)?;
     BRIBE_CREATOR.save(deps.storage, user_key, &user_bucket)?;
   }
 
   Ok(Response::new().add_attribute("action", "bribe/add_bribe").add_messages(msgs))
-}
-
-fn asset_sum_equal(asset: &Asset, bribes: &Vec<(u64, Uint128)>) -> Result<(), ContractError> {
-  let sum: Uint128 = bribes.iter().map(|(_, b)| b).sum();
-  if sum == asset.amount {
-    Ok(())
-  } else {
-    Err(ContractError::BribeDistribution("sum not equal to deposit".to_string()))
-  }
-}
-
-fn asset_future_only(block_period: u64, bribes: &Vec<(u64, Uint128)>) -> Result<(), ContractError> {
-  if bribes.iter().any(|(period, _)| *period <= block_period) {
-    Err(ContractError::BribesAlreadyDistributing {})
-  } else {
-    Ok(())
-  }
 }
 
 fn withdraw_bribes(
@@ -195,22 +194,151 @@ fn withdraw_bribes(
     return Err(ContractError::NoBribes {});
   }
 
-  let mut global_bucket = BRIBE_BUCKETS.load(deps.storage, period)?;
+  let mut global_bucket = BRIBE_AVAILABLE.load(deps.storage, period)?;
 
-  let mut transfer_msgs = vec![];
-  for bribe in user_bucket.assets {
-    global_bucket.withdraw(&bribe)?;
-    transfer_msgs.push(bribe.transfer_msg(user)?)
+  let mut together = BribeBucket {
+    gauge: "temp".to_string(),
+    asset: None,
+    assets: vec![],
+  };
+  for bucket in user_bucket.buckets {
+    for bribe in bucket.assets {
+      if let Some(asset) = &bucket.asset {
+        global_bucket.remove(&bucket.gauge, asset, &bribe)?
+      } else {
+        // buckets always have some asset, except for the group result
+      }
+
+      together.add(&bribe);
+    }
   }
+  let transfer_msgs = together.transfer_msgs(user)?;
 
   if global_bucket.is_empty() {
-    BRIBE_BUCKETS.remove(deps.storage, period);
+    BRIBE_AVAILABLE.remove(deps.storage, period);
   } else {
-    BRIBE_BUCKETS.save(deps.storage, period, &global_bucket)?;
+    BRIBE_AVAILABLE.save(deps.storage, period, &global_bucket)?;
   }
   BRIBE_CREATOR.remove(deps.storage, (user.as_str(), period));
 
-  Ok(Response::new().add_attribute("action", "bribe/withdraw").add_messages(transfer_msgs))
+  Ok(Response::new().add_attribute("action", "bribe/withdraw_bribes").add_messages(transfer_msgs))
+}
+
+fn claim_bribes(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  periods: Option<Vec<u64>>,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  let user = &info.sender;
+  let block_period = get_period(env.block.time.seconds())?;
+  let asset_gauge = config.asset_gauge(&deps.querier)?;
+
+  let periods = match periods {
+    Some(periods) => periods,
+    None => {
+      let last_claim = fetch_last_claimed(deps.storage, user.as_str(), block_period)?;
+
+      let last_claim = match last_claim {
+        Some((period, _)) => period,
+        None => match asset_gauge.query_first_participation(&deps.querier, user.clone())?.period {
+          Some(period) => period,
+          None => block_period - 1,
+        },
+      };
+
+      let end = min(last_claim + 101, block_period);
+      // take 10 periods
+      let numbs = (last_claim + 1)..end;
+      numbs.collect()
+    },
+  };
+
+  let periods: Vec<_> = periods.into_iter().sorted().take_while(|a| *a <= block_period).collect();
+
+  if periods.is_empty() {
+    return Err(ContractError::NoPeriodsValid {});
+  }
+
+  // this is ordered by period alread
+  let shares =
+    asset_gauge.query_user_shares(&deps.querier, user.clone(), Some(Times::Periods(periods)))?;
+
+  let mut context = ClaimContext::default();
+  let mut bribe_total = BribeBucket {
+    gauge: "temp".to_string(),
+    asset: None,
+    assets: vec![],
+  };
+  for share in shares.shares {
+    // shares list sorted by period, each time we find a new one, context is updated.
+    // starts with 0
+    if share.period != context.period {
+      context.save(deps.storage, user)?;
+
+      let bribe_available = match BRIBE_AVAILABLE.may_load(deps.storage, share.period)? {
+        Some(buckets) => buckets,
+        None => {
+          // if no bribes for the period, just skip till next period or end
+          context = ClaimContext::default();
+          context.period = share.period;
+          continue;
+        },
+      };
+
+      let bribe_totals = match BRIBE_TOTAL.may_load(deps.storage, share.period)? {
+        Some(buckets) => buckets,
+        None => {
+          // if no totals yet, first time this period is touched -> copy it over
+          BRIBE_TOTAL.save(deps.storage, share.period, &bribe_available)?;
+          bribe_available.clone()
+        },
+      };
+
+      if BRIBE_CLAIMED.has(deps.storage, (user.as_str(), share.period)) {
+        return Err(ContractError::BribeAlreadyClaimed(share.period));
+      }
+
+      context = ClaimContext {
+        should_save: true,
+        period: share.period,
+        bribe_available,
+        bribe_totals,
+        bribe_claimed: BribeBuckets::default(),
+      };
+    }
+
+    let UserShare {
+      gauge,
+      asset,
+      vp,
+      total_vp,
+      ..
+    } = share;
+
+    // see how much total bribe rewards for the asset in the gauge
+    let total_bribe_bucket = context.bribe_totals.get(&gauge, &asset);
+    // calculate the reward share based on the user vp compared to total vp
+    let rewards = total_bribe_bucket.calc_share_amounts(vp, total_vp)?;
+    // add these rewards to the claimed bucket by the user
+    context.bribe_claimed.get(&gauge, &asset).add_multi(&rewards);
+    // remove the rewards from the available bribe bucket
+    context.bribe_available.get(&gauge, &asset).remove_multi(&rewards).map_err(|s| {
+      // safety if we try to take more than what is available in the bucket for the asset, then it fails for the user
+      ContractError::SharedErrorExtended(
+        s,
+        format!("gauge: {gauge} asset {asset} vp {vp} total {total_vp} user {user}"),
+      )
+    })?;
+    // add the rewards also to the flattened
+    bribe_total.add_multi(&rewards);
+  }
+
+  context.save(deps.storage, user)?;
+
+  let transfer_msgs = bribe_total.transfer_msgs(user)?;
+  Ok(Response::new().add_attribute("action", "bribe/claim_bribes").add_messages(transfer_msgs))
 }
 
 fn whitelist_assets(
@@ -252,6 +380,23 @@ fn remove_assets(
     Response::new()
       .add_attributes(vec![("action", "bribe/remove_assets"), ("assets", &assets_str)]),
   )
+}
+
+fn asset_sum_equal(asset: &Asset, bribes: &[(u64, Uint128)]) -> Result<(), ContractError> {
+  let sum: Uint128 = bribes.iter().map(|(_, b)| b).sum();
+  if sum == asset.amount {
+    Ok(())
+  } else {
+    Err(ContractError::BribeDistribution("sum not equal to deposit".to_string()))
+  }
+}
+
+fn asset_future_only(block_period: u64, bribes: &[(u64, Uint128)]) -> Result<(), ContractError> {
+  if bribes.iter().any(|(period, _)| *period <= block_period) {
+    Err(ContractError::BribesAlreadyDistributing {})
+  } else {
+    Ok(())
+  }
 }
 
 fn assert_asset_whitelisted(

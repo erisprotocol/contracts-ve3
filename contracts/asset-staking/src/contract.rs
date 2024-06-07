@@ -19,7 +19,7 @@ use ve3_shared::constants::{
   AT_ASSET_WHITELIST_CONTROLLER, AT_REWARD_DISTRIBUTION_CONTROLLER, AT_TAKE_RECIPIENT,
   SECONDS_PER_YEAR,
 };
-use ve3_shared::contract_asset_staking::{
+use ve3_shared::msgs_asset_staking::{
   AssetConfigRuntime, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg,
   InstantiateMsg, UpdateAssetConfig,
 };
@@ -209,7 +209,7 @@ fn whitelist_assets(
   assert_asset_whitelist_controller(&deps, &info, &config)?;
 
   for asset in &assets {
-    WHITELIST.save(deps.storage, &asset, &true)?;
+    WHITELIST.save(deps.storage, asset, &true)?;
     ASSET_REWARD_RATE.update(deps.storage, asset, |rate| -> StdResult<_> {
       Ok(rate.unwrap_or(Decimal::zero()))
     })?;
@@ -229,7 +229,7 @@ fn remove_assets(
   // Only allow the governance address to update whitelisted assets
   assert_asset_whitelist_controller(&deps, &info, &config)?;
   for asset in &assets {
-    WHITELIST.remove(deps.storage, &asset);
+    WHITELIST.remove(deps.storage, asset);
   }
   let assets_str = assets.iter().map(|asset| asset.to_string()).collect::<Vec<String>>().join(",");
   Ok(Response::new().add_attributes(vec![("action", "remove_assets"), ("assets", &assets_str)]))
@@ -534,13 +534,13 @@ fn distribute_take_rate(
     response = response
       .add_messages(unstake_msgs)
       .add_message(take_msg)
-      .add_attribute("take", format!("{0}{1}", take_amount, asset.to_string()));
+      .add_attribute("take", format!("{0}{1}", take_amount, asset));
   }
   Ok(response)
 }
 
 fn update_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-  if info.funds.len() > 0 {
+  if !info.funds.is_empty() {
     Err(SharedError::NoFundsAllowed {})?;
   }
 
@@ -635,7 +635,7 @@ fn add_tributes_callback(
 }
 
 fn assert_asset_whitelisted(deps: &DepsMut, asset: &AssetInfo) -> Result<bool, ContractError> {
-  WHITELIST.load(deps.storage, &asset).map_err(|_| ContractError::AssetNotWhitelisted {})
+  WHITELIST.load(deps.storage, asset).map_err(|_| ContractError::AssetNotWhitelisted {})
 }
 
 // Only governance (through a on-chain prop) can change the whitelisted assets

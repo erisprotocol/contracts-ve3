@@ -1,10 +1,10 @@
 use crate::adapters::astroport::AstroportIncentives;
 use crate::adapters::ve3_asset_staking::Ve3AssetStaking;
-use crate::contract_asset_staking::CallbackMsg;
-use crate::contract_asset_staking::ExecuteMsg;
 use crate::error::SharedError;
 use crate::extensions::asset_infos_ext::AssetInfosEx;
 use crate::extensions::env_ext::EnvExt;
+use crate::msgs_asset_staking::CallbackMsg;
+use crate::msgs_asset_staking::ExecuteMsg;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use cosmwasm_std::CosmosMsg;

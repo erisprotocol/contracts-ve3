@@ -1,5 +1,5 @@
 use crate::{
-    contract_asset_staking::{
+    msgs_asset_staking::{
         AssetDistribution, Cw20HookMsg, ExecuteMsg, QueryMsg, WhitelistedAssetsResponse,
     },
     error::SharedError,

@@ -1,8 +1,8 @@
 use crate::adapters::eris::ErisHub;
-use crate::helpers::governance::get_period;
-use crate::voting_escrow::QueryMsg::{LockInfo, LockVamp, TotalVamp};
+use crate::helpers::time::Time;
+use crate::msgs_voting_escrow::QueryMsg::{LockInfo, LockVamp, TotalVamp};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Binary, Decimal, Empty, Env, QuerierWrapper, StdResult, Uint128};
+use cosmwasm_std::{Addr, Binary, Decimal, Empty, QuerierWrapper, StdResult, Uint128};
 use cw20::Expiration;
 #[allow(unused_imports)]
 use cw20::{
@@ -232,31 +232,6 @@ impl fmt::Display for BlacklistedVotersResponse {
       } => {
         write!(f, "Voter is not blacklisted: {}", voter)
       },
-    }
-  }
-}
-
-#[cw_serde]
-#[derive(Default)]
-pub enum Time {
-  #[default]
-  Current,
-  Time(u64),
-  Period(u64),
-}
-
-pub trait GetPeriod {
-  fn get_period(self, env: &Env) -> StdResult<u64>;
-}
-impl GetPeriod for Option<Time> {
-  fn get_period(self, env: &Env) -> StdResult<u64> {
-    match self {
-      Some(time) => match time {
-        Time::Current => get_period(env.block.time.seconds()),
-        Time::Time(time) => get_period(time),
-        Time::Period(period) => Ok(period),
-      },
-      None => get_period(env.block.time.seconds()),
     }
   }
 }

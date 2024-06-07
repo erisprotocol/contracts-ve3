@@ -8,7 +8,7 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response};
 use cw2::set_contract_version;
 use cw_ownable::update_ownership;
-use ve3_shared::contract_global_config::{ExecuteMsg, InstantiateMsg};
+use ve3_shared::msgs_global_config::{ExecuteMsg, InstantiateMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(

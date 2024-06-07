@@ -5,7 +5,7 @@ use cosmwasm_std::{Order, OverflowError, StdError, StdResult, Storage, Uint128};
 use cw_storage_plus::{Bound, Map, Prefix};
 use ve3_shared::{
   helpers::{bps::BasicPoints, governance::calc_voting_power},
-  voting_escrow::LockInfoResponse,
+  msgs_voting_escrow::LockInfoResponse,
 };
 
 pub struct PeriodIndex<'a> {
@@ -69,14 +69,14 @@ pub struct Line {
   end: u64,
 }
 
-impl Into<Line> for &LockInfoResponse {
-  fn into(self) -> Line {
+impl From<&LockInfoResponse> for Line {
+  fn from(val: &LockInfoResponse) -> Self {
     Line {
-      vp: self.voting_power,
-      slope: self.slope,
-      fixed: self.fixed_amount,
-      start: self.start,
-      end: self.end,
+      vp: val.voting_power,
+      slope: val.slope,
+      fixed: val.fixed_amount,
+      start: val.start,
+      end: val.end,
     }
   }
 }
@@ -113,10 +113,8 @@ impl<'a> PeriodIndex<'a> {
     let fixed_amount = line.fixed;
     let lock_end = line.end;
 
-    if !fixed_amount.is_zero() || !vp.is_zero() {
-      if !self.keys.has(storage, &key) {
-        self.keys.save(storage, &key, &())?;
-      }
+    if (!fixed_amount.is_zero() || !vp.is_zero()) && !self.keys.has(storage, key) {
+      self.keys.save(storage, key, &())?;
     }
 
     // Schedule slope changes
@@ -204,7 +202,7 @@ impl<'a> PeriodIndex<'a> {
     )?;
 
     if result.fixed_amount.is_zero() && !result.voting_power.is_zero() {
-      self.keys.remove(storage, &key);
+      self.keys.remove(storage, key);
     }
 
     Ok(result)
@@ -224,6 +222,7 @@ impl<'a> PeriodIndex<'a> {
     Ok(self)
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub(crate) fn change_vote(
     &self,
     storage: &mut dyn Storage,
@@ -232,9 +231,8 @@ impl<'a> PeriodIndex<'a> {
     key: &str,
     old_bps: BasicPoints,
     new_bps: BasicPoints,
-
     current: &Data,
-    slopes: &Vec<(u64, Uint128)>,
+    slopes: &[(u64, Uint128)],
   ) -> StdResult<Data> {
     let slope = current.slope;
     let vp = current.voting_power;
@@ -271,7 +269,7 @@ impl<'a> PeriodIndex<'a> {
 
     if (!old_bps.is_zero() || !new_bps.is_zero()) && old_bps != new_bps {
       // iterate slopes and apply changes to the asset
-      for (period, slope) in slopes.clone() {
+      for (period, slope) in slopes.iter().copied() {
         let mut current = self.slope_changes.may_load(storage, (key, period))?.unwrap_or_default();
         if !old_bps.is_zero() {
           let op = Operation::Sub;
@@ -291,17 +289,18 @@ impl<'a> PeriodIndex<'a> {
     }
 
     if result.has_vp() {
-      if !self.keys.has(storage, &key) {
-        self.keys.save(storage, &key, &())?;
+      if !self.keys.has(storage, key) {
+        self.keys.save(storage, key, &())?;
       }
     } else {
-      self.keys.remove(storage, &key);
+      self.keys.remove(storage, key);
     }
 
     Ok(result)
   }
 
   #[cfg(test)]
+  #[allow(clippy::too_many_arguments)]
   pub(crate) fn change_0(
     &self,
     storage: &mut dyn Storage,
@@ -312,7 +311,7 @@ impl<'a> PeriodIndex<'a> {
     new_bps: BasicPoints,
 
     current: &Data,
-    slopes: &Vec<(u64, Uint128)>,
+    slopes: &[(u64, Uint128)],
   ) -> StdResult<&PeriodIndex<'a>> {
     self.change_vote(storage, period, key, old_bps, new_bps, current, slopes)?;
     Ok(self)
@@ -502,19 +501,19 @@ impl<'a> PeriodIndex<'a> {
 
   pub fn print(&self, storage: &mut dyn Storage, text: &str) -> &PeriodIndex<'a> {
     println!("Points {text}");
-    for element in self.data.range(storage, None, None, Order::Ascending).into_iter() {
+    for element in self.data.range(storage, None, None, Order::Ascending) {
       let ((key, period), data) = element.unwrap();
       println!("key {key} period {period} - {data:?}")
     }
 
     println!("Slopes");
-    for element in self.slope_changes.range(storage, None, None, Order::Ascending).into_iter() {
+    for element in self.slope_changes.range(storage, None, None, Order::Ascending) {
       let ((key, period), data) = element.unwrap();
       println!("key {key} period {period} - {data:?}")
     }
 
     println!("Keys");
-    for element in self.keys.range(storage, None, None, Order::Ascending).into_iter() {
+    for element in self.keys.range(storage, None, None, Order::Ascending) {
       let (key, _) = element.unwrap();
       println!("existing key {key}")
     }

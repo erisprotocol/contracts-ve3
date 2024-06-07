@@ -1,4 +1,6 @@
-use cosmwasm_std::{DivideByZeroError, OverflowError, Response, StdError};
+use cosmwasm_std::{
+  CheckedMultiplyRatioError, DivideByZeroError, OverflowError, Response, StdError,
+};
 use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -13,13 +15,20 @@ pub enum ContractError {
   #[error("{0}")]
   SharedError(#[from] SharedError),
 
+  #[error("{0} {1}")]
+  SharedErrorExtended(SharedError, String),
+
   #[error("{0}")]
   AssetError(#[from] AssetError),
 
   #[error("{0}")]
   OverflowError(#[from] OverflowError),
+
   #[error("{0}")]
   DivideByZeroError(#[from] DivideByZeroError),
+
+  #[error("{0}")]
+  CheckedMultiplyRatioError(#[from] CheckedMultiplyRatioError),
 
   #[error("Asset not whitelisted")]
   AssetNotWhitelisted {},
@@ -35,4 +44,10 @@ pub enum ContractError {
 
   #[error("Fee can only be native.")]
   FeeCanOnlyBeNative {},
+
+  #[error("Bribe already claimed for period {0}")]
+  BribeAlreadyClaimed(u64),
+
+  #[error("No valid periods for claiming provided")]
+  NoPeriodsValid {},
 }

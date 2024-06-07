@@ -15,12 +15,12 @@ use std::collections::HashSet;
 use std::convert::TryInto;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::adapters::ve3_asset_staking::Ve3AssetStaking;
-use ve3_shared::asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, MigrateMsg};
+use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, MigrateMsg};
 use ve3_shared::constants::{AT_GAUGE_CONTROLLER, AT_VOTING_ESCROW};
-use ve3_shared::contract_asset_staking::AssetDistribution;
+use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
-use ve3_shared::voting_escrow::LockInfoResponse;
+use ve3_shared::msgs_voting_escrow::LockInfoResponse;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -123,7 +123,7 @@ fn handle_vote(
 
   let current_user = user_index.get_latest_data(deps.storage, block_period + 1, sender.as_str())?;
   if !current_user.has_vp() {
-    return Err(ContractError::ZeroVotingPower {});
+    return Err(ContractError::ZeroVotingPower(sender.to_string(), block_period + 1));
   }
 
   let (_, old_votes) =
@@ -333,7 +333,7 @@ fn _set_distribution(
   deps: DepsMut,
   _env: &Env,
   gauge_config: &GaugeConfig,
-  assets: &Vec<AssetInfo>,
+  assets: &[AssetInfo],
   period: u64,
 ) -> Result<Vec<AssetDistribution>, ContractError> {
   let gauge = &gauge_config.name;
@@ -368,7 +368,7 @@ fn _set_distribution(
     .map(|(asset, vp)| {
       Ok(AssetDistribution {
         asset,
-        vp,
+        total_vp: vp,
         distribution: Decimal::from_ratio(vp, sum_relevant),
       })
     })

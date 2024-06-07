@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, StdResult};
-use ve3_shared::contract_connector_alliance::QueryMsg;
+use ve3_shared::msgs_connector_alliance::QueryMsg;
 
 use crate::state::{CONFIG, VALIDATORS};
 

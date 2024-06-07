@@ -1,4 +1,5 @@
 use cosmwasm_std::{OverflowError, StdError};
+use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
 
@@ -14,11 +15,14 @@ pub enum ContractError {
   #[error("{0}")]
   OverflowError(#[from] OverflowError),
 
+  #[error("{0}")]
+  AssetError(#[from] AssetError),
+
   #[error("Unauthorized")]
   Unauthorized {},
 
-  #[error("You can't vote with zero voting power")]
-  ZeroVotingPower {},
+  #[error("User '{0}' has no voting power in period {1}")]
+  ZeroVotingPower(String, u64),
 
   #[error("Invalid validator address: {0}")]
   InvalidValidatorAddress(String),
@@ -37,4 +41,10 @@ pub enum ContractError {
 
   #[error("Gauge does not exist.")]
   GaugeDoesNotExist {},
+
+  #[error("Period {0} not yet finished.")]
+  PeriodNotFinished(u64),
+
+  #[error("Gauge distribution not yet executed. gauge: {0}, period {1}")]
+  GaugeDistributionNotExecuted(String, u64),
 }

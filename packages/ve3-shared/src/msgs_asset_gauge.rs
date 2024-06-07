@@ -1,8 +1,10 @@
 use crate::{
-  adapters::ve3_asset_staking::Ve3AssetStaking, error::SharedError, voting_escrow::LockInfoResponse,
+  adapters::ve3_asset_staking::Ve3AssetStaking, error::SharedError, helpers::time::Times,
+  msgs_voting_escrow::LockInfoResponse,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, QuerierWrapper, Uint128};
+use cw_asset::AssetInfo;
 
 /// This structure describes the basic settings for creating a contract.
 #[cw_serde]
@@ -66,41 +68,67 @@ impl GaugeConfig {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-  /// UserInfo returns information about a voter and the validators they voted for
-  #[returns(UserInfoResponse)]
-  UserInfo {
-    user: String,
-  },
-  #[returns(UserInfosResponse)]
-  UserInfos {
-    start_after: Option<String>,
-    limit: Option<u32>,
-  },
-
-  /// TuneInfo returns information about the latest generators that were voted to receive ASTRO emissions
-  // #[returns(GaugeInfoResponse)]
-  // TuneInfo {},
-
+  // /// UserInfo returns information about a voter and the validators they voted for
+  // #[returns(UserInfoResponse)]
+  // UserInfo {
+  //   user: String,
+  // },
+  // #[returns(UserInfosResponse)]
+  // UserInfos {
+  //   start_after: Option<String>,
+  //   limit: Option<u32>,
+  // },
   /// Config returns the contract configuration
   #[returns(Config)]
   Config {},
-  /// PoolInfo returns the latest voting power allocated to a specific pool (generator)
-  #[returns(VotedValidatorInfoResponse)]
-  ValidatorInfo {
-    validator_addr: String,
+
+  #[returns(UserSharesResponse)]
+  UserShares {
+    user: Addr,
+    times: Option<Times>,
   },
-  /// PoolInfo returns the voting power allocated to a specific pool (generator) at a specific period
-  #[returns(VotedValidatorInfoResponse)]
-  ValidatorInfoAtPeriod {
-    validator_addr: String,
-    period: u64,
+
+  #[returns(UserFirstParticipationResponse)]
+  UserFirstParticipation {
+    user: Addr,
   },
-  /// ValidatorInfos returns the latest EMPs allocated to all active validators
-  #[returns(Vec<(String,VotedValidatorInfoResponse)>)]
-  ValidatorInfos {
-    validator_addrs: Option<Vec<String>>,
-    period: Option<u64>,
-  },
+  // /// PoolInfo returns the latest voting power allocated to a specific pool (generator)
+  // #[returns(VotedValidatorInfoResponse)]
+  // ValidatorInfo {
+  //   validator_addr: String,
+  // },
+  // /// PoolInfo returns the voting power allocated to a specific pool (generator) at a specific period
+  // #[returns(VotedValidatorInfoResponse)]
+  // ValidatorInfoAtPeriod {
+  //   validator_addr: String,
+  //   period: u64,
+  // },
+  // /// ValidatorInfos returns the latest EMPs allocated to all active validators
+  // #[returns(Vec<(String,VotedValidatorInfoResponse)>)]
+  // ValidatorInfos {
+  //   validator_addrs: Option<Vec<String>>,
+  //   period: Option<u64>,
+  // },
+}
+
+#[cw_serde]
+pub struct UserFirstParticipationResponse {
+  pub period: Option<u64>,
+}
+
+#[cw_serde]
+pub struct UserSharesResponse {
+  pub shares: Vec<UserShare>,
+}
+
+#[cw_serde]
+pub struct UserShare {
+  pub gauge: String,
+  pub asset: AssetInfo,
+  pub period: u64,
+
+  pub vp: Uint128,
+  pub total_vp: Uint128,
 }
 
 /// This structure describes a migration message.

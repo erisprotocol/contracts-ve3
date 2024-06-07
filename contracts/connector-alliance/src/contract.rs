@@ -22,7 +22,7 @@ use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{AT_ASSET_STAKING, AT_DELEGATION_CONTROLLER};
-use ve3_shared::contract_connector_alliance::{
+use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
   ExecuteMsg, InstantiateMsg, MigrateMsg,
 };

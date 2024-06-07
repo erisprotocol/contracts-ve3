@@ -29,5 +29,4 @@ cw-asset.workspace = true
 thiserror.workspace = true
 cosmwasm-schema.workspace = true
 ve3-shared.workspace = true
-
-itertools = "0.10"
+itertools.workspace = true

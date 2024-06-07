@@ -63,29 +63,20 @@ impl GlobalConfig {
   ) -> Result<(), SharedError> {
     // check if the address_type is allowed through the address
     let address = ADDRESSES.query(querier, self.0.clone(), address_type.to_string())?;
-    match address {
-      Some(allowed) => {
-        if allowed == *sender {
-          return Ok(());
-        }
-      },
-      _ => {},
+    if let Some(allowed) = address {
+      if allowed == *sender {
+        return Ok(());
+      }
     }
 
     // fallback check if the address_type is allowed through the address list
     let address_list = ADDRESS_LIST.query(querier, self.0.clone(), address_type.to_string())?;
-    match address_list {
-      Some(allowed) => {
-        if allowed.contains(sender) {
-          return Ok(());
-        }
-      },
-      _ => {},
+    if let Some(allowed) = address_list {
+      if allowed.contains(sender) {
+        return Ok(());
+      }
     }
-    return Err(SharedError::UnauthorizedMissingRight(
-      address_type.to_string(),
-      sender.to_string(),
-    ));
+    Err(SharedError::UnauthorizedMissingRight(address_type.to_string(), sender.to_string()))
   }
 }
 
@@ -95,7 +86,7 @@ pub trait ConfigExt {
   fn global_config(&self) -> GlobalConfig;
 }
 
-impl ConfigExt for crate::contract_asset_staking::Config {
+impl ConfigExt for crate::msgs_asset_staking::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
   }
@@ -104,17 +95,7 @@ impl ConfigExt for crate::contract_asset_staking::Config {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
-impl ConfigExt for crate::voting_escrow::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
-  fn global_config(&self) -> GlobalConfig {
-    GlobalConfig(self.global_config_addr.clone())
-  }
-}
-
-impl ConfigExt for crate::asset_gauge::Config {
+impl ConfigExt for crate::msgs_voting_escrow::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
   }
@@ -124,7 +105,7 @@ impl ConfigExt for crate::asset_gauge::Config {
   }
 }
 
-impl ConfigExt for crate::contract_connector_alliance::Config {
+impl ConfigExt for crate::msgs_asset_gauge::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
   }
@@ -134,7 +115,17 @@ impl ConfigExt for crate::contract_connector_alliance::Config {
   }
 }
 
-impl ConfigExt for crate::contract_bribe_manager::Config {
+impl ConfigExt for crate::msgs_connector_alliance::Config {
+  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
+    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+  }
+
+  fn global_config(&self) -> GlobalConfig {
+    GlobalConfig(self.global_config_addr.clone())
+  }
+}
+
+impl ConfigExt for crate::msgs_bribe_manager::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
   }

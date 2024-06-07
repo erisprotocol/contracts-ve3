@@ -25,7 +25,7 @@ impl Config {
 pub struct AssetDistribution {
   pub asset: AssetInfo,
   pub distribution: Decimal,
-  pub vp: Uint128,
+  pub total_vp: Uint128,
 }
 
 #[cw_serde]
@@ -96,9 +96,9 @@ pub enum CallbackMsg {
   },
 }
 
-impl Into<ExecuteMsg> for CallbackMsg {
-  fn into(self) -> ExecuteMsg {
-    ExecuteMsg::Callback(self)
+impl From<CallbackMsg> for ExecuteMsg {
+  fn from(val: CallbackMsg) -> Self {
+    ExecuteMsg::Callback(val)
   }
 }
 

@@ -8,7 +8,7 @@ use cw_asset::AssetInfo;
 use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::MsgClaimDelegationRewards;
 use terra_proto_rs::traits::Message;
-use ve3_shared::contract_connector_alliance::{CallbackMsg, ExecuteMsg};
+use ve3_shared::msgs_connector_alliance::{CallbackMsg, ExecuteMsg};
 use ve3_shared::constants::AT_ASSET_STAKING;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 

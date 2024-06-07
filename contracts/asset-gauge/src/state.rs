@@ -1,10 +1,10 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Order, StdResult, Storage};
 use cw_storage_plus::{Bound, Item, Map};
-use ve3_shared::asset_gauge::Config;
-use ve3_shared::contract_asset_staking::AssetDistribution;
+use ve3_shared::msgs_asset_gauge::Config;
+use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::helpers::bps::BasicPoints;
-use ve3_shared::voting_escrow::LockInfoResponse;
+use ve3_shared::msgs_voting_escrow::LockInfoResponse;
 
 use crate::period_index::PeriodIndex;
 
@@ -25,6 +25,20 @@ pub fn fetch_last_gauge_vote(
   let period_opt = GAUGE_VOTE
     .prefix((gauge, user))
     .range(storage, None, Some(Bound::inclusive(period)), Order::Descending)
+    .next()
+    .transpose()?;
+
+  Ok(period_opt)
+}
+
+pub fn fetch_first_gauge_vote(
+  storage: &dyn Storage,
+  gauge: &str,
+  user: &str,
+) -> StdResult<Option<(u64, UserVotes)>> {
+  let period_opt = GAUGE_VOTE
+    .prefix((gauge, user))
+    .range(storage, None, None, Order::Ascending)
     .next()
     .transpose()?;
 
@@ -73,7 +87,7 @@ impl AssetIndex {
     }
   }
 
-  pub fn idx<'a>(&'a self) -> PeriodIndex<'a> {
+  pub fn idx(&self) -> PeriodIndex<'_> {
     PeriodIndex::new(&self.data_key, &self.slope_key, &self.keys_key)
   }
 }

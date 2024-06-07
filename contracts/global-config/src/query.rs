@@ -5,7 +5,7 @@ use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult};
 use cw_ownable::get_ownership;
 use cw_storage_plus::Bound;
 use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
-use ve3_shared::contract_global_config::{AddressListResponse, AddressResponse, QueryMsg};
+use ve3_shared::msgs_global_config::{AddressListResponse, AddressResponse, QueryMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {

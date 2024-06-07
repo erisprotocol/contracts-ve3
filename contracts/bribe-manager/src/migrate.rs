@@ -6,7 +6,7 @@ use crate::{
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, Response};
 use cw2::{get_contract_version, set_contract_version};
-use ve3_shared::{contract_global_config::MigrateMsg, error::SharedError};
+use ve3_shared::{msgs_global_config::MigrateMsg, error::SharedError};
 
 /// Manages contract migration
 #[cfg_attr(not(feature = "library"), entry_point)]

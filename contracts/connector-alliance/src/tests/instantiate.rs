@@ -8,7 +8,7 @@ use cosmwasm_std::{
     Uint128,
 };
 use terra_proto_rs::traits::MessageExt;
-use ve3_shared::contract_connector_alliance::{Config, QueryMsg};
+use ve3_shared::msgs_connector_alliance::{Config, QueryMsg};
 
 #[test]
 fn test_setup_contract() {

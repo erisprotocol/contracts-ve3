@@ -1,5 +1,5 @@
 use cosmwasm_std::{Decimal, Uint128};
-use ve3_shared::contract_bribe_manager::{BribeDistribution, FuncType};
+use ve3_shared::msgs_bribe_manager::{BribeDistribution, FuncType};
 
 use crate::error::ContractError;
 
@@ -65,10 +65,44 @@ impl BribeDistributionExt for BribeDistribution {
   }
 }
 
+pub fn linear(t: Decimal) -> Decimal {
+  t
+}
+
+pub fn bezier(t: Decimal) -> Decimal {
+  t * t * (dec(3) - dec(2) * t)
+}
+
+pub fn parametric(t: Decimal) -> Decimal {
+  let sqr = t * t;
+  sqr / (dec(2) * sqr + Decimal::one() - dec(2) * t)
+}
+
+pub fn ease_in_cubic(t: Decimal) -> Decimal {
+  t * t * t
+}
+
+pub fn ease_out_cubic(t: Decimal) -> Decimal {
+  dec(3) * t + t * t * t - dec(3) * t * t
+}
+
+pub fn ease_in_out_cubic(t: Decimal) -> Decimal {
+  if t < Decimal::from_ratio(1u128, 2u128) {
+    dec(4) * t * t * t
+  } else {
+    dec(4) * t * t * t + dec(12) * t - dec(12) * t * t - dec(3)
+  }
+}
+
+#[inline]
+fn dec(numb: u128) -> Decimal {
+  Decimal::from_ratio(numb, 1u128)
+}
+
 #[cfg(test)]
 mod test {
   use cosmwasm_std::Uint128;
-  use ve3_shared::contract_bribe_manager::{BribeDistribution, FuncType};
+  use ve3_shared::msgs_bribe_manager::{BribeDistribution, FuncType};
 
   use crate::error::ContractError;
 
@@ -111,38 +145,4 @@ mod test {
 
     Ok(())
   }
-}
-
-pub fn linear(t: Decimal) -> Decimal {
-  t
-}
-
-pub fn bezier(t: Decimal) -> Decimal {
-  t * t * (dec(3) - dec(2) * t)
-}
-
-pub fn parametric(t: Decimal) -> Decimal {
-  let sqr = t * t;
-  return sqr / (dec(2) * sqr + Decimal::one() - dec(2) * t);
-}
-
-pub fn ease_in_cubic(t: Decimal) -> Decimal {
-  t * t * t
-}
-
-pub fn ease_out_cubic(t: Decimal) -> Decimal {
-  dec(3) * t + t * t * t - dec(3) * t * t
-}
-
-pub fn ease_in_out_cubic(t: Decimal) -> Decimal {
-  if t < Decimal::from_ratio(1u128, 2u128) {
-    dec(4) * t * t * t
-  } else {
-    dec(4) * t * t * t + dec(12) * t - dec(12) * t * t - dec(3)
-  }
-}
-
-#[inline]
-fn dec(numb: u128) -> Decimal {
-  Decimal::from_ratio(numb, 1u128)
 }

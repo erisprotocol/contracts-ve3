@@ -52,6 +52,7 @@ proptest = "1.0"
 schemars = "0.8"
 semver = "1.0"
 serde = "1.0"
+itertools = "0.10"
 
 
 ve3-shared = { path = "packages/ve3-shared"}

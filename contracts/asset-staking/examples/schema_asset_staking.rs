@@ -1,5 +1,5 @@
 use cosmwasm_schema::write_api;
-use ve3_shared::contract_asset_staking::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use ve3_shared::msgs_asset_staking::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {

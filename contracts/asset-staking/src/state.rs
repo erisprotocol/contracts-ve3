@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_asset::AssetInfo;
 use cw_storage_plus::{Item, Map};
-use ve3_shared::contract_asset_staking::{AssetConfigRuntime, AssetDistribution, Config};
+use ve3_shared::msgs_asset_staking::{AssetConfigRuntime, AssetDistribution, Config};
 
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const WHITELIST: Map<&AssetInfo, bool> = Map::new("whitelist");
