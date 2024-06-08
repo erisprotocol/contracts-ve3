@@ -8,7 +8,17 @@ use ve3_shared::msgs_asset_staking::*;
 #[allow(dead_code)]
 impl TestingSuite {
   fn contract_4(&self) -> Addr {
-    self.addresses.ve3_asset_staking_1.clone()
+    self.addresses.active_asset_staking.clone()
+  }
+
+  pub fn use_asset_staking_1(&mut self) -> &mut TestingSuite {
+    self.addresses.active_asset_staking = self.addresses.ve3_asset_staking_1.clone();
+    self
+  }
+
+  pub fn use_asset_staking_2(&mut self) -> &mut TestingSuite {
+    self.addresses.active_asset_staking = self.addresses.ve3_asset_staking_2.clone();
+    self
   }
 
   pub fn e_staking_receive(
@@ -75,7 +85,7 @@ impl TestingSuite {
 
   pub fn e_staking_whitelist_assets(
     &mut self,
-    asset_infos: Vec<AssetInfo>,
+    asset_infos: Vec<AssetInfoWithConfig>,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
@@ -99,7 +109,7 @@ impl TestingSuite {
 
   pub fn e_staking_update_asset_config(
     &mut self,
-    update_asset_config: UpdateAssetConfig,
+    update_asset_config: AssetInfoWithConfig,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
@@ -252,6 +262,16 @@ impl TestingSuite {
   ) -> &mut Self {
     let response =
       self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::TotalStakedBalances {});
+    result(response);
+    self
+  }
+
+  pub fn q_staking_whitelisted_asset_details(
+    &mut self,
+    result: impl Fn(StdResult<WhitelistedAssetsDetailsResponse>),
+  ) -> &mut Self {
+    let response =
+      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::WhitelistedAssetDetails {});
     result(response);
     self
   }

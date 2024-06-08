@@ -3,8 +3,9 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult, Uint128};
 use cw_asset::AssetInfo;
 use ve3_shared::msgs_asset_staking::{
-  AllPendingRewardsQuery, AllStakedBalancesQuery, AssetQuery, PendingRewardsRes, QueryMsg,
-  StakedBalanceRes, WhitelistedAssetsResponse,
+  AllPendingRewardsQuery, AllStakedBalancesQuery, AssetInfoWithRuntime, AssetQuery,
+  PendingRewardsRes, QueryMsg, StakedBalanceRes, WhitelistedAssetsDetailsResponse,
+  WhitelistedAssetsResponse,
 };
 
 use crate::{
@@ -20,6 +21,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
   Ok(match msg {
     QueryMsg::Config {} => get_config(deps)?,
     QueryMsg::WhitelistedAssets {} => get_whitelisted_assets(deps)?,
+    QueryMsg::WhitelistedAssetDetails {} => get_whitelisted_assets_details(deps)?,
     QueryMsg::RewardDistribution {} => get_rewards_distribution(deps)?,
     QueryMsg::StakedBalance(asset_query) => get_staked_balance(deps, asset_query)?,
     QueryMsg::PendingRewards(asset_query) => get_pending_rewards(deps, asset_query)?,
@@ -40,6 +42,26 @@ fn get_whitelisted_assets(deps: Deps) -> StdResult<Binary> {
     WHITELIST.keys(deps.storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
 
   let res: WhitelistedAssetsResponse = whitelist;
+  to_json_binary(&res)
+}
+
+fn get_whitelisted_assets_details(deps: Deps) -> StdResult<Binary> {
+  let whitelist =
+    WHITELIST.keys(deps.storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+
+  let res: WhitelistedAssetsDetailsResponse = ASSET_CONFIG
+    .range(deps.storage, None, None, Order::Ascending)
+    .map(|a| {
+      let (info, config) = a?;
+
+      Ok(AssetInfoWithRuntime {
+        whitelisted: whitelist.contains(&info),
+        info,
+        config,
+      })
+    })
+    .collect::<StdResult<Vec<_>>>()?;
+
   to_json_binary(&res)
 }
 

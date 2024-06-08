@@ -21,12 +21,6 @@ pub enum ContractError {
   #[error("{0}")]
   NftError(#[from] cw721_base::ContractError),
 
-  #[error("{location:?}: {orig:?}")]
-  OverflowLocation {
-    location: String,
-    orig: OverflowError,
-  },
-
   #[error("Asset not supported: {0}")]
   WrongAsset(String),
 
@@ -39,16 +33,13 @@ pub enum ContractError {
   #[error("You need to provide assets to create or deposit for a lock.")]
   LockRequiresAmount,
 
-  #[error("Lock already exists")]
-  LockAlreadyExists {},
-
   #[error("Lock does not exist: {0}")]
   LockDoesNotExist(String),
 
   #[error("Lock time must be within limits (week <= lock time < 2 years)")]
   LockTimeLimitsError {},
 
-  #[error("Lock period must be 3 or more weeks")]
+  #[error("Lock period must be 1 or more weeks")]
   LockPeriodsError {},
 
   #[error("Locks decommissioned, cannot extend or create new ones.")]
@@ -56,9 +47,6 @@ pub enum ContractError {
 
   #[error("The lock time has not yet expired")]
   LockHasNotExpired {},
-
-  #[error("The lock expired. Withdraw and create new lock")]
-  LockExpired {},
 
   #[error("The {0} address is blacklisted")]
   AddressBlacklisted(String),
@@ -74,9 +62,6 @@ pub enum ContractError {
 
   #[error("Checkpoint initialization error")]
   CheckpointInitializationFailed {},
-
-  #[error("Contract can't be migrated: {0}")]
-  MigrationError(String),
 
   #[error("Lock has not enough funds")]
   LockNotEnoughFunds {},

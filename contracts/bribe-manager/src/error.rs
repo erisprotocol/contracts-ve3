@@ -42,9 +42,6 @@ pub enum ContractError {
   #[error("Bribe distribution: {0}")]
   BribeDistribution(String),
 
-  #[error("Fee can only be native.")]
-  FeeCanOnlyBeNative {},
-
   #[error("Bribe already claimed for period {0}")]
   BribeAlreadyClaimed(u64),
 

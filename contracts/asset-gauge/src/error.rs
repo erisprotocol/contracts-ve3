@@ -18,29 +18,17 @@ pub enum ContractError {
   #[error("{0}")]
   AssetError(#[from] AssetError),
 
-  #[error("Unauthorized")]
-  Unauthorized {},
-
   #[error("User '{0}' has no voting power in period {1}")]
   ZeroVotingPower(String, u64),
 
-  #[error("Invalid validator address: {0}")]
-  InvalidValidatorAddress(String),
+  #[error("Invalid asset address: {0}")]
+  InvalidAsset(String),
 
   #[error("Votes contain duplicated values")]
   DuplicatedVotes {},
 
-  #[error("There are no validators to tune")]
-  TuneNoValidators {},
-
-  #[error("Contract can't be migrated!")]
-  MigrationError {},
-
   #[error("Cannot clear gauge that exists.")]
   CannotClearExistingGauge {},
-
-  #[error("Gauge does not exist.")]
-  GaugeDoesNotExist {},
 
   #[error("Period {0} not yet finished.")]
   PeriodNotFinished(u64),

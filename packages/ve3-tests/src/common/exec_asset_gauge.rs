@@ -13,18 +13,7 @@ impl TestingSuite {
     self.addresses.ve3_asset_gauge.clone()
   }
 
-  #[track_caller]
-  pub fn gauge_execute(
-    &mut self,
-    execute: ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(creator, self.contract_1(), &execute, &[]));
-    self
-  }
-
-  pub fn gauge_vote_execute(
+  pub fn e_gauge_vote(
     &mut self,
     gauge: String,
     votes: Vec<(String, u16)>,
@@ -40,7 +29,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn gauge_update_vote_execute(
+  pub fn e_gauge_update_vote(
     &mut self,
     token_id: String,
     lock_info: LockInfoResponse,
@@ -56,7 +45,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn gauge_set_distribution_execute(
+  pub fn e_gauge_set_distribution(
     &mut self,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
@@ -67,7 +56,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn gauge_clear_gauge_state_execute(
+  pub fn e_gauge_clear_gauge_state(
     &mut self,
     gauge: String,
     limit: Option<usize>,
@@ -83,7 +72,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn gauge_update_config_execute(
+  pub fn e_gauge_update_config(
     &mut self,
     update_gauge: Option<GaugeConfig>,
     remove_gauge: Option<String>,
@@ -99,7 +88,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn query_gauge_user_info(
+  pub fn q_gauge_user_info(
     &mut self,
     user: String,
     time: Option<Time>,
@@ -116,7 +105,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn query_gauge_user_infos(
+  pub fn q_gauge_user_infos(
     &mut self,
     start_after: Option<String>,
     limit: Option<u32>,
@@ -135,22 +124,22 @@ impl TestingSuite {
     self
   }
 
-  pub fn query_gauge_config(&mut self, result: impl Fn(StdResult<Config>)) -> &mut Self {
+  pub fn q_gauge_config(&mut self, result: impl Fn(StdResult<Config>)) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(self.contract_1(), &QueryMsg::Config {});
     result(response);
     self
   }
 
-  pub fn query_gauge_user_shares(
+  pub fn q_gauge_user_shares(
     &mut self,
-    user: Addr,
+    user: &str,
     times: Option<Times>,
     result: impl Fn(StdResult<UserSharesResponse>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract_1(),
       &QueryMsg::UserShares {
-        user,
+        user: self.address(user),
         times,
       },
     );
@@ -158,22 +147,22 @@ impl TestingSuite {
     self
   }
 
-  pub fn query_gauge_user_first_participation(
+  pub fn q_gauge_user_first_participation(
     &mut self,
-    user: Addr,
+    user: &str,
     result: impl Fn(StdResult<UserFirstParticipationResponse>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract_1(),
       &QueryMsg::UserFirstParticipation {
-        user,
+        user: self.address(user),
       },
     );
     result(response);
     self
   }
 
-  pub fn query_gauge_gauge_info(
+  pub fn q_gauge_gauge_info(
     &mut self,
     gauge: String,
     key: String,
@@ -192,7 +181,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn query_gauge_gauge_infos(
+  pub fn q_gauge_gauge_infos(
     &mut self,
     gauge: String,
     keys: Option<Vec<String>>,

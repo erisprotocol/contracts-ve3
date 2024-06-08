@@ -2,7 +2,8 @@
   "scripts": {
     "release": "bash scripts/build_release.sh",
     "schema": "nps schema",
-    "coverage": "cargo tarpaulin --target-dir target-tarpaulin --out lcov --frozen --locked --skip-clean"
+    "coverage": "cargo tarpaulin --target-dir target-tarpaulin --out lcov --frozen --locked --skip-clean",
+    "scc": "scc contracts packages/ve3-shared"
   },
   "dependencies": {
     "@terra-money/terra.js": "^3.0.8",

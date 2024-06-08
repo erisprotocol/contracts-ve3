@@ -8,7 +8,17 @@ use ve3_shared::msgs_connector_alliance::*;
 #[allow(dead_code)]
 impl TestingSuite {
   fn contract_5(&self) -> Addr {
-    self.addresses.ve3_connector_alliance_1.clone()
+    self.addresses.active_connector_alliance.clone()
+  }
+
+  pub fn use_connector_alliance_1(&mut self) -> &mut TestingSuite {
+    self.addresses.active_connector_alliance = self.addresses.ve3_connector_alliance_1.clone();
+    self
+  }
+
+  pub fn use_connector_alliance_2(&mut self) -> &mut TestingSuite {
+    self.addresses.active_connector_alliance = self.addresses.ve3_connector_alliance_2.clone();
+    self
   }
 
   pub fn e_alliance_claim_rewards(

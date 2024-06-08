@@ -22,8 +22,8 @@ use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::general::addr_opt_fallback;
 use ve3_shared::msgs_asset_staking::{
-  AssetConfigRuntime, AssetDistribution, CallbackMsg, Config, Cw20HookMsg, ExecuteMsg,
-  InstantiateMsg, UpdateAssetConfig,
+  AssetConfig, AssetConfigRuntime, AssetDistribution, AssetInfoWithConfig, CallbackMsg, Config,
+  Cw20HookMsg, ExecuteMsg, InstantiateMsg,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -173,24 +173,30 @@ fn update_asset_config(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
-  update: UpdateAssetConfig,
+  update: AssetInfoWithConfig,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_asset_whitelist_controller(&deps, &info, &config)?;
-  assert_asset_whitelisted(&deps, &update.asset)?;
-  let current = ASSET_CONFIG.may_load(deps.storage, &update.asset)?.unwrap_or_default();
+  assert_asset_whitelisted(&deps, &update.info)?;
+  let current = ASSET_CONFIG.may_load(deps.storage, &update.info)?.unwrap_or_default();
 
   let mut updated = current.clone();
-  updated.stake_config = update.config.stake_config;
-  updated.yearly_take_rate = update.config.yearly_take_rate;
-  ASSET_CONFIG.save(deps.storage, &update.asset, &updated)?;
+
+  let new_config = update.config.unwrap_or(AssetConfig {
+    yearly_take_rate: config.default_yearly_take_rate,
+    stake_config: ve3_shared::stake_config::StakeConfig::Default,
+  });
+
+  updated.stake_config = new_config.stake_config;
+  updated.yearly_take_rate = new_config.yearly_take_rate;
+  ASSET_CONFIG.save(deps.storage, &update.info, &updated)?;
 
   let mut msgs = vec![];
   if current.stake_config != updated.stake_config {
     // if stake config changed, withdraw from one (or do nothing), deposit on the other.
-    let (balance, _) = TOTAL_BALANCES.load(deps.storage, &update.asset)?;
+    let (balance, _) = TOTAL_BALANCES.load(deps.storage, &update.info)?;
     let available = balance - current.taken;
-    let asset = update.asset.with_balance(available);
+    let asset = update.info.with_balance(available);
 
     let mut unstake_msgs =
       current.stake_config.unstake_check_received_msg(&deps, &env, asset.clone())?;
@@ -201,41 +207,57 @@ fn update_asset_config(
   }
 
   Ok(
-    Response::new().add_attributes(vec![
-      ("action", "update_asset_config"),
-      ("asset", &update.asset.to_string()),
-    ]),
+    Response::new()
+      .add_attributes(vec![("action", "update_asset_config"), ("asset", &update.info.to_string())]),
   )
 }
 
 fn whitelist_assets(
   deps: DepsMut,
   info: MessageInfo,
-  infos: Vec<AssetInfo>,
+  asset_configs: Vec<AssetInfoWithConfig>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_asset_whitelist_controller(&deps, &info, &config)?;
 
-  for info in &infos {
-    if info == &config.reward_info {
+  let assets_str =
+    asset_configs.iter().map(|asset| asset.info.to_string()).collect::<Vec<String>>().join(",");
+
+  for asset_config in asset_configs {
+    if asset_config.info == config.reward_info {
       return Err(ContractError::AssetInfoCannotEqualReward {});
     }
 
-    WHITELIST.save(deps.storage, info, &true)?;
-    ASSET_REWARD_RATE
-      .update(deps.storage, info, |rate| -> StdResult<_> { Ok(rate.unwrap_or(Decimal::zero())) })?;
+    if WHITELIST.has(deps.storage, &asset_config.info) {
+      return Err(ContractError::AssetAlreadyWhitelisted);
+    }
+
+    WHITELIST.save(deps.storage, &asset_config.info, &true)?;
+    ASSET_REWARD_RATE.update(deps.storage, &asset_config.info, |rate| -> StdResult<_> {
+      Ok(rate.unwrap_or(Decimal::zero()))
+    })?;
+
+    let current_config =
+      ASSET_CONFIG.may_load(deps.storage, &asset_config.info)?.unwrap_or_default();
+
+    let new_config = asset_config.config.unwrap_or(AssetConfig {
+      yearly_take_rate: config.default_yearly_take_rate,
+      stake_config: ve3_shared::stake_config::StakeConfig::Default,
+    });
 
     ASSET_CONFIG.save(
       deps.storage,
-      info,
+      &asset_config.info,
       &AssetConfigRuntime {
-        yearly_take_rate: config.default_yearly_take_rate,
-        ..Default::default()
+        yearly_take_rate: new_config.yearly_take_rate,
+        stake_config: new_config.stake_config.clone(),
+
+        last_taken_s: 0,
+        taken: current_config.taken,
+        harvested: current_config.harvested,
       },
     )?;
   }
-
-  let assets_str = infos.iter().map(|asset| asset.to_string()).collect::<Vec<String>>().join(",");
 
   Ok(Response::new().add_attributes(vec![("action", "whitelist_assets"), ("assets", &assets_str)]))
 }

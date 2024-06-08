@@ -15,18 +15,7 @@ impl TestingSuite {
     self.addresses.ve3_voting_escrow.clone()
   }
 
-  #[track_caller]
-  pub fn ve_execute(
-    &mut self,
-    execute: ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(creator, self.contract(), &execute, &[]));
-    self
-  }
-
-  pub fn ve_create_lock_execute(
+  pub fn e_ve_create_lock_execute(
     &mut self,
     time: u64,
     funds: Asset,
@@ -59,7 +48,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_extend_lock_amount_execute(
+  pub fn e_ve_extend_lock_amount_execute(
     &mut self,
     token_id: &str,
     sender: &str,
@@ -92,7 +81,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_merge_lock_execute(
+  pub fn e_ve_merge_lock_execute(
     &mut self,
     token_id: &str,
     token_id_add: &str,
@@ -108,7 +97,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_split_lock_execute(
+  pub fn e_ve_split_lock_execute(
     &mut self,
     token_id: &str,
     amount: Uint128,
@@ -126,7 +115,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_extend_lock_time_execute(
+  pub fn e_ve_extend_lock_time_execute(
     &mut self,
     time: u64,
     token_id: &str,
@@ -142,7 +131,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_withdraw_execute(
+  pub fn e_ve_withdraw_execute(
     &mut self,
     token_id: &str,
     sender: &str,
@@ -156,7 +145,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_receive_execute(
+  pub fn e_ve_receive_execute(
     &mut self,
     cw20_receive_msg: Cw20ReceiveMsg,
     sender: &str,
@@ -168,7 +157,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_update_blacklist_execute(
+  pub fn e_ve_update_blacklist_execute(
     &mut self,
     append_addrs: Option<Vec<String>>,
     remove_addrs: Option<Vec<String>>,
@@ -184,7 +173,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_update_config_execute(
+  pub fn e_ve_update_config_execute(
     &mut self,
     append_deposit_assets: Option<Vec<DepositAsset<String>>>,
     push_update_contracts: Option<Vec<String>>,
@@ -202,7 +191,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_transfer_nft_execute(
+  pub fn e_ve_transfer_nft_execute(
     &mut self,
     recipient: String,
     token_id: String,
@@ -218,7 +207,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_send_nft_execute(
+  pub fn e_ve_send_nft_execute(
     &mut self,
     contract: String,
     token_id: String,
@@ -236,7 +225,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_burn_execute(
+  pub fn e_ve_burn_execute(
     &mut self,
     token_id: String,
     sender: &str,
@@ -250,7 +239,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_approve_execute(
+  pub fn e_ve_approve_execute(
     &mut self,
     spender: &str,
     token_id: String,
@@ -268,7 +257,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_revoke_execute(
+  pub fn e_ve_revoke_execute(
     &mut self,
     spender: String,
     token_id: String,
@@ -284,7 +273,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_approve_all_execute(
+  pub fn e_ve_approve_all_execute(
     &mut self,
     operator: String,
     expires: Option<Expiration>,
@@ -314,7 +303,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_lock_vamp(
+  pub(crate) fn q_ve_lock_vamp(
     &mut self,
     token_id: String,
     time: Option<Time>,
@@ -333,7 +322,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_blacklisted_voters(
+  pub(crate) fn q_ve_blacklisted_voters(
     &mut self,
     start_after: Option<String>,
     limit: Option<u32>,
@@ -350,7 +339,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_total_vamp(
+  pub(crate) fn q_ve_total_vamp(
     &mut self,
     time: Option<Time>,
     result: impl Fn(StdResult<VotingPowerResponse>),
@@ -365,7 +354,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_lock_info(
+  pub(crate) fn q_ve_lock_info(
     &mut self,
     token_id: String,
     time: Option<Time>,
@@ -382,13 +371,13 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_config(&mut self, result: impl Fn(StdResult<Config>)) -> &mut Self {
+  pub(crate) fn q_ve_config(&mut self, result: impl Fn(StdResult<Config>)) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(self.contract(), &QueryMsg::Config {});
     result(response);
     self
   }
 
-  pub(crate) fn query_ve_nft_info(
+  pub(crate) fn q_ve_nft_info(
     &mut self,
     token_id: String,
     result: impl Fn(StdResult<NftInfoResponse<Extension>>),
@@ -403,7 +392,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_all_nft_info(
+  pub(crate) fn q_ve_all_nft_info(
     &mut self,
     token_id: String,
     include_expired: Option<bool>,
@@ -420,7 +409,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_owner_of(
+  pub(crate) fn q_ve_owner_of(
     &mut self,
     token_id: String,
     include_expired: Option<bool>,
@@ -437,7 +426,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_approval(
+  pub(crate) fn q_ve_approval(
     &mut self,
     token_id: String,
     spender: String,
@@ -456,7 +445,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_approvals(
+  pub(crate) fn q_ve_approvals(
     &mut self,
     token_id: String,
     include_expired: Option<bool>,
@@ -473,7 +462,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_all_operators(
+  pub(crate) fn q_ve_all_operators(
     &mut self,
     owner: String,
     include_expired: Option<bool>,
@@ -494,7 +483,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_num_tokens(
+  pub(crate) fn q_ve_num_tokens(
     &mut self,
     result: impl Fn(StdResult<NumTokensResponse>),
   ) -> &mut Self {
@@ -503,7 +492,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_contract_info(
+  pub(crate) fn q_ve_contract_info(
     &mut self,
     result: impl Fn(StdResult<ContractInfoResponse>),
   ) -> &mut Self {
@@ -512,7 +501,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_tokens(
+  pub(crate) fn q_ve_tokens(
     &mut self,
     owner: String,
     start_after: Option<String>,
@@ -531,7 +520,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_all_tokens(
+  pub(crate) fn q_ve_all_tokens(
     &mut self,
     start_after: Option<String>,
     limit: Option<u32>,
@@ -548,10 +537,7 @@ impl TestingSuite {
     self
   }
 
-  pub(crate) fn query_ve_minter(
-    &mut self,
-    result: impl Fn(StdResult<MinterResponse>),
-  ) -> &mut Self {
+  pub(crate) fn q_ve_minter(&mut self, result: impl Fn(StdResult<MinterResponse>)) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(self.contract(), &QueryMsg::Minter {});
     result(response);
     self

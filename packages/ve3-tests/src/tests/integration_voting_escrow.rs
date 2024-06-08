@@ -26,14 +26,14 @@ fn test_locks() {
 
   suite
     .init()
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
       res.assert_attribute(attr("token_id", "1")).unwrap();
     })
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
-    .query_ve_all_tokens(None, None, |res| {
+    .q_ve_all_tokens(None, None, |res| {
       assert_eq!(
         res.unwrap(),
         TokensResponse {
@@ -41,7 +41,7 @@ fn test_locks() {
         }
       )
     })
-    .query_ve_all_nft_info("1".to_string(), None, |res| {
+    .q_ve_all_nft_info("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -77,7 +77,7 @@ fn test_locks() {
         }
       );
     })
-    .query_ve_total_vamp(None, |res| {
+    .q_ve_total_vamp(None, |res| {
       let mut vp =
         Decimal::from_ratio(90_u64 * 2, MAX_LOCK_PERIODS * 10).checked_mul_uint(u(1000)).unwrap();
       adjust_vp_and_slope(&mut vp, 2).unwrap();
@@ -102,14 +102,14 @@ fn test_locks_transfer() {
 
   suite
     .init()
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
       res.assert_attribute(attr("token_id", "1")).unwrap();
     })
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
-    .query_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -120,10 +120,10 @@ fn test_locks_transfer() {
         }
       );
     })
-    .ve_transfer_nft_execute(user2.clone(), "1".to_string(), "user1", |res| {
+    .e_ve_transfer_nft_execute(user2.clone(), "1".to_string(), "user1", |res| {
       res.assert_attribute(attr("new_owner", user2.clone())).unwrap();
     })
-    .query_ve_total_vamp(None, |res| {
+    .q_ve_total_vamp(None, |res| {
       let mut vp =
         Decimal::from_ratio(90_u64 * 2, MAX_LOCK_PERIODS * 10).checked_mul_uint(u(1000)).unwrap();
       adjust_vp_and_slope(&mut vp, 2).unwrap();
@@ -138,7 +138,7 @@ fn test_locks_transfer() {
         }
       )
     })
-    .query_ve_owner_of("1".to_string(), None, |res| {
+    .q_ve_owner_of("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         OwnerOfResponse {
@@ -147,7 +147,7 @@ fn test_locks_transfer() {
         }
       )
     })
-    .query_ve_owner_of("2".to_string(), None, |res| {
+    .q_ve_owner_of("2".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         OwnerOfResponse {
@@ -156,7 +156,7 @@ fn test_locks_transfer() {
         }
       )
     })
-    .query_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -167,7 +167,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .query_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -179,7 +179,7 @@ fn test_locks_transfer() {
       );
     })
     .add_one_period()
-    .query_gauge_user_info(user2.to_string(), Some(Time::Current), |res| {
+    .q_gauge_user_info(user2.to_string(), Some(Time::Current), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -190,7 +190,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .query_gauge_user_info(user1.to_string(), Some(Time::Current), |res| {
+    .q_gauge_user_info(user1.to_string(), Some(Time::Current), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -201,7 +201,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .query_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -212,7 +212,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .query_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -224,7 +224,7 @@ fn test_locks_transfer() {
       );
     })
     .add_one_period()
-    .query_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -235,7 +235,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .query_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -256,13 +256,13 @@ fn test_locks_exchange_rate() {
   let addr = suite.addresses.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
-    .ve_create_lock_execute(WEEK * 2, addr.ampluna(1000u128), "user2", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, addr.ampluna(1000u128), "user2", |res| {
       res.unwrap();
     })
-    .query_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.2 higher
@@ -274,7 +274,7 @@ fn test_locks_exchange_rate() {
         }
       );
     })
-    .query_ve_all_nft_info("2".to_string(), None, |res| {
+    .q_ve_all_nft_info("2".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -319,13 +319,13 @@ fn test_locks_lock_extension() {
   let addr = suite.addresses.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
-    .ve_extend_lock_time_execute(WEEK * 2, "1", "user1", |res| {
+    .e_ve_extend_lock_time_execute(WEEK * 2, "1", "user1", |res| {
       res.unwrap();
     })
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.2 higher
@@ -337,7 +337,7 @@ fn test_locks_lock_extension() {
         }
       );
     })
-    .query_ve_all_nft_info("1".to_string(), None, |res| {
+    .q_ve_all_nft_info("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -383,11 +383,11 @@ fn test_locks_lock_extension_ampluna() {
   let ampluna = addr.eris_hub_cw20.to_string();
 
   suite
-    .ve_create_lock_execute(WEEK * 2, addr.ampluna(1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, addr.ampluna(1000u128), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.3 higher
@@ -402,14 +402,14 @@ fn test_locks_lock_extension_ampluna() {
     .e_hub_update_exchange_rate(Decimal::from_str("1.3").unwrap(), "creator", |res| {
       res.unwrap();
     })
-    .ve_extend_lock_time_execute(WEEK * 2, "2", "user1", |res| {
+    .e_ve_extend_lock_time_execute(WEEK * 2, "2", "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .ve_extend_lock_time_execute(WEEK * 2, "1", "user1", |res| {
+    .e_ve_extend_lock_time_execute(WEEK * 2, "1", "user1", |res| {
       res.unwrap();
     })
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.3 higher
@@ -421,7 +421,7 @@ fn test_locks_lock_extension_ampluna() {
         }
       );
     })
-    .query_ve_all_nft_info("1".to_string(), None, |res| {
+    .q_ve_all_nft_info("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -467,30 +467,30 @@ fn test_locks_merge() {
   let fake = addr.fake_cw20.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 2, native("xxx", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("xxx", 1000u128), "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset("xxx".into()));
     })
-    .ve_create_lock_execute(WEEK * 2, cw20(fake.clone(), 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, cw20(fake.clone(), 1000u128), "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset(format!("cw20:{fake}")));
     })
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
     // 2 = wrong asset
-    .ve_create_lock_execute(WEEK * 2, addr.ampluna(1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, addr.ampluna(1000u128), "user1", |res| {
       res.unwrap();
     })
     // 3 = wrong end
-    .ve_create_lock_execute(WEEK * 3, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 3, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
-    .ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
-    .ve_merge_lock_execute("1", "2", "user2", |res| {
+    .e_ve_merge_lock_execute("1", "2", "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(
         res,
@@ -499,15 +499,15 @@ fn test_locks_merge() {
         ))
       );
     })
-    .ve_merge_lock_execute("1", "2", "user1", |res| {
+    .e_ve_merge_lock_execute("1", "2", "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LocksNeedSameAssets("1".into(), "2".into()));
     })
-    .ve_merge_lock_execute("3", "1", "user1", |res| {
+    .e_ve_merge_lock_execute("3", "1", "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LocksNeedSameEnd("3".into(), "1".into()));
     })
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.3 higher
@@ -520,7 +520,7 @@ fn test_locks_merge() {
       );
     })
     // tokens 1 and 4 exist
-    .query_ve_lock_info("1".to_string(), None, |res| {
+    .q_ve_lock_info("1".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -538,7 +538,7 @@ fn test_locks_merge() {
         }
       );
     })
-    .query_ve_lock_info("4".to_string(), None, |res| {
+    .q_ve_lock_info("4".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -556,14 +556,14 @@ fn test_locks_merge() {
         }
       );
     })
-    .ve_merge_lock_execute("1", "4", "user1", |res| {
+    .e_ve_merge_lock_execute("1", "4", "user1", |res| {
       res.assert_attribute(attr("action", "burn")).unwrap();
       res.assert_attribute(attr("token_id", "4")).unwrap();
       res.assert_attribute(attr("action", "ve/merge_lock")).unwrap();
       res.assert_attribute(attr("merge", "1,4")).unwrap();
     })
     // 1 is doubled
-    .query_ve_lock_info("1".to_string(), None, |res| {
+    .q_ve_lock_info("1".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -582,7 +582,7 @@ fn test_locks_merge() {
       );
     })
     // tokens 4 is empty
-    .query_ve_lock_info("4".to_string(), None, |res| {
+    .q_ve_lock_info("4".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -601,7 +601,7 @@ fn test_locks_merge() {
       );
     })
     // user info not changed
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       // merge doesnt change amount for user (in this case)
       assert_eq!(
         res.unwrap(),
@@ -613,7 +613,7 @@ fn test_locks_merge() {
         }
       );
     })
-    .query_ve_all_nft_info("1".to_string(), None, |res| {
+    .q_ve_all_nft_info("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -649,15 +649,15 @@ fn test_locks_merge() {
         }
       );
     })
-    .ve_extend_lock_time_execute(WEEK, "1", "user1", |res| {
+    .e_ve_extend_lock_time_execute(WEEK, "1", "user1", |res| {
       res.unwrap();
     })
     // 3 can now be merged
-    .ve_merge_lock_execute("1", "3", "user1", |res| {
+    .e_ve_merge_lock_execute("1", "3", "user1", |res| {
       res.unwrap();
     })
     // 1 is doubled
-    .query_ve_lock_info("1".to_string(), None, |res| {
+    .q_ve_lock_info("1".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -676,7 +676,7 @@ fn test_locks_merge() {
       );
     })
     // tokens 4 is empty
-    .query_ve_lock_info("3".to_string(), None, |res| {
+    .q_ve_lock_info("3".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -694,7 +694,7 @@ fn test_locks_merge() {
         }
       );
     })
-    .query_ve_all_nft_info("1".to_string(), None, |res| {
+    .q_ve_all_nft_info("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -740,11 +740,11 @@ fn test_locks_split() {
   let ampluna = suite.addresses.eris_hub_cw20.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
-    .ve_split_lock_execute("1", u(1000), Some("user2"), "user2", |res| {
+    .e_ve_split_lock_execute("1", u(1000), Some("user2"), "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(
         res,
@@ -753,10 +753,10 @@ fn test_locks_split() {
         ))
       );
     })
-    .ve_approve_execute("user2", "1".into(), None, "user1", |res| {
+    .e_ve_approve_execute("user2", "1".into(), None, "user1", |res| {
       res.unwrap();
     })
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -767,7 +767,7 @@ fn test_locks_split() {
         }
       );
     })
-    .query_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -778,10 +778,10 @@ fn test_locks_split() {
         }
       );
     })
-    .ve_split_lock_execute("1", u(1000), Some("user2"), "user2", |res| {
+    .e_ve_split_lock_execute("1", u(1000), Some("user2"), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
-    .query_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -792,7 +792,7 @@ fn test_locks_split() {
         }
       );
     })
-    .query_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -803,7 +803,7 @@ fn test_locks_split() {
         }
       );
     })
-    .query_ve_all_nft_info("1".to_string(), None, |res| {
+    .q_ve_all_nft_info("1".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -842,7 +842,7 @@ fn test_locks_split() {
         }
       );
     })
-    .query_ve_all_nft_info("2".to_string(), None, |res| {
+    .q_ve_all_nft_info("2".to_string(), None, |res| {
       assert_eq!(
         res.unwrap(),
         AllNftInfoResponse::<Extension> {
@@ -878,7 +878,7 @@ fn test_locks_split() {
         }
       );
     })
-    .query_ve_lock_info("1".to_string(), None, |res| {
+    .q_ve_lock_info("1".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -896,7 +896,7 @@ fn test_locks_split() {
         }
       );
     })
-    .query_ve_lock_info("2".to_string(), None, |res| {
+    .q_ve_lock_info("2".to_string(), None, |res| {
       let res = res.unwrap();
       assert_eq!(
         res,
@@ -923,11 +923,11 @@ fn test_lock_withdraw_cw20() {
   let addr = suite.addresses.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
       res.unwrap();
     })
     .add_periods(10)
-    .ve_withdraw_execute("1", "user2", |res| {
+    .e_ve_withdraw_execute("1", "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(
         res,
@@ -936,7 +936,7 @@ fn test_lock_withdraw_cw20() {
         ))
       );
     })
-    .ve_withdraw_execute("1", "user1", |res| {
+    .e_ve_withdraw_execute("1", "user1", |res| {
       res.assert_attribute(attr("action", "transfer")).unwrap();
       res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string())).unwrap();
       res.assert_attribute(attr("to", addr.user1.to_string())).unwrap();
@@ -950,11 +950,11 @@ fn test_lock_withdraw_native() {
   let addr = suite.addresses.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
       res.unwrap();
     })
     .add_periods(10)
-    .ve_withdraw_execute("1", "user2", |res| {
+    .e_ve_withdraw_execute("1", "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(
         res,
@@ -963,7 +963,7 @@ fn test_lock_withdraw_native() {
         ))
       );
     })
-    .ve_withdraw_execute("1", "user1", |res| {
+    .e_ve_withdraw_execute("1", "user1", |res| {
       res
         .assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()))
         .unwrap();
@@ -979,27 +979,27 @@ fn test_lock_increase_cw20() {
   let addr = suite.addresses.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
-    .ve_extend_lock_amount_execute("2", "user2", native("xxx", 100u128), |res| {
+    .e_ve_extend_lock_amount_execute("2", "user2", native("xxx", 100u128), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset("xxx".to_string()));
     })
-    .ve_extend_lock_amount_execute("2", "user2", cw20(addr.fake_cw20.clone(), 100u128), |res| {
+    .e_ve_extend_lock_amount_execute("2", "user2", cw20(addr.fake_cw20.clone(), 100u128), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset(format!("cw20:{0}", addr.fake_cw20)));
     })
-    .ve_extend_lock_amount_execute("2", "user2", addr.ampluna(100u128), |res| {
+    .e_ve_extend_lock_amount_execute("2", "user2", addr.ampluna(100u128), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .ve_extend_lock_amount_execute("1", "user1", addr.ampluna(1000u128), |res| {
+    .e_ve_extend_lock_amount_execute("1", "user1", addr.ampluna(1000u128), |res| {
       res.unwrap();
     })
     .add_periods(5)
-    .ve_withdraw_execute("1", "user2", |res| {
+    .e_ve_withdraw_execute("1", "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(
         res,
@@ -1008,7 +1008,7 @@ fn test_lock_increase_cw20() {
         ))
       );
     })
-    .ve_withdraw_execute("1", "user1", |res| {
+    .e_ve_withdraw_execute("1", "user1", |res| {
       res.assert_attribute(attr("action", "transfer")).unwrap();
       res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string())).unwrap();
       res.assert_attribute(attr("to", addr.user1.to_string())).unwrap();
@@ -1023,23 +1023,23 @@ fn test_lock_increase_native() {
   let addr = suite.addresses.clone();
 
   suite
-    .ve_create_lock_execute(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_execute(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
-    .ve_extend_lock_amount_execute("2", "user2", native("xxx", 100u128), |res| {
+    .e_ve_extend_lock_amount_execute("2", "user2", native("xxx", 100u128), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset("xxx".to_string()));
     })
-    .ve_extend_lock_amount_execute("2", "user2", native("uluna", 100u128), |res| {
+    .e_ve_extend_lock_amount_execute("2", "user2", native("uluna", 100u128), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .ve_extend_lock_amount_execute("1", "user1", native("uluna", 1000u128), |res| {
+    .e_ve_extend_lock_amount_execute("1", "user1", native("uluna", 1000u128), |res| {
       res.unwrap();
     })
     .add_periods(5)
-    .ve_withdraw_execute("1", "user2", |res| {
+    .e_ve_withdraw_execute("1", "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(
         res,
@@ -1048,7 +1048,7 @@ fn test_lock_increase_native() {
         ))
       );
     })
-    .ve_withdraw_execute("1", "user1", |res| {
+    .e_ve_withdraw_execute("1", "user1", |res| {
       res
         .assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()))
         .unwrap();

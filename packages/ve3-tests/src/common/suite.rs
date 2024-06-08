@@ -1,5 +1,6 @@
-use std::str::FromStr;
-
+use super::helpers::cw20;
+use crate::common::suite_contracts::*;
+use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::{coin, Addr, Coin, Decimal, Empty, Timestamp, Uint128};
@@ -11,15 +12,11 @@ use cw_multi_test::{
   StargateFailingModule, WasmKeeper,
 };
 use serde::Serialize;
+use std::str::FromStr;
 use ve3_shared::msgs_asset_gauge::GaugeConfig;
 use ve3_shared::msgs_voting_escrow::DepositAsset;
 use ve3_shared::{constants::*, msgs_asset_staking, msgs_bribe_manager};
 use ve3_shared::{msgs_connector_alliance, msgs_global_config};
-
-use crate::common::suite_contracts::*;
-use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
-
-use super::helpers::cw20;
 
 type OsmosisTokenFactoryApp = App<
   BankKeeper,
@@ -62,6 +59,13 @@ pub struct Addresses {
   pub eris_hub_cw20: Addr,
 
   pub fake_cw20: Addr,
+  pub lp_cw20: Addr,
+
+  pub active_asset_staking: Addr,
+  pub active_connector_alliance: Addr,
+
+  pub gauge_1: String,
+  pub gauge_2: String,
 }
 
 impl Addresses {
@@ -132,6 +136,7 @@ impl TestingSuite {
       coin(1_000_000_000u128, "uluna".to_string()),
       coin(1_000_000_000u128, "xxx".to_string()),
       coin(1_000_000_000u128, "usdc".to_string()),
+      coin(1_000_000_000u128, "native_lp".to_string()),
     ])
   }
 
@@ -180,9 +185,16 @@ impl TestingSuite {
         eris_hub: Addr::unchecked(""),
         eris_hub_cw20: Addr::unchecked(""),
         fake_cw20: Addr::unchecked(""),
+        lp_cw20: Addr::unchecked(""),
         creator,
         user1,
         user2,
+
+        active_asset_staking: Addr::unchecked(""),
+        active_connector_alliance: Addr::unchecked(""),
+
+        gauge_1: "stable".to_string(),
+        gauge_2: "project".to_string(),
       },
     }
   }
@@ -204,7 +216,7 @@ impl TestingSuite {
     self.init_no_config();
 
     self.init_global_config();
-    self.ve_update_config_execute(
+    self.e_ve_update_config_execute(
       None,
       Some(vec![self.addresses.ve3_asset_gauge.to_string()]),
       None,
@@ -262,6 +274,7 @@ impl TestingSuite {
     self.create_hub();
     self.create_hub_cw20();
     self.create_fake_cw20();
+    self.create_lp_cw20();
 
     self.create_global_config();
     self.create_asset_gauge();
@@ -271,6 +284,9 @@ impl TestingSuite {
     self.create_connector_alliance_1();
     self.create_connector_alliance_2();
     self.create_voting_escrow();
+
+    self.use_connector_alliance_1();
+    self.use_asset_staking_1();
 
     self
   }
@@ -314,7 +330,7 @@ impl TestingSuite {
       gauges: vec![
         GaugeConfig {
           name: self.gauge1(),
-          min_gauge_percentage: Decimal::percent(1),
+          min_gauge_percentage: Decimal::percent(10),
         },
         GaugeConfig {
           name: self.gauge2(),
@@ -484,6 +500,37 @@ impl TestingSuite {
     self.addresses.fake_cw20 = self.init_contract(code_id, msg, "fake_cw20");
   }
 
+  fn create_lp_cw20(&mut self) {
+    let code_id = self.app.store_code(eris_hub_cw20_mock());
+
+    let msg = cw20_base::msg::InstantiateMsg {
+      decimals: 6,
+      name: "lp_awesome".to_string(),
+      symbol: "ulp".to_string(),
+      initial_balances: vec![
+        Cw20Coin {
+          address: self.creator().to_string(),
+          amount: Uint128::new(100_000_000_000_000u128),
+        },
+        Cw20Coin {
+          address: self.user1().to_string(),
+          amount: Uint128::new(100_000_000_000_000u128),
+        },
+        Cw20Coin {
+          address: self.user2().to_string(),
+          amount: Uint128::new(100_000_000_000_000u128),
+        },
+      ],
+      mint: Some(cw20::MinterResponse {
+        minter: self.creator().to_string(),
+        cap: None,
+      }),
+      marketing: None,
+    };
+
+    self.addresses.lp_cw20 = self.init_contract(code_id, msg, "lp");
+  }
+
   fn init_global_config(&mut self) -> &mut TestingSuite {
     self.global_config_execute(
       msgs_global_config::ExecuteMsg::SetAddresses {
@@ -497,7 +544,7 @@ impl TestingSuite {
             AT_ASSET_WHITELIST_CONTROLLER.to_string(),
             self.address("AT_ASSET_WHITELIST_CONTROLLER").to_string(),
           ),
-          (AT_GAUGE_CONTROLLER.to_string(), self.address("AT_GAUGE_CONTROLLER").to_string()),
+          // (AT_GAUGE_CONTROLLER.to_string(), self.address("AT_GAUGE_CONTROLLER").to_string()),
           (AT_VE_GUARDIAN.to_string(), self.address("AT_VE_GUARDIAN").to_string()),
           // receivers
           (AT_TAKE_RECIPIENT.to_string(), self.address("AT_TAKE_RECIPIENT").to_string()),

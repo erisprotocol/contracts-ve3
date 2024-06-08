@@ -1,3 +1,4 @@
+use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::state::{
   fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex,
@@ -6,9 +7,9 @@ use crate::state::{
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  attr, Addr, Decimal, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, Uint128,
+  attr, Addr, Decimal, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint128,
 };
-use cw2::{get_contract_version, set_contract_version};
+use cw2::set_contract_version;
 use cw_asset::AssetInfo;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -17,12 +18,9 @@ use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::AT_VOTING_ESCROW;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
-use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, MigrateMsg};
+use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg};
 use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::msgs_voting_escrow::LockInfoResponse;
-
-const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -74,7 +72,7 @@ pub fn execute(
       Ok(Response::default().add_attribute("action", "gauge/clear_gauge_state"))
     },
 
-    ExecuteMsg::SetDistribution {} => set_distribution(deps, env, info),
+    ExecuteMsg::SetDistribution {} => set_distribution(deps, env),
 
     ExecuteMsg::UpdateConfig {
       update_gauge,
@@ -138,7 +136,7 @@ fn handle_vote(
         return Err(ContractError::DuplicatedVotes {});
       }
       if !allowed.contains(&addr) {
-        return Err(ContractError::InvalidValidatorAddress(addr));
+        return Err(ContractError::InvalidAsset(addr));
       }
 
       let bps: BasicPoints = bps.try_into()?;
@@ -270,13 +268,9 @@ fn update_vote(
 /// are not eligible to receive allocation points,
 /// takes top X pools by voting power, where X is 'config.pools_limit', calculates allocation points
 /// for these pools and applies allocation points in generator contract.
-fn set_distribution(
-  mut deps: DepsMut,
-  env: Env,
-  info: MessageInfo,
-) -> Result<Response, ContractError> {
+fn set_distribution(mut deps: DepsMut, env: Env) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
-  config.assert_gauge_controller(&deps, &info.sender)?;
+  // config.assert_gauge_controller(&deps, &info.sender)?;
   let block_period = get_period(env.block.time.seconds())?;
 
   let mut attrs = vec![];
@@ -312,7 +306,10 @@ fn set_distribution(
     attrs.push(attr("periods", periods.iter().join(",")));
 
     if let Some(new_distribution) = distribution {
-      msgs.push(asset_staking.set_reward_distribution_msg(new_distribution)?)
+      // only write if it has assets
+      if !new_distribution.is_empty() {
+        msgs.push(asset_staking.set_reward_distribution_msg(new_distribution)?)
+      }
     }
   }
 
@@ -371,12 +368,14 @@ fn _set_distribution(
 
   let total: Decimal = save_distribution.iter().map(|a| a.distribution).sum();
 
-  if total > Decimal::percent(100) {
-    let remove = total - Decimal::percent(100);
-    save_distribution[0].distribution -= remove;
-  } else {
-    let add = Decimal::percent(100) - total;
-    save_distribution[0].distribution += add;
+  if !save_distribution.is_empty() {
+    if total > Decimal::percent(100) {
+      let remove = total - Decimal::percent(100);
+      save_distribution[0].distribution -= remove;
+    } else {
+      let add = Decimal::percent(100) - total;
+      save_distribution[0].distribution += add;
+    }
   }
 
   GAUGE_DISTRIBUTION.save(
@@ -388,29 +387,4 @@ fn _set_distribution(
   )?;
 
   Ok(save_distribution)
-}
-
-/// Manages contract migration
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-  let contract_version = get_contract_version(deps.storage)?;
-  set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-  if contract_version.contract != CONTRACT_NAME {
-    return Err(
-      StdError::generic_err(format!(
-        "contract_name does not match: prev: {0}, new: {1}",
-        contract_version.contract, CONTRACT_VERSION
-      ))
-      .into(),
-    );
-  }
-
-  Ok(
-    Response::new()
-      .add_attribute("previous_contract_name", &contract_version.contract)
-      .add_attribute("previous_contract_version", &contract_version.version)
-      .add_attribute("new_contract_name", CONTRACT_NAME)
-      .add_attribute("new_contract_version", CONTRACT_VERSION),
-  )
 }

@@ -3,5 +3,6 @@
   "editor.indentSize": "tabSize",
   "editor.tabSize": 2,
   "rust-analyzer.check.command": "clippy",
-  "editor.inlayHints.enabled": "off"
+  "rust-analyzer.inlayHints.parameterHints.enable": false
+  // "editor.inlayHints.enabled": "off"
 }

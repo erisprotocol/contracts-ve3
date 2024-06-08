@@ -59,9 +59,31 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub struct UpdateAssetConfig {
-  pub asset: AssetInfo,
-  pub config: AssetConfig,
+pub struct AssetInfoWithConfig {
+  pub info: AssetInfo,
+  pub config: Option<AssetConfig>,
+}
+
+#[cw_serde]
+pub struct AssetInfoWithRuntime {
+  pub info: AssetInfo,
+  pub config: AssetConfigRuntime,
+  pub whitelisted: bool,
+}
+
+impl From<AssetInfo> for AssetInfoWithConfig {
+  fn from(val: AssetInfo) -> Self {
+    AssetInfoWithConfig::new(val, None)
+  }
+}
+
+impl AssetInfoWithConfig {
+  pub fn new(info: AssetInfo, config: Option<AssetConfig>) -> Self {
+    Self {
+      info,
+      config,
+    }
+  }
 }
 
 #[cw_serde]
@@ -104,10 +126,10 @@ pub enum ExecuteMsg {
   ClaimRewardsMultiple(Vec<AssetInfo>),
 
   // controller
-  WhitelistAssets(Vec<AssetInfo>),
+  WhitelistAssets(Vec<AssetInfoWithConfig>),
   RemoveAssets(Vec<AssetInfo>),
   // cant update multiple as we need to track bribe recapturing
-  UpdateAssetConfig(UpdateAssetConfig),
+  UpdateAssetConfig(AssetInfoWithConfig),
   SetAssetRewardDistribution(Vec<AssetDistribution>),
 
   // operator
@@ -123,7 +145,6 @@ pub enum ExecuteMsg {
   Callback(CallbackMsg),
 }
 
-
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
@@ -132,6 +153,9 @@ pub enum QueryMsg {
 
   #[returns(WhitelistedAssetsResponse)]
   WhitelistedAssets {},
+
+  #[returns(WhitelistedAssetsDetailsResponse)]
+  WhitelistedAssetDetails {},
 
   #[returns(Vec<AssetDistribution>)]
   RewardDistribution {},
@@ -153,6 +177,7 @@ pub enum QueryMsg {
 }
 
 pub type WhitelistedAssetsResponse = Vec<AssetInfo>;
+pub type WhitelistedAssetsDetailsResponse = Vec<AssetInfoWithRuntime>;
 
 #[cw_serde]
 pub struct AssetQuery {

@@ -1,8 +1,21 @@
 use cosmwasm_std::{Addr, Uint128};
-use cw_asset::Asset;
+use cw_asset::{Asset, AssetInfo};
 
 pub fn native<A: Into<String>, B: Into<Uint128>>(d: A, a: B) -> Asset {
   Asset::native(d, a)
+}
+
+#[allow(non_snake_case)]
+pub fn Native(denom: &str) -> AssetInfo {
+  cw_asset::AssetInfoBase::Native(denom.to_string())
+}
+#[allow(non_snake_case)]
+pub fn Addr(denom: &str) -> Addr {
+  Addr::unchecked(denom.to_string())
+}
+#[allow(non_snake_case)]
+pub fn Cw20(denom: Addr) -> AssetInfo {
+  cw_asset::AssetInfoBase::Cw20(denom)
 }
 
 pub fn cw20<A: Into<Addr>, B: Into<Uint128>>(addr: A, a: B) -> Asset {
@@ -10,6 +23,11 @@ pub fn cw20<A: Into<Addr>, B: Into<Uint128>>(addr: A, a: B) -> Asset {
 }
 
 pub fn u(a: u32) -> Uint128 {
+  Uint128::new(a.into())
+}
+
+#[allow(non_snake_case)]
+pub fn Uint128(a: u32) -> Uint128 {
   Uint128::new(a.into())
 }
 

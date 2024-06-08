@@ -7,3 +7,4 @@ pub mod exec_voting_escrow;
 pub mod helpers;
 pub mod suite;
 pub mod suite_contracts;
+pub mod exec_defaults;

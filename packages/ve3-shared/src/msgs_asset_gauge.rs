@@ -1,6 +1,6 @@
 use crate::{
   adapters::{asset_staking::AssetStaking, global_config_adapter::ConfigExt},
-  constants::{at_asset_staking, AT_GAUGE_CONTROLLER},
+  constants::at_asset_staking,
   error::SharedError,
   helpers::time::{Time, Times},
   msgs_voting_escrow::LockInfoResponse,
@@ -71,6 +71,9 @@ pub enum QueryMsg {
   #[returns(Config)]
   Config {},
 
+  /// This is one of the most important queries.
+  /// Queries the user shares [per user; per gauge; per period; per lp] compared to the total vp of [per gauge; per period; per lp]
+  /// Which is used to distribute voting bribes
   #[returns(UserSharesResponse)]
   UserShares {
     user: Addr,
@@ -136,9 +139,9 @@ impl Config {
     gauge_config.ok_or_else(|| SharedError::NotFound(format!("gauge not found: {0}", gauge)))
   }
 
-  pub fn assert_gauge_controller(&self, deps: &DepsMut, sender: &Addr) -> Result<(), SharedError> {
-    self.global_config().assert_has_access(&deps.querier, AT_GAUGE_CONTROLLER, sender)
-  }
+  // pub fn assert_gauge_controller(&self, deps: &DepsMut, sender: &Addr) -> Result<(), SharedError> {
+  //   self.global_config().assert_has_access(&deps.querier, AT_GAUGE_CONTROLLER, sender)
+  // }
 
   pub fn get_asset_staking(
     &self,

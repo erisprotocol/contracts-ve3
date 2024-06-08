@@ -21,7 +21,7 @@ pub fn ve3_asset_gauge() -> Box<dyn Contract<Empty>> {
     ve3_asset_gauge::contract::instantiate,
     ve3_asset_gauge::query::query,
   )
-  .with_migrate(ve3_asset_gauge::contract::migrate);
+  .with_migrate(ve3_asset_gauge::migrate::migrate);
 
   Box::new(contract)
 }
@@ -65,7 +65,7 @@ pub fn ve3_voting_escrow() -> Box<dyn Contract<Empty>> {
     ve3_voting_escrow::contract::instantiate,
     ve3_voting_escrow::query::query,
   )
-  .with_migrate(ve3_voting_escrow::contract::migrate);
+  .with_migrate(ve3_voting_escrow::migrate::migrate);
 
   Box::new(contract)
 }

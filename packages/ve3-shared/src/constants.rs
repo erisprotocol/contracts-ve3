@@ -1,7 +1,7 @@
 // AT = Address Type
 pub const AT_DELEGATION_CONTROLLER: &str = "DELEGATION_CONTROLLER";
 pub const AT_ASSET_WHITELIST_CONTROLLER: &str = "ASSET_WHITELIST_CONTROLLER";
-pub const AT_GAUGE_CONTROLLER: &str = "GAUGE_CONTROLLER";
+// pub const AT_GAUGE_CONTROLLER: &str = "GAUGE_CONTROLLER";
 pub const AT_VE_GUARDIAN: &str = "VE_GUARDIAN";
 
 pub const AT_VOTING_ESCROW: &str = "VOTING_ESCROW";
@@ -37,9 +37,9 @@ pub const SECONDS_PER_YEAR: u64 = 60 * 60 * 24 * 365;
 // testnet: 60 * 60
 pub const WEEK: u64 = 7 * 86400;
 /// Seconds in 2 years which is the maximum lock period.
-pub const MAX_LOCK_TIME: u64 = 2 * 365 * 86400; // 2 years (104 weeks)
-
-pub const MAX_LOCK_PERIODS: u64 = 104; // 2 years (104 weeks)
+pub const MAX_LOCK_TIME: u64 = 2 * 365 * 86400;
+// 2 years (104 weeks)
+pub const MAX_LOCK_PERIODS: u64 = 104;
 /// Funds need to be at least locked for 3 weeks.
 pub const MIN_LOCK_PERIODS: u64 = 1;
 /// Monday, October 31, 2022 12:00:00 AM

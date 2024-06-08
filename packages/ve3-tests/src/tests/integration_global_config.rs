@@ -36,9 +36,13 @@ fn test_config_default() {
             Addr::unchecked("terra1q7440dq4ydqh3x63rdfljq38xmyutjjzzrzhk9r9d8xmeeaxynxqkyqche")
           ),
           (
-            "GAUGE_CONTROLLER".to_string(),
-            Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
-          )
+            "TAKE_RECIPIENT".to_string(),
+            Addr::unchecked("terra1lx7v09sx6mwazws6nd4n499ue7z28d7wyst3js6rtcu47fuwnmtqh5r9xl")
+          ),
+          // (
+          //   "GAUGE_CONTROLLER".to_string(),
+          //   Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
+          // )
         ]
       );
     })

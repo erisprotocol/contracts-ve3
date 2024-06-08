@@ -14,7 +14,7 @@ use cosmwasm_std::{
   attr, from_json, to_json_binary, Addr, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
   MessageInfo, Response, StdResult, Storage, Uint128, WasmMsg,
 };
-use cw2::{get_contract_version, set_contract_version};
+use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use cw_asset::Asset;
 use std::collections::HashSet;
@@ -28,8 +28,8 @@ use ve3_shared::helpers::governance::{get_period, get_periods_count};
 use ve3_shared::helpers::slope::{adjust_vp_and_slope, calc_coefficient};
 use ve3_shared::msgs_asset_gauge;
 use ve3_shared::msgs_voting_escrow::{
-  AssetInfoConfig, Config, DepositAsset, ExecuteMsg, InstantiateMsg, LockInfoResponse, MigrateMsg,
-  ReceiveMsg, VeNftCollection,
+  AssetInfoConfig, Config, DepositAsset, ExecuteMsg, InstantiateMsg, LockInfoResponse, ReceiveMsg,
+  VeNftCollection,
 };
 
 /// Creates a new contract with the specified parameters in [`InstantiateMsg`].
@@ -649,6 +649,10 @@ fn split_lock(
 
   // only allow editing of locks by approvals
   nft.check_can_send(deps.as_ref(), &env, &message_info(sender), &token)?;
+
+  let block_period = get_period(env.block.time.seconds())?;
+  let periods = lock.end - block_period;
+  assert_periods_remaining(periods)?;
 
   // update existing lock that is reduced by new_lock_amount
   let exchange_rate = asset_config.get_exchange_rate(&deps.querier)?;
@@ -1275,27 +1279,4 @@ fn execute_update_config(
   CONFIG.save(deps.storage, &config)?;
 
   Ok(Response::default().add_attribute("action", "ve/execute_update_config"))
-}
-
-/// Manages contract migration.
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-  let contract_version = get_contract_version(deps.storage)?;
-  set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-  if contract_version.contract != CONTRACT_NAME {
-    return Err(ContractError::MigrationError(format!(
-      "contract_name does not match: prev: {0}, new: {1}",
-      contract_version.contract, CONTRACT_VERSION
-    )));
-  }
-
-  Ok(
-    Response::new()
-      .add_attribute("action", "ve/migrate")
-      .add_attribute("previous_contract_name", &contract_version.contract)
-      .add_attribute("previous_contract_version", &contract_version.version)
-      .add_attribute("new_contract_name", CONTRACT_NAME)
-      .add_attribute("new_contract_version", CONTRACT_VERSION),
-  )
 }
