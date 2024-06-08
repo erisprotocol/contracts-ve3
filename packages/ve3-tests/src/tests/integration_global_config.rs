@@ -1,6 +1,7 @@
 use cosmwasm_std::{coin, Addr};
 use cw_ownable::Ownership;
 use ve3_global_config::error::ContractError;
+use ve3_shared::constants::AT_FREE_BRIBES;
 
 use crate::common::suite::TestingSuite;
 
@@ -9,54 +10,44 @@ fn test_config_default() {
   let mut suite =
     TestingSuite::default_with_balances(vec![coin(1_000_000_000u128, "uluna".to_string())]);
   suite.init();
+  let addr = suite.addresses.clone();
 
-  suite.q_gc_all_addresses(None, None, |res| {
-    assert_eq!(
-      res.unwrap(),
-      vec![
-        (
-          "ASSET_GAUGE".to_string(),
-          Addr::unchecked("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")
-        ),
-        (
-          "ASSET_STAKING__project".to_string(),
-          Addr::unchecked("terra1mf6ptkssddfmxvhdx0ech0k03ktp6kf9yk59renau2gvht3nq2gqfnlz0z")
-        ),
-        (
-          "ASSET_STAKING__stable".to_string(),
-          Addr::unchecked("terra1436kxs0w2es6xlqpp9rd35e3d0cjnw4sv8j3a7483sgks29jqwgsnyey7t")
-        ),
-        (
-          "ASSET_WHITELIST_CONTROLLER".to_string(),
-          Addr::unchecked("terra1yrnr2tuwnz9l95886n8d757lc70g7szefm6jzu885kafdusx3f4sg6uhup")
-        ),
-        (
-          "BRIBE_MANAGER".to_string(),
-          Addr::unchecked("terra1wn625s4jcmvk0szpl85rj5azkfc6suyvf75q6vrddscjdphtve8stalnth")
-        ),
-        (
-          "CONNECTOR__project".to_string(),
-          Addr::unchecked("terra1gurgpv8savnfw66lckwzn4zk7fp394lpe667dhu7aw48u40lj6jsln7pjn")
-        ),
-        (
-          "CONNECTOR__stable".to_string(),
-          Addr::unchecked("terra1tqwwyth34550lg2437m05mjnjp8w7h5ka7m70jtzpxn4uh2ktsmq5dugjd")
-        ),
-        (
-          "DELEGATION_CONTROLLER".to_string(),
-          Addr::unchecked("terra15ja5gr6saap69dnszyf3zwh28306xw8sefl8yluvsvkcttxh4u5sv2xus6")
-        ),
-        (
-          "FEE_COLLECTOR".to_string(),
-          Addr::unchecked("terra1q7440dq4ydqh3x63rdfljq38xmyutjjzzrzhk9r9d8xmeeaxynxqkyqche")
-        ),
-        (
-          "GAUGE_CONTROLLER".to_string(),
-          Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
-        )
-      ]
-    );
-  });
+  suite
+    .q_gc_all_addresses(None, None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          ("ASSET_GAUGE".to_string(), addr.ve3_asset_gauge.clone()),
+          ("ASSET_STAKING__project".to_string(), addr.ve3_asset_staking_2.clone()),
+          ("ASSET_STAKING__stable".to_string(), addr.ve3_asset_staking_1.clone()),
+          (
+            "ASSET_WHITELIST_CONTROLLER".to_string(),
+            Addr::unchecked("terra1yrnr2tuwnz9l95886n8d757lc70g7szefm6jzu885kafdusx3f4sg6uhup")
+          ),
+          ("BRIBE_MANAGER".to_string(), addr.ve3_bribe_manager.clone()),
+          ("CONNECTOR__project".to_string(), addr.ve3_connector_alliance_2.clone()),
+          ("CONNECTOR__stable".to_string(), addr.ve3_connector_alliance_1.clone()),
+          (
+            "DELEGATION_CONTROLLER".to_string(),
+            Addr::unchecked("terra15ja5gr6saap69dnszyf3zwh28306xw8sefl8yluvsvkcttxh4u5sv2xus6")
+          ),
+          (
+            "FEE_COLLECTOR".to_string(),
+            Addr::unchecked("terra1q7440dq4ydqh3x63rdfljq38xmyutjjzzrzhk9r9d8xmeeaxynxqkyqche")
+          ),
+          (
+            "GAUGE_CONTROLLER".to_string(),
+            Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
+          )
+        ]
+      );
+    })
+    .q_gc_address_list(AT_FREE_BRIBES.to_string(), |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![addr.ve3_asset_staking_1.clone(), addr.ve3_asset_staking_2.clone()]
+      )
+    });
 }
 
 #[test]
