@@ -1,10 +1,12 @@
 #[cfg(test)]
 pub mod common;
+mod extensions;
 #[cfg(test)]
 pub mod mocks;
 #[cfg(test)]
 pub mod tests;
 
+extern crate colored;
 // pub mod arb_contract;
 // pub mod base;
 // mod custom_gov;

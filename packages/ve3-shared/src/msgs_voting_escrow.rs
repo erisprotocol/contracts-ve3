@@ -57,26 +57,26 @@ pub enum ExecuteMsg {
     time: u64,
   },
   MergeLock {
-    token_id: Uint128,
-    token_id_add: Uint128,
+    token_id: String,
+    token_id_add: String,
   },
   SplitLock {
-    token_id: Uint128,
+    token_id: String,
     amount: Uint128,
     recipient: Option<String>,
   },
   /// Extend the lockup time for your staked ampLP. For an expired lock, it will always start from the current period.
   ExtendLockTime {
     time: u64,
-    token_id: Uint128,
+    token_id: String,
   },
   /// Add more ampLP to your vAMP position
   ExtendLockAmount {
-    token_id: Uint128,
+    token_id: String,
   },
   /// Withdraw ampLP from the voting escrow contract
   Withdraw {
-    token_id: Uint128,
+    token_id: String,
   },
   /// Implements the Cw20 receiver interface
   Receive(Cw20ReceiveMsg),
@@ -203,19 +203,10 @@ impl From<ExecuteMsg> for CW721ExecuteMsg<Metadata, Empty> {
 #[cw_serde]
 pub enum ReceiveMsg {
   ExtendLockAmount {
-    token_id: Uint128,
+    token_id: String,
   },
   CreateLock {
     time: u64,
-  },
-}
-
-#[cw_serde]
-pub enum PushExecuteMsg {
-  UpdateVote {
-    token_id: String,
-    lock_info: LockInfoResponse,
-    old_owner: Option<Addr>,
   },
 }
 
@@ -252,12 +243,6 @@ pub enum QueryMsg {
   BlacklistedVoters {
     start_after: Option<String>,
     limit: Option<u32>,
-  },
-
-  /// Return the user's vAMP balance
-  #[returns(BalanceResponse)]
-  Balance {
-    address: String,
   },
 
   /// Return the current total amount of vAMP
@@ -483,7 +468,7 @@ pub struct VotingPowerResponse {
 pub struct LockInfoResponse {
   pub owner: Addr,
 
-  pub period: u64,
+  pub from_period: u64,
 
   pub asset: Asset,
   /// The underlying_amount locked in the position

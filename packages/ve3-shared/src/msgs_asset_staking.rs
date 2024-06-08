@@ -59,38 +59,6 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub enum ExecuteMsg {
-  Receive(Cw20ReceiveMsg),
-
-  // user
-  Stake {
-    recipient: Option<String>,
-  },
-  Unstake(Asset),
-  ClaimRewards(AssetInfo),
-  ClaimRewardsMultiple(Vec<AssetInfo>),
-
-  // controller
-  WhitelistAssets(Vec<AssetInfo>),
-  RemoveAssets(Vec<AssetInfo>),
-  // cant update multiple as we need to track bribe recapturing
-  UpdateAssetConfig(UpdateAssetConfig),
-  SetAssetRewardDistribution(Vec<AssetDistribution>),
-
-  // operator
-  UpdateRewards {},
-  DistributeTakeRate {
-    update: Option<bool>,
-    assets: Option<Vec<AssetInfo>>,
-  },
-  DistributeBribes {
-    update: Option<bool>,
-    assets: Option<Vec<AssetInfo>>,
-  },
-  Callback(CallbackMsg),
-}
-
-#[cw_serde]
 pub struct UpdateAssetConfig {
   pub asset: AssetInfo,
   pub config: AssetConfig,
@@ -122,6 +90,39 @@ pub enum Cw20HookMsg {
     recipient: Option<String>,
   },
 }
+
+#[cw_serde]
+pub enum ExecuteMsg {
+  Receive(Cw20ReceiveMsg),
+
+  // user
+  Stake {
+    recipient: Option<String>,
+  },
+  Unstake(Asset),
+  ClaimRewards(AssetInfo),
+  ClaimRewardsMultiple(Vec<AssetInfo>),
+
+  // controller
+  WhitelistAssets(Vec<AssetInfo>),
+  RemoveAssets(Vec<AssetInfo>),
+  // cant update multiple as we need to track bribe recapturing
+  UpdateAssetConfig(UpdateAssetConfig),
+  SetAssetRewardDistribution(Vec<AssetDistribution>),
+
+  // operator
+  UpdateRewards {},
+  DistributeTakeRate {
+    update: Option<bool>,
+    assets: Option<Vec<AssetInfo>>,
+  },
+  DistributeBribes {
+    update: Option<bool>,
+    assets: Option<Vec<AssetInfo>>,
+  },
+  Callback(CallbackMsg),
+}
+
 
 #[cw_serde]
 #[derive(QueryResponses)]

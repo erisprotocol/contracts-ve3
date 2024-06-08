@@ -1,6 +1,6 @@
 use crate::error::ContractError;
 use crate::state::{Point, BLACKLIST, HISTORY, LAST_SLOPE_CHANGE, SLOPE_CHANGES};
-use cosmwasm_std::{Addr, Coin, MessageInfo, Order, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Coin, MessageInfo, Order, StdResult, Storage, Uint128};
 use cw_asset::{Asset, AssetInfo};
 use cw_storage_plus::Bound;
 use ve3_shared::{
@@ -38,7 +38,7 @@ pub(crate) fn assert_asset_allowed(
   asset: &Asset,
 ) -> Result<AssetInfoConfig, ContractError> {
   if asset.amount.is_zero() {
-    return Err(ContractError::LockRequiresAmount {});
+    return Err(ContractError::LockRequiresAmount);
   }
 
   if let Some(asset) = config.deposit_assets.iter().find(|a| a.info == asset.info) {
@@ -77,12 +77,12 @@ pub(crate) fn assert_not_blacklisted_all(
 
 /// Find the amount of a denom sent along a message, assert it is non-zero, and no other denom were
 /// sent together
-pub fn validate_received_funds(funds: &[Coin], allowed: &[DepositAsset<Addr>]) -> StdResult<Asset> {
+pub fn validate_received_funds(
+  funds: &[Coin],
+  allowed: &[DepositAsset<Addr>],
+) -> Result<Asset, ContractError> {
   if funds.len() != 1 {
-    return Err(StdError::generic_err(format!(
-      "must deposit exactly one coin; received {}",
-      funds.len()
-    )));
+    return Err(ContractError::NoAssetsSent);
   }
 
   let fund = &funds[0];
@@ -90,25 +90,28 @@ pub fn validate_received_funds(funds: &[Coin], allowed: &[DepositAsset<Addr>]) -
   let is_allowed = allowed.iter().any(|a| a.info == info);
 
   if !is_allowed {
-    return Err(StdError::generic_err(format!("received unsupported denom {0}", fund.denom)));
+    return Err(ContractError::WrongAsset(fund.denom.clone()));
   }
 
   if fund.amount.is_zero() {
-    return Err(StdError::generic_err("deposit amount must be non-zero"));
+    return Err(ContractError::LockRequiresAmount);
   }
 
   Ok(info.with_balance(fund.amount))
 }
 
-pub fn validate_received_cw20(asset: Asset, allowed: &[DepositAsset<Addr>]) -> StdResult<Asset> {
+pub fn validate_received_cw20(
+  asset: Asset,
+  allowed: &[DepositAsset<Addr>],
+) -> Result<Asset, ContractError> {
   let is_allowed = allowed.iter().any(|a| a.info == asset.info);
 
   if !is_allowed {
-    return Err(StdError::generic_err(format!("received unsupported denom {0}", asset.info)));
+    return Err(ContractError::WrongAsset(asset.info.to_string()));
   }
 
   if asset.amount.is_zero() {
-    return Err(StdError::generic_err("deposit amount must be non-zero"));
+    return Err(ContractError::LockRequiresAmount);
   }
 
   Ok(asset)

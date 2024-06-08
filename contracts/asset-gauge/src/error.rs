@@ -4,7 +4,7 @@ use thiserror::Error;
 use ve3_shared::error::SharedError;
 
 /// This enum describes contract errors
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
   #[error("{0}")]
   Std(#[from] StdError),

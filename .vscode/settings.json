@@ -2,5 +2,6 @@
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.indentSize": "tabSize",
   "editor.tabSize": 2,
-  "rust-analyzer.check.command": "clippy"
+  "rust-analyzer.check.command": "clippy",
+  "editor.inlayHints.enabled": "off"
 }

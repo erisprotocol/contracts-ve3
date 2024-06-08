@@ -18,7 +18,6 @@ use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ReceiveMsg;
 use cw_asset::Asset;
 use std::collections::HashSet;
-use std::str::FromStr;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{AT_VE_GUARDIAN, EPOCH_START, MIN_LOCK_PERIODS, WEEK};
 use ve3_shared::error::SharedError;
@@ -27,9 +26,10 @@ use ve3_shared::extensions::decimal_ext::DecimalExt;
 use ve3_shared::helpers::general::{addr_opt_fallback, validate_addresses};
 use ve3_shared::helpers::governance::{get_period, get_periods_count};
 use ve3_shared::helpers::slope::{adjust_vp_and_slope, calc_coefficient};
+use ve3_shared::msgs_asset_gauge;
 use ve3_shared::msgs_voting_escrow::{
   AssetInfoConfig, Config, DepositAsset, ExecuteMsg, InstantiateMsg, LockInfoResponse, MigrateMsg,
-  PushExecuteMsg, ReceiveMsg, VeNftCollection,
+  ReceiveMsg, VeNftCollection,
 };
 
 /// Creates a new contract with the specified parameters in [`InstantiateMsg`].
@@ -193,7 +193,7 @@ pub fn execute(
     // same as withdraw
     ExecuteMsg::Burn {
       token_id,
-    } => withdraw(deps, env, nft, info.sender, Uint128::from_str(&token_id)?),
+    } => withdraw(deps, env, nft, info.sender, token_id),
 
     // Approve, Revoke, ApproveAll, RevokeAll
     _ => Ok(nft.execute(deps, env, info, msg.into())?),
@@ -550,7 +550,7 @@ fn _create_lock(
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
       .add_attribute("lock_end", lock_info.end.to_string())
       .add_attributes(mint_response.attributes)
-      .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info), None)?),
+      .add_messages(get_push_update_msgs(config, token_id.to_string(), Ok(lock_info))?),
   )
 }
 
@@ -559,14 +559,14 @@ fn merge_lock(
   env: Env,
   nft: VeNftCollection,
   sender: Addr,
-  token_id_1: Uint128,
-  token_id_2: Uint128,
+  token_id_1: String,
+  token_id_2: String,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_not_blacklisted(deps.storage, &sender)?;
   assert_not_decommissioned(&config)?;
-  let token_id_1_str = &token_id_1.to_string();
-  let token_id_2_str = &token_id_2.to_string();
+  let token_id_1_str = &token_id_1;
+  let token_id_2_str = &token_id_2;
   let mut lock1 = LOCKED
     .load(deps.storage, token_id_1_str)
     .map_err(|_| ContractError::LockDoesNotExist(token_id_1.to_string()))?;
@@ -614,13 +614,14 @@ fn merge_lock(
   Ok(
     Response::default()
       .add_attribute("action", "ve/merge_lock")
+      .add_attribute("merge", format!("{0},{1}", token_id_1_str, token_id_2_str))
       .add_attribute("voting_power", lock1_info.voting_power.to_string())
       .add_attribute("fixed_power", lock1_info.fixed_amount.to_string())
       .add_attribute("lock_end", lock1_info.end.to_string())
-      .add_messages(get_push_update_msgs(&config, token_id_1.to_string(), Ok(lock1_info), None)?)
+      .add_messages(get_push_update_msgs(&config, token_id_1.to_string(), Ok(lock1_info))?)
       // add burnt lock attrs
       .add_attributes(burn_attrs)
-      .add_messages(get_push_update_msgs(&config, token_id_2.to_string(), Ok(lock2_info), None)?),
+      .add_messages(get_push_update_msgs(&config, token_id_2.to_string(), Ok(lock2_info))?),
   )
 }
 
@@ -629,7 +630,7 @@ fn split_lock(
   env: Env,
   nft: VeNftCollection,
   sender: Addr,
-  token_id: Uint128,
+  token_id: String,
   new_lock_amount: Uint128,
   recipient: Addr,
 ) -> Result<Response, ContractError> {
@@ -680,7 +681,7 @@ fn split_lock(
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
       .add_attribute("lock_end", lock_info.end.to_string())
-      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info), None)?)
+      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info))?)
       // add new lock msgs
       .add_attributes(create_response.attributes)
       .add_submessages(create_response.messages),
@@ -702,7 +703,7 @@ fn deposit_for(
   config: Config,
   sender: Addr,
   asset: Asset,
-  token_id: Uint128,
+  token_id: String,
 ) -> Result<Response, ContractError> {
   assert_not_blacklisted(deps.storage, &sender)?;
   assert_not_decommissioned(&config)?;
@@ -754,7 +755,7 @@ fn deposit_for(
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
       .add_attribute("lock_end", lock_info.end.to_string())
-      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info), None)?),
+      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info))?),
   )
 }
 
@@ -806,16 +807,13 @@ fn change_lock_owner(
   };
 
   Ok(
-    resp
+    Response::new()
       .add_attribute("action", "ve/change_lock_owner")
       .add_attribute("old_owner", old_owner.to_string())
       .add_attribute("new_owner", lock.owner.to_string())
-      .add_messages(get_push_update_msgs(
-        &config,
-        token_id.to_string(),
-        Ok(lock_info),
-        Some(old_owner),
-      )?),
+      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info))?)
+      .add_attributes(resp.attributes)
+      .add_submessages(resp.messages),
   )
 }
 /// Increase the current lock time for a staker by a specified time period.
@@ -834,7 +832,7 @@ fn extend_lock_time(
   env: Env,
   nft: VeNftCollection,
   sender: Addr,
-  token_id: Uint128,
+  token_id: String,
   time: u64,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
@@ -889,7 +887,7 @@ fn extend_lock_time(
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
       .add_attribute("lock_end", lock_info.end.to_string())
-      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info), None)?),
+      .add_messages(get_push_update_msgs(&config, token_id.to_string(), Ok(lock_info))?),
   )
 }
 
@@ -900,7 +898,7 @@ fn withdraw(
   env: Env,
   nft: VeNftCollection,
   sender: Addr,
-  token_id: Uint128,
+  token_id: String,
 ) -> Result<Response, ContractError> {
   let token_id_str = &token_id.to_string();
 
@@ -922,7 +920,7 @@ fn withdraw(
     attrs = _burn(&mut deps, &env, nft, sender, token_id_str, lock, cur_period)?;
 
     let lock_info = get_token_lock_info(deps.as_ref(), &env, token_id.to_string(), None);
-    let msgs = get_push_update_msgs(&config, token_id.to_string(), lock_info, None)?;
+    let msgs = get_push_update_msgs(&config, token_id.to_string(), lock_info)?;
 
     Ok(
       Response::default()
@@ -1034,7 +1032,7 @@ fn get_push_update_msgs_multi(
     .into_iter()
     .map(|token_id| {
       let lock_info = get_token_lock_info(deps, &env, token_id.to_string(), None);
-      get_push_update_msgs(&config, token_id, lock_info, None)
+      get_push_update_msgs(&config, token_id, lock_info)
     })
     .collect::<StdResult<Vec<_>>>()?
     .into_iter()
@@ -1048,7 +1046,6 @@ fn get_push_update_msgs(
   config: &Config,
   token_id: String,
   lock_info: Result<LockInfoResponse, ContractError>,
-  old_owner: Option<Addr>,
 ) -> StdResult<Vec<CosmosMsg>> {
   // only send update if lock info is available. LOCK info is never removed for any user that locked anything.
   if let Ok(lock_info) = lock_info {
@@ -1058,10 +1055,9 @@ fn get_push_update_msgs(
       .map(|contract| {
         Ok(CosmosMsg::Wasm(WasmMsg::Execute {
           contract_addr: contract.to_string(),
-          msg: to_json_binary(&PushExecuteMsg::UpdateVote {
+          msg: to_json_binary(&msgs_asset_gauge::ExecuteMsg::UpdateVote {
             token_id: token_id.clone(),
             lock_info: lock_info.clone(),
-            old_owner: old_owner.clone(),
           })?,
           funds: vec![],
         }))

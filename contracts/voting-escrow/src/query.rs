@@ -5,7 +5,6 @@ use crate::utils::{calc_voting_power, fetch_last_checkpoint, fetch_slope_changes
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult, Uint128};
-use cw20::BalanceResponse;
 use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
 use ve3_shared::helpers::slope::calc_coefficient;
 use ve3_shared::helpers::time::{GetPeriod, Time};
@@ -39,7 +38,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::LockVamp {
       time,
       token_id,
-    } => Ok(to_json_binary(&get_user_vamp_at_time(deps, env, token_id, time)?)?),
+    } => Ok(to_json_binary(&get_token_vamp_at_time(deps, env, token_id, time)?)?),
 
     QueryMsg::LockInfo {
       token_id,
@@ -50,9 +49,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       let config = CONFIG.load(deps.storage)?;
       Ok(to_json_binary(&config)?)
     },
-    QueryMsg::Balance {
-      address,
-    } => Ok(to_json_binary(&get_user_balance(deps, env, address)?)?),
 
     _ => Ok(nft.query(deps, env, msg.into())?),
   }
@@ -123,7 +119,7 @@ pub fn get_token_lock_info(
     let coefficient = calc_coefficient(lock.end - lock.last_extend_lock_period);
 
     let resp = LockInfoResponse {
-      period,
+      from_period: period,
 
       owner: lock.owner,
       asset: lock.asset,
@@ -140,16 +136,6 @@ pub fn get_token_lock_info(
   } else {
     Err(ContractError::LockDoesNotExist(token_id))
   }
-}
-
-/// Calculates a user's voting power at the current block.
-///
-/// * **user** user/staker for which we fetch the current voting power (vAMP balance).
-fn get_user_balance(deps: Deps, env: Env, user: String) -> StdResult<BalanceResponse> {
-  let vp_response = get_user_vamp_at_time(deps, env, user, None)?;
-  Ok(BalanceResponse {
-    balance: vp_response.vamp,
-  })
 }
 
 /// Calculates the total voting power (total vAMP supply) at the given period number.
@@ -201,7 +187,7 @@ fn get_total_vamp_at_time(
 /// * **user** user/staker for which we fetch the current voting power (vAMP balance).
 ///
 /// * **period** period number at which to fetch the user's voting power (vAMP balance).
-fn get_user_vamp_at_time(
+fn get_token_vamp_at_time(
   deps: Deps,
   env: Env,
   token_id: String,

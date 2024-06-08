@@ -180,15 +180,20 @@ impl<'a> PeriodIndex<'a> {
     }
 
     // this is the remaining vp
-    let vp_to_reduce = if old_lock_end > period {
+    let vp_to_reduce = if old_lock_end + 1 > period {
       old_slope
-        .checked_mul(Uint128::from(old_lock_end - period))
+        .checked_mul(Uint128::from(old_lock_end + 1 - period))
         .unwrap_or_else(|_| Uint128::zero())
     } else {
       Uint128::zero()
     };
 
-    let slope_to_reduce = if old_lock_end > period {
+    // println!("remove {:?}", line);
+    // println!("old_lock_end {:?}", old_lock_end);
+    // println!("period {:?}", period);
+    // println!("vp_to_reduce {:?}", vp_to_reduce);
+
+    let slope_to_reduce = if old_lock_end + 1 > period {
       old_slope
     } else {
       Uint128::zero()

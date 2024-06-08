@@ -14,6 +14,14 @@ pub enum ExecuteMsg {
     addresses: Vec<(String, String)>,
     lists: Vec<(String, Vec<String>)>,
   },
+
+  ClearAddresses {
+    addresses: Vec<String>,
+  },
+
+  ClearLists {
+    lists: Vec<String>,
+  },
 }
 
 #[cw_serde]
@@ -43,7 +51,7 @@ pub enum QueryMsg {
 }
 
 pub type AddressResponse = (String, Addr);
-pub type AddressListResponse = (String, Vec<Addr>);
+pub type AddressListResponse = Vec<Addr>;
 
 #[cw_serde]
 pub struct MigrateMsg {}

@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError, StdResult};
+use cosmwasm_std::{CosmosMsg, StdError, StdResult};
 
 pub trait CosmosMsgExt {
   fn to_specific<T>(self) -> StdResult<cosmwasm_std::CosmosMsg<T>>;
@@ -15,6 +15,13 @@ impl CosmosMsgExt for cosmwasm_std::CosmosMsg {
       // },
       cosmwasm_std::CosmosMsg::Ibc(msg) => Ok(cosmwasm_std::CosmosMsg::Ibc(msg)),
       cosmwasm_std::CosmosMsg::Gov(msg) => Ok(cosmwasm_std::CosmosMsg::Gov(msg)),
+      Self::Stargate {
+        type_url,
+        value,
+      } => Ok(CosmosMsg::<T>::Stargate {
+        type_url,
+        value,
+      }),
       _ => Err(StdError::generic_err("not supported")),
     }
   }

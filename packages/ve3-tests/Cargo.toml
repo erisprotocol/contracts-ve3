@@ -27,9 +27,11 @@ cw-utils.workspace = true
 ve3-shared.workspace = true
 cw-ownable.workspace = true
 
-
 cw20.workspace = true
 cw20-base.workspace = true
+cw721.workspace = true
+cw721-base.workspace = true
+
 cw-multi-test = { version = "1.1.0", default-features = false }
 
 ve3-asset-gauge = {path = "../../contracts/asset-gauge"}
@@ -44,4 +46,5 @@ ve3-voting-escrow = {path = "../../contracts/voting-escrow"}
 
 eris-staking-token = { git = "https://github.com/erisprotocol/contracts-terra.git", default-features = false, rev = "dbcaa4db951f2bec6e239ccf94f25c85f3bed80a"}
 
+colored = "2.1.0"
 anyhow = "1"

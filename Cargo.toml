@@ -9,6 +9,7 @@ members = [
     "contracts/bribe-manager",
     "packages/*",
 ]
+resolver = "2"
 
 [workspace.package]
 version = "1.0.0"

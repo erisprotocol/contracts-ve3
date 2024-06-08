@@ -16,33 +16,6 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub enum ExecuteMsg {
-  AddBribe {
-    bribe: AssetUnchecked,
-    gauge: String,
-    for_info: AssetInfoUnchecked,
-    distribution: BribeDistribution,
-  },
-
-  WithdrawBribes {
-    period: u64,
-  },
-
-  ClaimBribes {
-    periods: Option<Vec<u64>>,
-  },
-
-  // controller
-  WhitelistAssets(Vec<AssetInfoUnchecked>),
-  RemoveAssets(Vec<AssetInfoUnchecked>),
-
-  UpdateConfig {
-    fee: Option<AssetUnchecked>,
-    allow_any: Option<bool>,
-  },
-}
-
-#[cw_serde]
 pub enum BribeDistribution {
   Func {
     start: Option<u64>,
@@ -133,6 +106,33 @@ impl BribeBuckets {
   pub fn is_empty(&self) -> bool {
     self.buckets.len() == 0
   }
+}
+
+#[cw_serde]
+pub enum ExecuteMsg {
+  AddBribe {
+    bribe: AssetUnchecked,
+    gauge: String,
+    for_info: AssetInfoUnchecked,
+    distribution: BribeDistribution,
+  },
+
+  WithdrawBribes {
+    period: u64,
+  },
+
+  ClaimBribes {
+    periods: Option<Vec<u64>>,
+  },
+
+  // controller
+  WhitelistAssets(Vec<AssetInfoUnchecked>),
+  RemoveAssets(Vec<AssetInfoUnchecked>),
+
+  UpdateConfig {
+    fee: Option<AssetUnchecked>,
+    allow_any: Option<bool>,
+  },
 }
 
 #[cw_serde]

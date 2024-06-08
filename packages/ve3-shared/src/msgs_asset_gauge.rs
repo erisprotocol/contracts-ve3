@@ -2,7 +2,7 @@ use crate::{
   adapters::{asset_staking::AssetStaking, global_config_adapter::ConfigExt},
   constants::{at_asset_staking, AT_GAUGE_CONTROLLER},
   error::SharedError,
-  helpers::time::Times,
+  helpers::time::{Time, Times},
   msgs_voting_escrow::LockInfoResponse,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -14,6 +14,12 @@ use cw_asset::AssetInfo;
 pub struct InstantiateMsg {
   pub global_config_addr: String,
   pub gauges: Vec<GaugeConfig>,
+}
+
+#[cw_serde]
+pub struct GaugeConfig {
+  pub name: String,
+  pub min_gauge_percentage: Decimal,
 }
 
 /// This structure describes the execute messages available in the contract.
@@ -45,26 +51,22 @@ pub enum ExecuteMsg {
   },
 }
 
-#[cw_serde]
-pub struct GaugeConfig {
-  pub name: String,
-  pub min_gauge_percentage: Decimal,
-}
-
 /// This structure describes the query messages available in the contract.
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-  // /// UserInfo returns information about a voter and the validators they voted for
-  // #[returns(UserInfoResponse)]
-  // UserInfo {
-  //   user: String,
-  // },
-  // #[returns(UserInfosResponse)]
-  // UserInfos {
-  //   start_after: Option<String>,
-  //   limit: Option<u32>,
-  // },
+  /// UserInfo returns information about a voter and the validators they voted for
+  #[returns(UserInfoExtendedResponse)]
+  UserInfo {
+    user: String,
+    time: Option<Time>,
+  },
+  #[returns(UserInfosResponse)]
+  UserInfos {
+    start_after: Option<String>,
+    limit: Option<u32>,
+    time: Option<Time>,
+  },
   /// Config returns the contract configuration
   #[returns(Config)]
   Config {},
@@ -79,23 +81,21 @@ pub enum QueryMsg {
   UserFirstParticipation {
     user: Addr,
   },
-  // /// PoolInfo returns the latest voting power allocated to a specific pool (generator)
-  // #[returns(VotedValidatorInfoResponse)]
-  // ValidatorInfo {
-  //   validator_addr: String,
-  // },
-  // /// PoolInfo returns the voting power allocated to a specific pool (generator) at a specific period
-  // #[returns(VotedValidatorInfoResponse)]
-  // ValidatorInfoAtPeriod {
-  //   validator_addr: String,
-  //   period: u64,
-  // },
-  // /// ValidatorInfos returns the latest EMPs allocated to all active validators
-  // #[returns(Vec<(String,VotedValidatorInfoResponse)>)]
-  // ValidatorInfos {
-  //   validator_addrs: Option<Vec<String>>,
-  //   period: Option<u64>,
-  // },
+  /// PoolInfo returns the latest voting power allocated to a specific pool (generator)
+  #[returns(VotedInfoResponse)]
+  GaugeInfo {
+    gauge: String,
+    key: String,
+    time: Option<Time>,
+  },
+
+  /// ValidatorInfos returns the latest EMPs allocated to all active validators
+  #[returns(GaugeInfosResponse)]
+  GaugeInfos {
+    gauge: String,
+    keys: Option<Vec<String>>,
+    time: Option<Time>,
+  },
 }
 
 #[cw_serde]
@@ -145,17 +145,14 @@ impl Config {
     deps: &DepsMut,
     gauge: &str,
   ) -> Result<AssetStaking, SharedError> {
-    self
-      .global_config()
-      .get_address(&deps.querier, &at_asset_staking(gauge))
-      .map(AssetStaking)
+    self.global_config().get_address(&deps.querier, &at_asset_staking(gauge)).map(AssetStaking)
   }
 }
 
 /// This structure describes the response used to return voting information for a specific pool (generator).
 #[cw_serde]
 #[derive(Default)]
-pub struct VotedValidatorInfoResponse {
+pub struct VotedInfoResponse {
   /// Dynamic voting power that voted for this validator
   pub voting_power: Uint128,
   /// fixed amount available
@@ -167,50 +164,22 @@ pub struct VotedValidatorInfoResponse {
 /// The struct describes a response used to return a staker's vAMP lock position.
 #[cw_serde]
 #[derive(Default)]
-pub struct UserInfoResponse {
-  /// Last timestamp when the user voted
-  pub vote_ts: u64,
-  /// The user's decreasing voting power
+pub struct UserInfoExtendedResponse {
   pub voting_power: Uint128,
-  /// The slope at which the user's voting power decays
-  pub slope: Uint128,
-  /// Timestamp when the user's lock expires
-  pub lock_end: u64,
-  /// The vote distribution for all the validators the staker picked
-  pub votes: Vec<(String, u16)>,
-  /// fixed amount available
   pub fixed_amount: Uint128,
-  /// Current voting power at the current
-  pub current_power: Uint128,
+  pub slope: Uint128,
+
+  /// The vote distribution for all the validators the staker picked
+  pub gauge_votes: Vec<GaugeVote>,
 }
 
 #[cw_serde]
 #[derive(Default)]
-pub struct UserInfosResponse {
-  pub users: Vec<(Addr, UserInfoResponse)>,
+pub struct GaugeVote {
+  pub period: u64,
+  pub votes: Vec<(String, u16)>,
 }
 
-// /// Queries amp tune info.
-// pub fn get_amp_tune_info(
-//     querier: &QuerierWrapper,
-//     amp_gauge_addr: impl Into<String>,
-// ) -> StdResult<GaugeInfoResponse> {
-//     let gauge: GaugeInfoResponse =
-//         querier.query_wasm_smart(amp_gauge_addr, &QueryMsg::TuneInfo {})?;
-//     Ok(gauge)
-// }
+pub type UserInfosResponse = Vec<(Addr, VotedInfoResponse)>;
 
-// pub fn get_amp_validator_infos(
-//     querier: &QuerierWrapper,
-//     amp_gauge_addr: impl Into<String>,
-//     period: u64,
-// ) -> StdResult<Vec<(String, VotedValidatorInfoResponse)>> {
-//     let gauge: Vec<(String, VotedValidatorInfoResponse)> = querier.query_wasm_smart(
-//         amp_gauge_addr,
-//         &QueryMsg::ValidatorInfos {
-//             validator_addrs: None,
-//             period: Some(period),
-//         },
-//     )?;
-//     Ok(gauge)
-// }
+pub type GaugeInfosResponse = Vec<(String, VotedInfoResponse)>;

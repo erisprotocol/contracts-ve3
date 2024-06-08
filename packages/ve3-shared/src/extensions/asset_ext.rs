@@ -13,6 +13,8 @@ pub trait AssetExt {
     spender: String,
     expires: Option<Expiration>,
   ) -> Result<CosmosMsg, SharedError>;
+
+  fn to_coin(&self) -> Result<Coin, AssetError>;
 }
 
 impl AssetExt for Asset {
@@ -37,6 +39,10 @@ impl AssetExt for Asset {
       })),
       _ => Err(SharedError::NotSupported("only cw20".to_string())),
     }
+  }
+
+  fn to_coin(&self) -> Result<Coin, AssetError> {
+    self.try_into()
   }
 }
 

@@ -38,6 +38,8 @@ pub const SECONDS_PER_YEAR: u64 = 60 * 60 * 24 * 365;
 pub const WEEK: u64 = 7 * 86400;
 /// Seconds in 2 years which is the maximum lock period.
 pub const MAX_LOCK_TIME: u64 = 2 * 365 * 86400; // 2 years (104 weeks)
+
+pub const MAX_LOCK_PERIODS: u64 = 104; // 2 years (104 weeks)
 /// Funds need to be at least locked for 3 weeks.
 pub const MIN_LOCK_PERIODS: u64 = 1;
 /// Monday, October 31, 2022 12:00:00 AM

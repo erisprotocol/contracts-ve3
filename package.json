@@ -1,8 +1,8 @@
 {
   "scripts": {
     "release": "bash scripts/build_release.sh",
-    "coverage": "bash scripts/build_coverage.sh",
-    "schema": "nps schema"
+    "schema": "nps schema",
+    "coverage": "cargo tarpaulin --out lcov --frozen --locked"
   },
   "dependencies": {
     "@terra-money/terra.js": "^3.0.8",

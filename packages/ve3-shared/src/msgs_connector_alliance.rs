@@ -16,22 +16,6 @@ pub struct InstantiateMsg {
 pub struct MigrateMsg {}
 
 #[cw_serde]
-pub enum ExecuteMsg {
-  // Privileged functions
-  ClaimRewards {},
-
-  AllianceDelegate(AllianceDelegateMsg),
-  AllianceUndelegate(AllianceUndelegateMsg),
-  AllianceRedelegate(AllianceRedelegateMsg),
-
-  RemoveValidator {
-    validator: String,
-  },
-
-  Callback(CallbackMsg),
-}
-
-#[cw_serde]
 pub enum CallbackMsg {
   ClaimRewardsCallback {
     asset: AssetInfo,
@@ -84,6 +68,22 @@ pub struct Config {
   pub reward_denom: String,
   pub global_config_addr: Addr,
   pub gauge: String,
+}
+
+#[cw_serde]
+pub enum ExecuteMsg {
+  // Privileged functions
+  ClaimRewards {},
+
+  AllianceDelegate(AllianceDelegateMsg),
+  AllianceUndelegate(AllianceUndelegateMsg),
+  AllianceRedelegate(AllianceRedelegateMsg),
+
+  RemoveValidator {
+    validator: String,
+  },
+
+  Callback(CallbackMsg),
 }
 
 #[cw_serde]

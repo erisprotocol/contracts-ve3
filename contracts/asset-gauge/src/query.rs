@@ -1,29 +1,33 @@
-use std::str::FromStr;
-
 use crate::error::ContractError;
 use crate::state::{
-  fetch_first_gauge_vote, fetch_last_gauge_vote, user_idx, CONFIG, GAUGE_DISTRIBUTION,
+  fetch_first_gauge_vote, fetch_last_gauge_vote, user_idx, AssetIndex, CONFIG, GAUGE_DISTRIBUTION,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
+use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult};
 use cw_asset::AssetInfoUnchecked;
+use cw_storage_plus::Bound;
+use std::str::FromStr;
+use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
 use ve3_shared::helpers::governance::get_period;
-use ve3_shared::helpers::time::{GetPeriods, Times};
+use ve3_shared::helpers::time::{GetPeriod, GetPeriods, Time, Times};
 use ve3_shared::msgs_asset_gauge::{
-  QueryMsg, UserFirstParticipationResponse, UserShare, UserSharesResponse,
+  GaugeInfosResponse, GaugeVote, QueryMsg, UserFirstParticipationResponse,
+  UserInfoExtendedResponse, UserInfosResponse, UserShare, UserSharesResponse, VotedInfoResponse,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
   match msg {
-    // QueryMsg::UserInfo {
-    //     user,
-    // } => to_json_binary(&user_info(deps, env, user)?),
-    // QueryMsg::UserInfos {
-    //     start_after,
-    //     limit,
-    // } => to_json_binary(&user_infos(deps, env, start_after, limit)?),
+    QueryMsg::UserInfo {
+      user,
+      time,
+    } => Ok(to_json_binary(&user_info(deps, env, user, time)?)?),
+    QueryMsg::UserInfos {
+      start_after,
+      limit,
+      time,
+    } => Ok(to_json_binary(&user_infos(deps, env, start_after, limit, time)?)?),
     QueryMsg::Config {} => Ok(to_json_binary(&CONFIG.load(deps.storage)?)?),
 
     QueryMsg::UserShares {
@@ -34,6 +38,18 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::UserFirstParticipation {
       user,
     } => Ok(to_json_binary(&user_first_participation(deps, user)?)?),
+
+    QueryMsg::GaugeInfo {
+      time,
+      gauge,
+      key,
+    } => Ok(to_json_binary(&gauge_info(deps, env, gauge, key, time)?)?),
+
+    QueryMsg::GaugeInfos {
+      time,
+      gauge,
+      keys,
+    } => Ok(to_json_binary(&gauge_infos(deps, env, gauge, keys, time)?)?),
   }
 }
 
@@ -126,88 +142,130 @@ fn user_shares(
   Ok(response)
 }
 
-// /// Returns user information.
-// fn user_info(deps: Deps, env: Env, user: String) -> StdResult<UserInfoResponse> {
-//     let user_addr = deps.api.addr_validate(&user)?;
-//     let user = USER_INFO
-//         .may_load(deps.storage, &user_addr)?
-//         .ok_or_else(|| StdError::generic_err("User not found"))?;
+/// Returns user information.
+fn user_info(
+  deps: Deps,
+  env: Env,
+  user: String,
+  time: Option<Time>,
+) -> StdResult<UserInfoExtendedResponse> {
+  deps.api.addr_validate(&user)?;
 
-//     let block_period = get_period(env.block.time.seconds())?;
-//     UserInfo::into_response(user, block_period)
-// }
+  let period = time.get_period(&env)?;
 
-// // returns all user votes
-// fn user_infos(
-//     deps: Deps,
-//     env: Env,
-//     start_after: Option<String>,
-//     limit: Option<u32>,
-// ) -> StdResult<UserInfosResponse> {
-//     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+  let info = user_idx().get_latest_data(deps.storage, period, &user)?;
 
-//     let mut start: Option<Bound<&Addr>> = None;
-//     let addr: Addr;
-//     if let Some(start_after) = start_after {
-//         if let Ok(start_after_addr) = deps.api.addr_validate(&start_after) {
-//             addr = start_after_addr;
-//             start = Some(Bound::exclusive(&addr));
-//         }
-//     }
+  let gauges = CONFIG.load(deps.storage)?.gauges;
+  let mut gauge_votes = vec![];
+  for gauge in gauges {
+    if let Some((period, votes)) = fetch_last_gauge_vote(deps.storage, &gauge.name, &user, period)?
+    {
+      gauge_votes.push(GaugeVote {
+        period,
+        votes: votes.votes.into_iter().map(|(a, b)| (a, b.u16())).collect(),
+      })
+    }
+  }
 
-//     let block_period = get_period(env.block.time.seconds())?;
+  Ok(UserInfoExtendedResponse {
+    voting_power: info.voting_power,
+    fixed_amount: info.fixed_amount,
+    slope: info.slope,
+    gauge_votes,
+  })
+}
 
-//     let users = USER_INFO
-//         .range(deps.storage, start, None, Order::Ascending)
-//         .take(limit)
-//         .map(|item| {
-//             let (user, v) = item?;
-//             Ok((user, UserInfo::into_response(v, block_period)?))
-//         })
-//         .collect::<StdResult<Vec<(Addr, UserInfoResponse)>>>()?;
+// returns all user votes
+fn user_infos(
+  deps: Deps,
+  env: Env,
+  start_after: Option<String>,
+  limit: Option<u32>,
+  time: Option<Time>,
+) -> StdResult<UserInfosResponse> {
+  let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+  let period = time.get_period(&env)?;
+  let idx = user_idx();
 
-//     Ok(UserInfosResponse {
-//         users,
-//     })
-// }
+  let mut start: Option<Bound<&str>> = None;
+  let addr: Addr;
+  if let Some(start_after) = start_after {
+    if let Ok(start_after_addr) = deps.api.addr_validate(&start_after) {
+      addr = start_after_addr;
+      start = Some(Bound::exclusive(addr.as_str()));
+    }
+  }
 
-// /// Returns all active validators info at a specified period.
-// fn validator_infos(
-//     deps: Deps,
-//     env: Env,
-//     validator_addrs: Option<Vec<String>>,
-//     period: Option<u64>,
-// ) -> StdResult<Vec<(String, VotedValidatorInfoResponse)>> {
-//     let period = period.unwrap_or(get_period(env.block.time.seconds())?);
+  let mut result = vec![];
 
-//     // use active validators as fallback
-//     let validator_addrs = validator_addrs.unwrap_or_else(|| {
-//         let active_validators = VALIDATORS
-//             .keys(deps.storage, None, None, Order::Ascending)
-//             .collect::<StdResult<Vec<_>>>();
+  for key in idx.keys.range(deps.storage, start, None, cosmwasm_std::Order::Ascending).take(limit) {
+    let (key, _) = key?;
+    let data = idx.get_latest_data(deps.storage, period, &key)?;
+    result.push((
+      Addr::unchecked(key),
+      VotedInfoResponse {
+        voting_power: data.voting_power,
+        fixed_amount: data.fixed_amount,
+        slope: data.slope,
+      },
+    ))
+  }
 
-//         active_validators.unwrap_or_default()
-//     });
+  Ok(result)
+}
 
-//     let validator_infos: Vec<_> = validator_addrs
-//         .into_iter()
-//         .map(|validator_addr| {
-//             let validator_info = get_asset_info(deps.storage, period, &validator_addr)?;
-//             Ok((validator_addr, validator_info))
-//         })
-//         .collect::<StdResult<Vec<_>>>()?;
+fn gauge_info(
+  deps: Deps,
+  env: Env,
+  gauge: String,
+  key: String,
+  time: Option<Time>,
+) -> StdResult<VotedInfoResponse> {
+  let period = time.get_period(&env)?;
+  let idx = AssetIndex::new(&gauge);
+  let idx = idx.idx();
+  let info = idx.get_latest_data(deps.storage, period, &key)?;
 
-//     Ok(validator_infos)
-// }
+  Ok(VotedInfoResponse {
+    voting_power: info.voting_power,
+    fixed_amount: info.fixed_amount,
+    slope: info.slope,
+  })
+}
 
-// /// Returns pool's voting information at a specified period.
-// fn validator_info(
-//     deps: Deps,
-//     env: Env,
-//     validator_addr: String,
-//     period: Option<u64>,
-// ) -> StdResult<VotedValidatorInfoResponse> {
-//     let block_period = get_period(env.block.time.seconds())?;
-//     let period = period.unwrap_or(block_period);
-//     get_asset_info(deps.storage, period, &validator_addr)
-// }
+fn gauge_infos(
+  deps: Deps,
+  env: Env,
+  gauge: String,
+  keys: Option<Vec<String>>,
+  time: Option<Time>,
+) -> StdResult<GaugeInfosResponse> {
+  let period = time.get_period(&env)?;
+  let idx = AssetIndex::new(&gauge);
+  let idx = idx.idx();
+
+  let keys = if let Some(keys) = keys {
+    keys
+  } else {
+    idx
+      .keys
+      .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+      .map(|a| Ok(a?.0))
+      .collect::<StdResult<Vec<_>>>()?
+  };
+
+  let mut result = vec![];
+  for key in keys {
+    let data = idx.get_latest_data(deps.storage, period, &key)?;
+    result.push((
+      key,
+      VotedInfoResponse {
+        voting_power: data.voting_power,
+        fixed_amount: data.fixed_amount,
+        slope: data.slope,
+      },
+    ))
+  }
+
+  Ok(result)
+}

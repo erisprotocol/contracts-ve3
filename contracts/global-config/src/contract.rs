@@ -5,7 +5,7 @@ use crate::{
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_json_string, Addr, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 use cw_ownable::update_ownership;
 use ve3_shared::msgs_global_config::{ExecuteMsg, InstantiateMsg};
@@ -26,13 +26,23 @@ pub fn instantiate(
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> ContractResult {
   match msg {
     ExecuteMsg::UpdateOwnership(action) => {
-      update_ownership(deps, &env.block, &info.sender, action)?;
-      Ok(Response::new().add_attribute("action", "update_ownership"))
+      update_ownership(deps, &env.block, &info.sender, action.clone())?;
+      Ok(
+        Response::new()
+          .add_attribute("action", "update_ownership")
+          .add_attribute("data", to_json_string(&action)?),
+      )
     },
     ExecuteMsg::SetAddresses {
       addresses,
       lists,
     } => set_addresses(deps, info.sender, addresses, lists),
+    ExecuteMsg::ClearAddresses {
+      addresses,
+    } => clear_addresses(deps, info.sender, addresses),
+    ExecuteMsg::ClearLists {
+      lists,
+    } => clear_lists(deps, info.sender, lists),
   }
 }
 
@@ -53,13 +63,33 @@ fn set_addresses(
   }
 
   for (address_type, list) in lists {
-    set_address_list(&mut deps, address_type, list)?;
+    _set_address_list(&mut deps, address_type, list)?;
   }
 
   Ok(Response::new().add_attribute("action", "set_addresses"))
 }
 
-fn set_address_list(deps: &mut DepsMut, address_type: String, list: Vec<String>) -> StdResult<()> {
+fn clear_addresses(deps: DepsMut, sender: Addr, addresses: Vec<String>) -> ContractResult {
+  cw_ownable::assert_owner(deps.storage, &sender)?;
+
+  for address_type in addresses {
+    ADDRESSES.remove(deps.storage, address_type);
+  }
+
+  Ok(Response::new().add_attribute("action", "clear_addresses"))
+}
+
+fn clear_lists(deps: DepsMut, sender: Addr, addresses: Vec<String>) -> ContractResult {
+  cw_ownable::assert_owner(deps.storage, &sender)?;
+
+  for address_type in addresses {
+    ADDRESS_LIST.remove(deps.storage, address_type);
+  }
+
+  Ok(Response::new().add_attribute("action", "clear_lists"))
+}
+
+fn _set_address_list(deps: &mut DepsMut, address_type: String, list: Vec<String>) -> StdResult<()> {
   let mut addresses_addr = vec![];
   for address in list {
     addresses_addr.push(deps.api.addr_validate(&address)?);
