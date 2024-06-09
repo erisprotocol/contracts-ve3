@@ -1,9 +1,8 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Order, StdResult, Storage};
 use cw_storage_plus::{Bound, Item, Map};
-use ve3_shared::msgs_asset_gauge::Config;
-use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::helpers::bps::BasicPoints;
+use ve3_shared::msgs_asset_gauge::{Config, GaugeDistributionPeriod};
 use ve3_shared::msgs_voting_escrow::LockInfoResponse;
 
 use crate::period_index::PeriodIndex;
@@ -90,17 +89,4 @@ impl AssetIndex {
   pub fn idx(&self) -> PeriodIndex<'_> {
     PeriodIndex::new(&self.data_key, &self.slope_key, &self.keys_key)
   }
-}
-
-// pub fn asset_idx<'a>(gauge: &str) -> AssetIndex<'a> {
-//   AssetIndex::new(
-//     &format!("asset_votes__{0}", gauge),
-//     &format!("asset_slope_changes__{0}", gauge),
-//     &format!("asset_keys__{0}", gauge),
-//   )
-// }
-
-#[cw_serde]
-pub struct GaugeDistributionPeriod {
-  pub assets: Vec<AssetDistribution>,
 }

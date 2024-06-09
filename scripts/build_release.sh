@@ -4,14 +4,14 @@ set -e
 set -o pipefail
 
 # projectPath=/c/Projects/eris/liquid-staking-contracts
-projectPath=$(dirname `pwd`) 
-folderName=$(basename $(dirname `pwd`)) 
+projectPath=$(pwd) 
+folderName=$(basename $(pwd)) 
 
-mkdir -p "../../$folderName-cache"
-mkdir -p "../../$folderName-cache/target"
-mkdir -p "../../$folderName-cache/registry"
+mkdir -p "../$folderName-cache"
+mkdir -p "../$folderName-cache/target"
+mkdir -p "../$folderName-cache/registry"
 
 docker run --rm -v "/$projectPath":/code \
-  --mount type=bind,source=/$projectPath-cache/target,target=/code/target \
+  --mount type=bind,source=/$projectPath-cache/target,target=/target \
   --mount type=bind,source=/$projectPath-cache/registry,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.15.1
+  cosmwasm/optimizer:0.16.0

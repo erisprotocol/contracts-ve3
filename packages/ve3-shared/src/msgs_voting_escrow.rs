@@ -1,37 +1,20 @@
 use crate::adapters::eris::ErisHub;
 use crate::helpers::time::Time;
-use crate::msgs_voting_escrow::QueryMsg::{LockInfo, LockVamp, TotalVamp};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary, Decimal, Empty, QuerierWrapper, StdResult, Uint128};
-use cw20::Expiration;
+use cw20::{Cw20ReceiveMsg, Expiration};
 #[allow(unused_imports)]
-use cw20::{
-  BalanceResponse, Cw20ReceiveMsg, DownloadLogoResponse, Logo, MarketingInfoResponse,
-  TokenInfoResponse,
-};
 use cw721::{
   AllNftInfoResponse, ApprovalResponse, ApprovalsResponse, ContractInfoResponse, NftInfoResponse,
   NumTokensResponse, OperatorsResponse, OwnerOfResponse, TokensResponse,
 };
 use cw721_base::ExecuteMsg as CW721ExecuteMsg;
+#[allow(unused_imports)]
 use cw721_base::MinterResponse;
 use cw721_base::QueryMsg as CW721QueryMsg;
 use cw_address_like::AddressLike;
 use cw_asset::{Asset, AssetInfoBase};
 use std::fmt;
-
-/// This structure stores marketing information for voting escrow.
-#[cw_serde]
-pub struct UpdateMarketingInfo {
-  /// Project URL
-  pub project: Option<String>,
-  /// Token description
-  pub description: Option<String>,
-  /// Token marketing information
-  pub marketing: Option<String>,
-  /// Token logo
-  pub logo: Option<Logo>,
-}
 
 /// This structure stores general parameters for the voting escrow contract.
 #[cw_serde]
@@ -537,112 +520,3 @@ impl AssetInfoConfig {
 /// This structure describes a Migration message.
 #[cw_serde]
 pub struct MigrateMsg {}
-
-/// Queries current user's voting power from the voting escrow contract.
-///
-/// * **user** staker for which we calculate the latest vAMP voting power.
-pub fn get_voting_power(
-  querier: &QuerierWrapper,
-  escrow_addr: impl Into<String>,
-  user: impl Into<String>,
-) -> StdResult<Uint128> {
-  let vp: VotingPowerResponse = querier.query_wasm_smart(
-    escrow_addr,
-    &LockVamp {
-      token_id: user.into(),
-      time: None,
-    },
-  )?;
-  Ok(vp.vamp)
-}
-
-/// Queries current user's voting power from the voting escrow contract by timestamp.
-///
-/// * **user** staker for which we calculate the voting power at a specific time.
-///
-/// * **timestamp** timestamp at which we calculate the staker's voting power.
-pub fn get_voting_power_at(
-  querier: &QuerierWrapper,
-  escrow_addr: impl Into<String>,
-  token_id: impl Into<String>,
-  timestamp: u64,
-) -> StdResult<Uint128> {
-  let vp: VotingPowerResponse = querier.query_wasm_smart(
-    escrow_addr,
-    &LockVamp {
-      token_id: token_id.into(),
-      time: Some(Time::Time(timestamp)),
-    },
-  )?;
-
-  Ok(vp.vamp)
-}
-
-/// Queries current total voting power from the voting escrow contract.
-pub fn get_total_voting_power(
-  querier: &QuerierWrapper,
-  escrow_addr: impl Into<String>,
-) -> StdResult<Uint128> {
-  let vp: VotingPowerResponse = querier.query_wasm_smart(
-    escrow_addr,
-    &TotalVamp {
-      time: None,
-    },
-  )?;
-
-  Ok(vp.vamp)
-}
-
-/// Queries total voting power from the voting escrow contract by timestamp.
-///
-/// * **timestamp** time at which we fetch the total voting power.
-pub fn get_total_voting_power_at(
-  querier: &QuerierWrapper,
-  escrow_addr: impl Into<String>,
-  timestamp: u64,
-) -> StdResult<Uint128> {
-  let vp: VotingPowerResponse = querier.query_wasm_smart(
-    escrow_addr,
-    &TotalVamp {
-      time: Some(Time::Time(timestamp)),
-    },
-  )?;
-
-  Ok(vp.vamp)
-}
-
-/// Queries total voting power from the voting escrow contract by period.
-///
-/// * **timestamp** time at which we fetch the total voting power.
-pub fn get_total_voting_power_at_by_period(
-  querier: &QuerierWrapper,
-  escrow_addr: impl Into<String>,
-  period: u64,
-) -> StdResult<Uint128> {
-  let vp: VotingPowerResponse = querier.query_wasm_smart(
-    escrow_addr,
-    &QueryMsg::TotalVamp {
-      time: Some(Time::Period(period)),
-    },
-  )?;
-
-  Ok(vp.vamp)
-}
-
-/// Queries user's lockup information from the voting escrow contract.
-///
-/// * **user** staker for which we return lock position information.
-pub fn get_lock_info(
-  querier: &QuerierWrapper,
-  escrow_addr: impl Into<String>,
-  token_id: impl Into<String>,
-) -> StdResult<LockInfoResponse> {
-  let lock_info: LockInfoResponse = querier.query_wasm_smart(
-    escrow_addr,
-    &LockInfo {
-      token_id: token_id.into(),
-      time: None,
-    },
-  )?;
-  Ok(lock_info)
-}

@@ -3,6 +3,7 @@ use crate::{
   constants::at_asset_staking,
   error::SharedError,
   helpers::time::{Time, Times},
+  msgs_asset_staking::AssetDistribution,
   msgs_voting_escrow::LockInfoResponse,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -40,11 +41,10 @@ pub enum ExecuteMsg {
   /// TunePools transforms the latest vote distribution into alloc_points which are then applied to ASTRO generators
   SetDistribution {},
 
-  ClearGaugeState {
-    gauge: String,
-    limit: Option<usize>,
-  },
-
+  // ClearGaugeState {
+  //   gauge: String,
+  //   limit: Option<usize>,
+  // },
   UpdateConfig {
     update_gauge: Option<GaugeConfig>,
     remove_gauge: Option<String>,
@@ -97,6 +97,17 @@ pub enum QueryMsg {
   GaugeInfos {
     gauge: String,
     keys: Option<Vec<String>>,
+    time: Option<Time>,
+  },
+
+  #[returns(GaugeDistributionPeriod)]
+  Distribution {
+    gauge: String,
+    time: Option<Time>,
+  },
+
+  #[returns(Vec<GaugeDistributionPeriod>)]
+  Distributions {
     time: Option<Time>,
   },
 }
@@ -181,6 +192,12 @@ pub struct UserInfoExtendedResponse {
 pub struct GaugeVote {
   pub period: u64,
   pub votes: Vec<(String, u16)>,
+}
+
+#[cw_serde]
+pub struct GaugeDistributionPeriod {
+  pub total_gauge_vp: Uint128,
+  pub assets: Vec<AssetDistribution>,
 }
 
 pub type UserInfosResponse = Vec<(Addr, VotedInfoResponse)>;

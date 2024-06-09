@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Order, OverflowError, StdError, StdResult, Storage, Uint128};
-use cw_storage_plus::{Bound, Map, Prefix};
+use cw_storage_plus::{Bound, Map};
 use ve3_shared::{
   helpers::{bps::BasicPoints, governance::calc_voting_power},
   msgs_voting_escrow::LockInfoResponse,
@@ -90,12 +90,12 @@ impl<'a> PeriodIndex<'a> {
     }
   }
 
-  pub fn clear(&self, storage: &mut dyn Storage, limit: Option<usize>) {
-    Prefix::<Vec<u8>, (), &str>::new(self.keys.namespace(), &[]).clear(storage, limit);
-    Prefix::<Vec<u8>, Data, (&str, u64)>::new(self.data.namespace(), &[]).clear(storage, limit);
-    Prefix::<Vec<u8>, Uint128, (&str, u64)>::new(self.slope_changes.namespace(), &[])
-      .clear(storage, limit);
-  }
+  // pub fn clear(&self, storage: &mut dyn Storage, limit: Option<usize>) {
+  //   Prefix::<Vec<u8>, (), &str>::new(self.keys.namespace(), &[]).clear(storage, limit);
+  //   Prefix::<Vec<u8>, Data, (&str, u64)>::new(self.data.namespace(), &[]).clear(storage, limit);
+  //   Prefix::<Vec<u8>, Uint128, (&str, u64)>::new(self.slope_changes.namespace(), &[])
+  //     .clear(storage, limit);
+  // }
 
   /// Applies user's vote for a given pool.   
   /// Firstly, it schedules slope change for lockup end period.  

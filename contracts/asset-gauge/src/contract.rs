@@ -1,8 +1,8 @@
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::state::{
-  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex,
-  GaugeDistributionPeriod, UserVotes, CONFIG, GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO,
+  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex, UserVotes, CONFIG,
+  GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -18,7 +18,9 @@ use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::AT_VOTING_ESCROW;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
-use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg};
+use ve3_shared::msgs_asset_gauge::{
+  Config, ExecuteMsg, GaugeConfig, GaugeDistributionPeriod, InstantiateMsg,
+};
 use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::msgs_voting_escrow::LockInfoResponse;
 
@@ -60,18 +62,18 @@ pub fn execute(
       lock_info,
     } => update_vote(deps, env, info.sender, token_id, lock_info),
 
-    ExecuteMsg::ClearGaugeState {
-      gauge,
-      limit,
-    } => {
-      let config = CONFIG.load(deps.storage)?;
-      if config.gauges.iter().any(|a| a.name == gauge) {
-        return Err(ContractError::CannotClearExistingGauge {});
-      }
-      AssetIndex::new(&gauge).idx().clear(deps.storage, limit);
-      Ok(Response::default().add_attribute("action", "gauge/clear_gauge_state"))
-    },
-
+    // ExecuteMsg::ClearGaugeState {
+    //   gauge,
+    //   limit,
+    // } => {
+    //   let config = CONFIG.load(deps.storage)?;
+    //   if config.gauges.iter().any(|a| a.name == gauge) {
+    //     return Err(ContractError::CannotClearExistingGauge {});
+    //   }
+    //   // only being able to clear gauge state for non-existing gauges
+    //   AssetIndex::new(&gauge).idx().clear(deps.storage, limit);
+    //   Ok(Response::default().add_attribute("action", "gauge/clear_gauge_state"))
+    // },
     ExecuteMsg::SetDistribution {} => set_distribution(deps, env),
 
     ExecuteMsg::UpdateConfig {
@@ -347,8 +349,8 @@ fn _set_distribution(
     .sorted_by(|(_, a), (_, b)| b.cmp(a)) // Sort in descending order
     .collect();
 
-  let total_voting_power: Uint128 = allowed_votes.iter().map(|(_, b)| b).sum();
-  let min_voting_power = gauge_config.min_gauge_percentage * total_voting_power;
+  let total_gauge_vp: Uint128 = allowed_votes.iter().map(|(_, b)| b).sum();
+  let min_voting_power = gauge_config.min_gauge_percentage * total_gauge_vp;
 
   let relevant_votes =
     allowed_votes.into_iter().filter(|(_, amount)| *amount > min_voting_power).collect_vec();
@@ -382,6 +384,7 @@ fn _set_distribution(
     deps.storage,
     (&gauge, period),
     &GaugeDistributionPeriod {
+      total_gauge_vp,
       assets: save_distribution.clone(),
     },
   )?;

@@ -1,5 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
+#[allow(unused_imports)]
 use cw_ownable::{cw_ownable_execute, Ownership};
 
 #[cw_serde]

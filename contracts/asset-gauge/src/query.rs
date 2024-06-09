@@ -12,22 +12,13 @@ use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::helpers::time::{GetPeriod, GetPeriods, Time, Times};
 use ve3_shared::msgs_asset_gauge::{
-  GaugeInfosResponse, GaugeVote, QueryMsg, UserFirstParticipationResponse,
+  GaugeDistributionPeriod, GaugeInfosResponse, GaugeVote, QueryMsg, UserFirstParticipationResponse,
   UserInfoExtendedResponse, UserInfosResponse, UserShare, UserSharesResponse, VotedInfoResponse,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
   match msg {
-    QueryMsg::UserInfo {
-      user,
-      time,
-    } => Ok(to_json_binary(&user_info(deps, env, user, time)?)?),
-    QueryMsg::UserInfos {
-      start_after,
-      limit,
-      time,
-    } => Ok(to_json_binary(&user_infos(deps, env, start_after, limit, time)?)?),
     QueryMsg::Config {} => Ok(to_json_binary(&CONFIG.load(deps.storage)?)?),
 
     QueryMsg::UserShares {
@@ -38,6 +29,17 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::UserFirstParticipation {
       user,
     } => Ok(to_json_binary(&user_first_participation(deps, user)?)?),
+
+    QueryMsg::UserInfo {
+      user,
+      time,
+    } => Ok(to_json_binary(&user_info(deps, env, user, time)?)?),
+
+    QueryMsg::UserInfos {
+      start_after,
+      limit,
+      time,
+    } => Ok(to_json_binary(&user_infos(deps, env, start_after, limit, time)?)?),
 
     QueryMsg::GaugeInfo {
       time,
@@ -50,6 +52,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       gauge,
       keys,
     } => Ok(to_json_binary(&gauge_infos(deps, env, gauge, keys, time)?)?),
+
+    QueryMsg::Distribution {
+      gauge,
+      time,
+    } => Ok(to_json_binary(&distribution(deps, env, gauge, time)?)?),
+
+    QueryMsg::Distributions {
+      time,
+    } => Ok(to_json_binary(&distributions(deps, env, time)?)?),
   }
 }
 
@@ -212,6 +223,31 @@ fn user_infos(
   }
 
   Ok(result)
+}
+
+fn distribution(
+  deps: Deps,
+  env: Env,
+  gauge: String,
+  time: Option<Time>,
+) -> StdResult<GaugeDistributionPeriod> {
+  let period = time.get_period(&env)?;
+  GAUGE_DISTRIBUTION.load(deps.storage, (&gauge, period))
+}
+
+fn distributions(
+  deps: Deps,
+  env: Env,
+  time: Option<Time>,
+) -> StdResult<Vec<GaugeDistributionPeriod>> {
+  let config = CONFIG.load(deps.storage)?;
+  let period = time.get_period(&env)?;
+
+  config
+    .gauges
+    .iter()
+    .map(|a| GAUGE_DISTRIBUTION.load(deps.storage, (&a.name, period)))
+    .collect::<StdResult<Vec<_>>>()
 }
 
 fn gauge_info(

@@ -56,21 +56,21 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_gauge_clear_gauge_state(
-    &mut self,
-    gauge: String,
-    limit: Option<usize>,
-    sender: &str,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let msg = ExecuteMsg::ClearGaugeState {
-      gauge,
-      limit,
-    };
-    let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
-    self
-  }
+  // pub fn e_gauge_clear_gauge_state(
+  //   &mut self,
+  //   gauge: String,
+  //   limit: Option<usize>,
+  //   sender: &str,
+  //   result: impl Fn(Result<AppResponse, anyhow::Error>),
+  // ) -> &mut TestingSuite {
+  //   let msg = ExecuteMsg::ClearGaugeState {
+  //     gauge,
+  //     limit,
+  //   };
+  //   let sender = self.address(sender);
+  //   result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
+  //   self
+  // }
 
   pub fn e_gauge_update_config(
     &mut self,
@@ -193,6 +193,38 @@ impl TestingSuite {
       &QueryMsg::GaugeInfos {
         gauge,
         keys,
+        time,
+      },
+    );
+    result(response);
+    self
+  }
+
+  pub fn q_gauge_distribution(
+    &mut self,
+    gauge: String,
+    time: Option<Time>,
+    result: impl Fn(StdResult<GaugeDistributionPeriod>),
+  ) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(
+      self.contract_1(),
+      &QueryMsg::Distribution {
+        gauge,
+        time,
+      },
+    );
+    result(response);
+    self
+  }
+
+  pub fn q_gauge_distributions(
+    &mut self,
+    time: Option<Time>,
+    result: impl Fn(StdResult<Vec<GaugeDistributionPeriod>>),
+  ) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(
+      self.contract_1(),
+      &QueryMsg::Distributions {
         time,
       },
     );

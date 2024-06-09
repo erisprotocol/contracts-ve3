@@ -1,8 +1,8 @@
-use std::collections::HashSet;
-
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, StdResult, Uint128, WasmMsg};
 use cw_asset::AssetInfo;
+#[allow(unused_imports)]
+use std::collections::HashSet;
 
 #[cw_serde]
 pub struct InstantiateMsg {
