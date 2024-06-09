@@ -7,16 +7,15 @@ use cosmwasm_std::{coin, Addr, Coin, Decimal, Empty, Timestamp, Uint128};
 use cw20::Cw20Coin;
 use cw_asset::{Asset, AssetInfoBase, AssetInfoUnchecked, AssetUnchecked};
 use cw_multi_test::{
-  App, AppBuilder, AppResponse, BankKeeper, DistributionKeeper, Executor, FailingModule,
-  GovFailingModule, IbcFailingModule, MockAddressGenerator, MockApiBech32, StakeKeeper,
-  StargateFailingModule, WasmKeeper,
+  App, AppBuilder, BankKeeper, DistributionKeeper, Executor, FailingModule, GovFailingModule,
+  IbcFailingModule, MockAddressGenerator, MockApiBech32, StakeKeeper, StargateFailingModule,
+  WasmKeeper,
 };
 use serde::Serialize;
 use std::str::FromStr;
+use ve3_shared::constants::*;
 use ve3_shared::msgs_asset_gauge::GaugeConfig;
 use ve3_shared::msgs_voting_escrow::DepositAsset;
-use ve3_shared::{constants::*, msgs_asset_staking, msgs_bribe_manager};
-use ve3_shared::{msgs_connector_alliance, msgs_global_config};
 
 type OsmosisTokenFactoryApp = App<
   BankKeeper,
@@ -216,7 +215,7 @@ impl TestingSuite {
     self.init_no_config();
 
     self.init_global_config();
-    self.e_ve_update_config_execute(
+    self.e_ve_update_config(
       None,
       Some(vec![self.addresses.ve3_asset_gauge.to_string()]),
       None,
@@ -532,40 +531,39 @@ impl TestingSuite {
   }
 
   fn init_global_config(&mut self) -> &mut TestingSuite {
-    self.global_config_execute(
-      msgs_global_config::ExecuteMsg::SetAddresses {
-        addresses: vec![
-          // controller
-          (
-            AT_DELEGATION_CONTROLLER.to_string(),
-            self.address("AT_DELEGATION_CONTROLLER").to_string(),
-          ),
-          (
-            AT_ASSET_WHITELIST_CONTROLLER.to_string(),
-            self.address("AT_ASSET_WHITELIST_CONTROLLER").to_string(),
-          ),
-          // (AT_GAUGE_CONTROLLER.to_string(), self.address("AT_GAUGE_CONTROLLER").to_string()),
-          (AT_VE_GUARDIAN.to_string(), self.address("AT_VE_GUARDIAN").to_string()),
-          // receivers
-          (AT_TAKE_RECIPIENT.to_string(), self.address("AT_TAKE_RECIPIENT").to_string()),
-          (AT_FEE_COLLECTOR.to_string(), self.address("AT_FEE_COLLECTOR").to_string()),
-          // contracts
-          (AT_VOTING_ESCROW.to_string(), self.addresses.ve3_voting_escrow.to_string()),
-          (AT_ASSET_GAUGE.to_string(), self.addresses.ve3_asset_gauge.to_string()),
-          (AT_BRIBE_MANAGER.to_string(), self.addresses.ve3_bribe_manager.to_string()),
-          (at_connector(&self.gauge1()), self.addresses.ve3_connector_alliance_1.to_string()),
-          (at_connector(&self.gauge2()), self.addresses.ve3_connector_alliance_2.to_string()),
-          (at_asset_staking(&self.gauge1()), self.addresses.ve3_asset_staking_1.to_string()),
-          (at_asset_staking(&self.gauge2()), self.addresses.ve3_asset_staking_2.to_string()),
+    self.e_gc_set_addresses(
+      vec![
+        // controller
+        (
+          AT_DELEGATION_CONTROLLER.to_string(),
+          self.address("AT_DELEGATION_CONTROLLER").to_string(),
+        ),
+        (
+          AT_ASSET_WHITELIST_CONTROLLER.to_string(),
+          self.address("AT_ASSET_WHITELIST_CONTROLLER").to_string(),
+        ),
+        // (AT_GAUGE_CONTROLLER.to_string(), self.address("AT_GAUGE_CONTROLLER").to_string()),
+        (AT_VE_GUARDIAN.to_string(), self.address("AT_VE_GUARDIAN").to_string()),
+        // receivers
+        (AT_TAKE_RECIPIENT.to_string(), self.address("AT_TAKE_RECIPIENT").to_string()),
+        (AT_FEE_COLLECTOR.to_string(), self.address("AT_FEE_COLLECTOR").to_string()),
+        // contracts
+        (AT_VOTING_ESCROW.to_string(), self.addresses.ve3_voting_escrow.to_string()),
+        (AT_ASSET_GAUGE.to_string(), self.addresses.ve3_asset_gauge.to_string()),
+        (AT_BRIBE_MANAGER.to_string(), self.addresses.ve3_bribe_manager.to_string()),
+        (at_connector(&self.gauge1()), self.addresses.ve3_connector_alliance_1.to_string()),
+        (at_connector(&self.gauge2()), self.addresses.ve3_connector_alliance_2.to_string()),
+        (at_asset_staking(&self.gauge1()), self.addresses.ve3_asset_staking_1.to_string()),
+        (at_asset_staking(&self.gauge2()), self.addresses.ve3_asset_staking_2.to_string()),
+      ],
+      vec![(
+        AT_FREE_BRIBES.to_string(),
+        vec![
+          self.addresses.ve3_asset_staking_1.to_string(),
+          self.addresses.ve3_asset_staking_2.to_string(),
         ],
-        lists: vec![(
-          AT_FREE_BRIBES.to_string(),
-          vec![
-            self.addresses.ve3_asset_staking_1.to_string(),
-            self.addresses.ve3_asset_staking_2.to_string(),
-          ],
-        )],
-      },
+      )],
+      "creator",
       |a| {
         a.unwrap();
       },
@@ -573,104 +571,17 @@ impl TestingSuite {
   }
 }
 
-impl TestingSuite {
-  #[track_caller]
-  pub fn global_config_execute(
-    &mut self,
-    execute: msgs_global_config::ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(
-      creator,
-      self.addresses.ve3_global_config.clone(),
-      &execute,
-      &[],
-    ));
-    self
-  }
-}
+impl TestingSuite {}
 
 impl TestingSuite {
   #[track_caller]
-  pub fn bribe_execute(
-    &mut self,
-    execute: msgs_bribe_manager::ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(
-      creator,
-      self.addresses.ve3_bribe_manager.clone(),
-      &execute,
-      &[],
-    ));
-    self
-  }
-}
-impl TestingSuite {
-  #[track_caller]
-  pub fn connector_1_execute(
-    &mut self,
-    execute: msgs_connector_alliance::ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(
-      creator,
-      self.addresses.ve3_connector_alliance_1.clone(),
-      &execute,
-      &[],
-    ));
-    self
-  }
+  pub fn print_block(&mut self, text: &str) -> &mut TestingSuite {
+    println!("-------------------------------------------------");
+    println!("-------------------------------------------------");
+    println!("------ {text} -----------------------------------");
+    println!("-------------------------------------------------");
+    println!("-------------------------------------------------");
 
-  #[track_caller]
-  pub fn connector_2_execute(
-    &mut self,
-    execute: msgs_connector_alliance::ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(
-      creator,
-      self.addresses.ve3_connector_alliance_2.clone(),
-      &execute,
-      &[],
-    ));
-    self
-  }
-}
-impl TestingSuite {
-  #[track_caller]
-  pub fn staking_1_execute(
-    &mut self,
-    execute: msgs_asset_staking::ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(
-      creator,
-      self.addresses.ve3_asset_staking_1.clone(),
-      &execute,
-      &[],
-    ));
-    self
-  }
-
-  #[track_caller]
-  pub fn staking_2_execute(
-    &mut self,
-    execute: msgs_asset_staking::ExecuteMsg,
-    result: impl Fn(Result<AppResponse, anyhow::Error>),
-  ) -> &mut TestingSuite {
-    let creator = self.creator().clone();
-    result(self.app.execute_contract(
-      creator,
-      self.addresses.ve3_asset_staking_2.clone(),
-      &execute,
-      &[],
-    ));
     self
   }
 }

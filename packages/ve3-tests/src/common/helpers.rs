@@ -5,6 +5,10 @@ pub fn native<A: Into<String>, B: Into<Uint128>>(d: A, a: B) -> Asset {
   Asset::native(d, a)
 }
 
+pub fn uluna(amount: u32) -> Asset {
+  native("uluna", u(amount))
+}
+
 #[allow(non_snake_case)]
 pub fn Native(denom: &str) -> AssetInfo {
   cw_asset::AssetInfoBase::Native(denom.to_string())

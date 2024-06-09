@@ -1,10 +1,11 @@
 pub mod exec_alliance_connector;
 pub mod exec_asset_gauge;
 pub mod exec_asset_staking;
+pub mod exec_bribe_manager;
+pub mod exec_defaults;
 pub mod exec_global_config;
 pub mod exec_hub;
 pub mod exec_voting_escrow;
 pub mod helpers;
 pub mod suite;
 pub mod suite_contracts;
-pub mod exec_defaults;

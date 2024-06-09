@@ -42,6 +42,12 @@ pub enum ContractError {
   #[error("Lock period must be 1 or more weeks")]
   LockPeriodsError {},
 
+  #[error("Lock is permanent: {0}")]
+  LockIsPermanent(String),
+
+  #[error("Lock is not permanent")]
+  LockIsNotPermanent,
+
   #[error("Locks decommissioned, cannot extend or create new ones.")]
   DecommissionedError {},
 

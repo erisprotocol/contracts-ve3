@@ -8,10 +8,10 @@ use cw721::{
   AllNftInfoResponse, ApprovalResponse, ApprovalsResponse, ContractInfoResponse, NftInfoResponse,
   NumTokensResponse, OperatorsResponse, OwnerOfResponse, TokensResponse,
 };
-use cw721_base::ExecuteMsg as CW721ExecuteMsg;
 #[allow(unused_imports)]
 use cw721_base::MinterResponse;
 use cw721_base::QueryMsg as CW721QueryMsg;
+use cw721_base::{state::TokenInfo, ExecuteMsg as CW721ExecuteMsg};
 use cw_address_like::AddressLike;
 use cw_asset::{Asset, AssetInfoBase};
 use std::fmt;
@@ -37,7 +37,7 @@ pub enum ExecuteMsg {
   /// USER
   /// Create a vAMP position and lock ampLP for `time` amount of time
   CreateLock {
-    time: u64,
+    time: Option<u64>,
   },
   MergeLock {
     token_id: String,
@@ -57,6 +57,15 @@ pub enum ExecuteMsg {
   ExtendLockAmount {
     token_id: String,
   },
+
+  LockPermanent {
+    token_id: String,
+  },
+
+  UnlockPermanent {
+    token_id: String,
+  },
+
   /// Withdraw ampLP from the voting escrow contract
   Withdraw {
     token_id: String,
@@ -123,6 +132,7 @@ pub enum ExecuteMsg {
 }
 
 pub type VeNftCollection<'a> = cw721_base::Cw721Contract<'a, Extension, Empty, Empty, Empty>;
+pub type VeNftInfo = TokenInfo<Metadata>;
 
 #[cw_serde]
 pub struct Trait {
@@ -189,7 +199,7 @@ pub enum ReceiveMsg {
     token_id: String,
   },
   CreateLock {
-    time: u64,
+    time: Option<u64>,
   },
 }
 
@@ -461,7 +471,7 @@ pub struct LockInfoResponse {
   /// Start time for the vAMP position decay
   pub start: u64,
   /// End time for the vAMP position decay
-  pub end: u64,
+  pub end: End,
   /// Slope at which a staker's vAMP balance decreases over time
   pub slope: Uint128,
 
@@ -474,6 +484,27 @@ pub struct LockInfoResponse {
 impl LockInfoResponse {
   pub fn has_vp(&self) -> bool {
     !self.fixed_amount.is_zero() || !self.voting_power.is_zero()
+  }
+
+  pub fn end_string(&self) -> String {
+    self.end.to_string()
+  }
+}
+
+#[cw_serde]
+pub enum End {
+  Permanent,
+  Period(u64),
+}
+
+impl fmt::Display for End {
+  fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      End::Permanent => fmt.write_str("permanent")?,
+      End::Period(period) => fmt.write_str(&period.to_string())?,
+    }
+
+    Ok(())
   }
 }
 

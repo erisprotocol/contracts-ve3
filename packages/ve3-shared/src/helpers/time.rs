@@ -18,13 +18,19 @@ pub trait GetPeriod {
 impl GetPeriod for Option<Time> {
   fn get_period(self, env: &Env) -> StdResult<u64> {
     match self {
-      Some(time) => match time {
-        Time::Current => get_period(env.block.time.seconds()),
-        Time::Next => Ok(get_period(env.block.time.seconds())? + 1),
-        Time::Time(time) => get_period(time),
-        Time::Period(period) => Ok(period),
-      },
+      Some(time) => time.get_period(env),
       None => get_period(env.block.time.seconds()),
+    }
+  }
+}
+
+impl GetPeriod for Time {
+  fn get_period(self, env: &Env) -> StdResult<u64> {
+    match self {
+      Time::Current => get_period(env.block.time.seconds()),
+      Time::Next => Ok(get_period(env.block.time.seconds())? + 1),
+      Time::Time(time) => get_period(time),
+      Time::Period(period) => Ok(period),
     }
   }
 }

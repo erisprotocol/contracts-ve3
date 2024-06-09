@@ -5,7 +5,7 @@ use cosmwasm_std::{Order, OverflowError, StdError, StdResult, Storage, Uint128};
 use cw_storage_plus::{Bound, Map};
 use ve3_shared::{
   helpers::{bps::BasicPoints, governance::calc_voting_power},
-  msgs_voting_escrow::LockInfoResponse,
+  msgs_voting_escrow::{End, LockInfoResponse},
 };
 
 pub struct PeriodIndex<'a> {
@@ -66,7 +66,7 @@ pub struct Line {
   slope: Uint128,
   fixed: Uint128,
   start: u64,
-  end: u64,
+  end: End,
 }
 
 impl From<&LockInfoResponse> for Line {
@@ -76,7 +76,7 @@ impl From<&LockInfoResponse> for Line {
       slope: val.slope,
       fixed: val.fixed_amount,
       start: val.start,
-      end: val.end,
+      end: val.end.clone(),
     }
   }
 }
@@ -90,17 +90,10 @@ impl<'a> PeriodIndex<'a> {
     }
   }
 
-  // pub fn clear(&self, storage: &mut dyn Storage, limit: Option<usize>) {
-  //   Prefix::<Vec<u8>, (), &str>::new(self.keys.namespace(), &[]).clear(storage, limit);
-  //   Prefix::<Vec<u8>, Data, (&str, u64)>::new(self.data.namespace(), &[]).clear(storage, limit);
-  //   Prefix::<Vec<u8>, Uint128, (&str, u64)>::new(self.slope_changes.namespace(), &[])
-  //     .clear(storage, limit);
-  // }
-
   /// Applies user's vote for a given pool.   
   /// Firstly, it schedules slope change for lockup end period.  
   /// Secondly, it updates voting parameters with applied user's vote.
-  pub fn add_vote(
+  pub fn add_line(
     &self,
     storage: &mut dyn Storage,
     period: u64,
@@ -117,14 +110,18 @@ impl<'a> PeriodIndex<'a> {
       self.keys.save(storage, key, &())?;
     }
 
-    // Schedule slope changes
-    self.slope_changes.update::<_, StdError>(storage, (key, lock_end + 1), |slope_opt| {
-      if let Some(saved_slope) = slope_opt {
-        Ok(saved_slope + bps * slope)
-      } else {
-        Ok(bps * slope)
-      }
-    })?;
+    // only schedule when an end exists otherwise it is constant
+    if let End::Period(lock_end) = lock_end {
+      // Schedule slope changes
+      self.slope_changes.update::<_, StdError>(storage, (key, lock_end + 1), |slope_opt| {
+        if let Some(saved_slope) = slope_opt {
+          Ok(saved_slope + bps * slope)
+        } else {
+          Ok(bps * slope)
+        }
+      })?;
+    }
+
     let data = self.update_data(
       storage,
       period,
@@ -144,14 +141,14 @@ impl<'a> PeriodIndex<'a> {
     bps: BasicPoints,
     line: Line,
   ) -> StdResult<&PeriodIndex<'a>> {
-    self.add_vote(storage, period, key, bps, line)?;
+    self.add_line(storage, period, key, bps, line)?;
     Ok(self)
   }
 
   /// Cancels user changes using old voting parameters for a given pool.  
   /// Firstly, it removes slope change scheduled for previous lockup end period.  
   /// Secondly, it updates voting parameters for the given period, but without user's vote.
-  pub(crate) fn remove_vote(
+  pub(crate) fn remove_line(
     &self,
     storage: &mut dyn Storage,
     // block +1
@@ -165,38 +162,42 @@ impl<'a> PeriodIndex<'a> {
     let old_lock_end = line.end;
 
     // Cancel scheduled slope changes
-    let (last_validator_period, _) =
-      self.fetch_last_period(storage, period, key)?.unwrap_or((period, Data::default()));
+    let (last_point_period, _) =
+      self.fetch_last_point(storage, period, key)?.unwrap_or((period, Data::default()));
 
-    if last_validator_period < old_lock_end + 1 {
-      let end_period_key = old_lock_end + 1;
-      let old_scheduled_change = self.slope_changes.load(storage, (key, end_period_key))?;
-      let new_slope = old_scheduled_change.saturating_sub(old_bps * old_slope);
-      if !new_slope.is_zero() {
-        self.slope_changes.save(storage, (key, end_period_key), &new_slope)?
-      } else {
-        self.slope_changes.remove(storage, (key, end_period_key))
+    let (vp_to_reduce, slope_to_reduce) = if let End::Period(old_lock_end) = old_lock_end {
+      if last_point_period < old_lock_end + 1 && period < old_lock_end + 1 {
+        // only if lock end is in the future and not included in the last point
+        let end = old_lock_end + 1;
+        let old_scheduled_change = self.slope_changes.load(storage, (key, end))?;
+        let new_slope = old_scheduled_change.saturating_sub(old_bps * old_slope);
+        if !new_slope.is_zero() {
+          self.slope_changes.save(storage, (key, end), &new_slope)?
+        } else {
+          self.slope_changes.remove(storage, (key, end))
+        }
       }
-    }
+      // self.print(storage, "remove-line");
 
-    // this is the remaining vp
-    let vp_to_reduce = if old_lock_end + 1 > period {
-      old_slope
-        .checked_mul(Uint128::from(old_lock_end + 1 - period))
-        .unwrap_or_else(|_| Uint128::zero())
+      // this is the remaining vp
+      let vp_to_reduce = if old_lock_end + 1 > period {
+        old_slope
+          .checked_mul(Uint128::from(old_lock_end + 1 - period))
+          .unwrap_or_else(|_| Uint128::zero())
+      } else {
+        Uint128::zero()
+      };
+
+      let slope_to_reduce = old_slope;
+
+      // println!(
+      //   "vp_to_reduce {vp_to_reduce} old_slope {old_slope} slope_to_reduce {slope_to_reduce}"
+      // );
+      // println!("old_lock_end {old_lock_end} period {period}");
+
+      (vp_to_reduce, slope_to_reduce)
     } else {
-      Uint128::zero()
-    };
-
-    // println!("remove {:?}", line);
-    // println!("old_lock_end {:?}", old_lock_end);
-    // println!("period {:?}", period);
-    // println!("vp_to_reduce {:?}", vp_to_reduce);
-
-    let slope_to_reduce = if old_lock_end + 1 > period {
-      old_slope
-    } else {
-      Uint128::zero()
+      (line.vp, Uint128::zero())
     };
 
     let result = self.update_data(
@@ -223,12 +224,12 @@ impl<'a> PeriodIndex<'a> {
     old_bps: BasicPoints,
     line: Line,
   ) -> StdResult<&PeriodIndex<'a>> {
-    self.remove_vote(storage, period, key, old_bps, line)?;
+    self.remove_line(storage, period, key, old_bps, line)?;
     Ok(self)
   }
 
   #[allow(clippy::too_many_arguments)]
-  pub(crate) fn change_vote(
+  pub(crate) fn change_weights(
     &self,
     storage: &mut dyn Storage,
     // block +1
@@ -245,31 +246,31 @@ impl<'a> PeriodIndex<'a> {
     let period_key = period;
 
     let result = match self.get_asset_info_mut(storage, period, key)? {
-      VoteResult::Unchanged(mut validator_info) | VoteResult::New(mut validator_info)
+      VoteResult::Unchanged(mut point) | VoteResult::New(mut point)
         if (!old_bps.is_zero() || !new_bps.is_zero()) && old_bps != new_bps =>
       {
         if !old_bps.is_zero() {
           let op = Operation::Sub;
-          validator_info.slope = op.calc(validator_info.slope, slope, old_bps);
-          validator_info.voting_power = op.calc(validator_info.voting_power, vp, old_bps);
-          validator_info.fixed_amount = op.calc(validator_info.fixed_amount, fixed, old_bps)
+          point.slope = op.calc(point.slope, slope, old_bps);
+          point.voting_power = op.calc(point.voting_power, vp, old_bps);
+          point.fixed_amount = op.calc(point.fixed_amount, fixed, old_bps)
         }
 
         if !new_bps.is_zero() {
           let op = Operation::Add;
-          validator_info.slope = op.calc(validator_info.slope, slope, new_bps);
-          validator_info.voting_power = op.calc(validator_info.voting_power, vp, new_bps);
-          validator_info.fixed_amount = op.calc(validator_info.fixed_amount, fixed, new_bps)
+          point.slope = op.calc(point.slope, slope, new_bps);
+          point.voting_power = op.calc(point.voting_power, vp, new_bps);
+          point.fixed_amount = op.calc(point.fixed_amount, fixed, new_bps)
         }
 
-        self.data.save(storage, (key, period_key), &validator_info)?;
-        validator_info
+        self.data.save(storage, (key, period_key), &point)?;
+        point
       },
-      VoteResult::New(validator_info) => {
-        self.data.save(storage, (key, period_key), &validator_info)?;
-        validator_info
+      VoteResult::New(point) => {
+        self.data.save(storage, (key, period_key), &point)?;
+        point
       },
-      VoteResult::Unchanged(validator_info) => validator_info,
+      VoteResult::Unchanged(point) => point,
     };
 
     if (!old_bps.is_zero() || !new_bps.is_zero()) && old_bps != new_bps {
@@ -318,7 +319,7 @@ impl<'a> PeriodIndex<'a> {
     current: &Data,
     slopes: &[(u64, Uint128)],
   ) -> StdResult<&PeriodIndex<'a>> {
-    self.change_vote(storage, period, key, old_bps, new_bps, current, slopes)?;
+    self.change_weights(storage, period, key, old_bps, new_bps, current, slopes)?;
     Ok(self)
   }
 
@@ -334,27 +335,25 @@ impl<'a> PeriodIndex<'a> {
     changes: Option<(BasicPoints, Uint128, Uint128, Uint128, Operation)>,
   ) -> StdResult<Data> {
     let period_key = period;
-    let validator_info = match self.get_asset_info_mut(storage, period, key)? {
-      VoteResult::Unchanged(mut validator_info) | VoteResult::New(mut validator_info)
-        if changes.is_some() =>
-      {
+    let point = match self.get_asset_info_mut(storage, period, key)? {
+      VoteResult::Unchanged(mut point) | VoteResult::New(mut point) if changes.is_some() => {
         if let Some((bps, vp, slope, fixed, op)) = changes {
-          validator_info.slope = op.calc(validator_info.slope, slope, bps);
-          validator_info.voting_power = op.calc(validator_info.voting_power, vp, bps);
-          validator_info.fixed_amount = op.calc(validator_info.fixed_amount, fixed, bps)
+          point.slope = op.calc(point.slope, slope, bps);
+          point.voting_power = op.calc(point.voting_power, vp, bps);
+          point.fixed_amount = op.calc(point.fixed_amount, fixed, bps)
         }
 
-        self.data.save(storage, (key, period_key), &validator_info)?;
-        validator_info
+        self.data.save(storage, (key, period_key), &point)?;
+        point
       },
-      VoteResult::New(validator_info) => {
-        self.data.save(storage, (key, period_key), &validator_info)?;
-        validator_info
+      VoteResult::New(point) => {
+        self.data.save(storage, (key, period_key), &point)?;
+        point
       },
-      VoteResult::Unchanged(validator_info) => validator_info,
+      VoteResult::Unchanged(point) => point,
     };
 
-    Ok(validator_info)
+    Ok(point)
   }
 
   /// Returns pool info at specified period or calculates it. Saves intermediate results in storage.
@@ -364,42 +363,37 @@ impl<'a> PeriodIndex<'a> {
     period: u64,
     key: &str,
   ) -> StdResult<VoteResult> {
-    let validator_info_result =
-      if let Some(validator_info) = self.data.may_load(storage, (key, period))? {
-        VoteResult::Unchanged(validator_info)
-      } else {
-        let validator_info_result = if let Some((mut prev_period, mut validator_info)) =
-          self.fetch_last_period(storage, period, key)?
-        {
-          // let mut validator_info = ASSET_VOTES.load(storage, (prev_period, validator_addr))?;
+    if let Some(point) = self.data.may_load(storage, (key, period))? {
+      Ok(VoteResult::Unchanged(point))
+    } else {
+      let new_point =
+        if let Some((mut prev_period, mut point)) = self.fetch_last_point(storage, period, key)? {
           // Recalculating passed periods
           let scheduled_slope_changes =
             self.fetch_slope_changes(storage, key, prev_period, period)?;
+
+          // self.print(storage, "PRINT FULL");
+
           for (recalc_period, scheduled_change) in scheduled_slope_changes {
-            validator_info = Data {
+            point = Data {
               voting_power: calc_voting_power(
-                validator_info.slope,
-                validator_info.voting_power,
+                point.slope,
+                point.voting_power,
                 prev_period,
                 recalc_period,
               ),
-              slope: validator_info.slope.saturating_sub(scheduled_change),
-              fixed_amount: validator_info.fixed_amount,
+              slope: point.slope.saturating_sub(scheduled_change),
+              fixed_amount: point.fixed_amount,
             };
             // Save intermediate result
             let recalc_period_key = recalc_period;
-            self.data.save(storage, (key, recalc_period_key), &validator_info)?;
+            self.data.save(storage, (key, recalc_period_key), &point)?;
             prev_period = recalc_period
           }
 
           Data {
-            voting_power: calc_voting_power(
-              validator_info.slope,
-              validator_info.voting_power,
-              prev_period,
-              period,
-            ),
-            ..validator_info
+            voting_power: calc_voting_power(point.slope, point.voting_power, prev_period, period),
+            ..point
           }
         } else {
           Data {
@@ -409,51 +403,42 @@ impl<'a> PeriodIndex<'a> {
           }
         };
 
-        VoteResult::New(validator_info_result)
-      };
-
-    Ok(validator_info_result)
+      Ok(VoteResult::New(new_point))
+    }
   }
 
   pub fn get_latest_data(&self, storage: &dyn Storage, period: u64, key: &str) -> StdResult<Data> {
-    // let fixed_amount = fetch_last_validator_fixed_vamp_value(storage, period, validator_addr)?;
-
-    let validator_info = if let Some(validator_info) = self.data.may_load(storage, (key, period))? {
-      validator_info
-    } else if let Some((mut prev_period, mut validator_info)) =
-      self.fetch_last_period(storage, period, key)?
+    let current_point = if let Some(point) = self.data.may_load(storage, (key, period))? {
+      point
+    } else if let Some((mut prev_period, mut point)) =
+      self.fetch_last_point(storage, period, key)?
     {
       // Recalculating passed periods
       let scheduled_slope_changes = self.fetch_slope_changes(storage, key, prev_period, period)?;
       for (recalc_period, scheduled_change) in scheduled_slope_changes {
-        validator_info = Data {
+        point = Data {
           voting_power: calc_voting_power(
-            validator_info.slope,
-            validator_info.voting_power,
+            point.slope,
+            point.voting_power,
             prev_period,
             recalc_period,
           ),
-          slope: validator_info.slope.saturating_sub(scheduled_change),
-          fixed_amount: validator_info.fixed_amount,
+          slope: point.slope.saturating_sub(scheduled_change),
+          fixed_amount: point.fixed_amount,
         };
         prev_period = recalc_period
       }
 
       Data {
-        voting_power: calc_voting_power(
-          validator_info.slope,
-          validator_info.voting_power,
-          prev_period,
-          period,
-        ),
-        fixed_amount: validator_info.fixed_amount,
-        slope: validator_info.slope,
+        voting_power: calc_voting_power(point.slope, point.voting_power, prev_period, period),
+        fixed_amount: point.fixed_amount,
+        slope: point.slope,
       }
     } else {
       Data::default()
     };
 
-    Ok(validator_info)
+    Ok(current_point)
   }
 
   fn fetch_slope_changes(
@@ -488,7 +473,7 @@ impl<'a> PeriodIndex<'a> {
       .collect()
   }
 
-  fn fetch_last_period(
+  fn fetch_last_point(
     &self,
     storage: &dyn Storage,
     period: u64,
@@ -531,7 +516,7 @@ impl<'a> PeriodIndex<'a> {
 #[cfg(test)]
 mod test {
   use cosmwasm_std::{testing::mock_dependencies, StdResult, Uint128};
-  use ve3_shared::helpers::bps::BasicPoints;
+  use ve3_shared::{helpers::bps::BasicPoints, msgs_voting_escrow::End};
 
   use super::{Line, PeriodIndex};
 
@@ -550,7 +535,7 @@ mod test {
       slope,
       fixed,
       start: 1,
-      end: 101,
+      end: End::Period(101),
     };
 
     let user_2_vote_1 = Line {
@@ -558,7 +543,7 @@ mod test {
       slope,
       fixed,
       start: 4,
-      end: 104,
+      end: End::Period(104),
     };
 
     let user_2_vote_2 = Line {
@@ -566,7 +551,7 @@ mod test {
       slope,
       fixed: Uint128::new(20_000000),
       start: 10,
-      end: 20,
+      end: End::Period(20),
     };
 
     index
@@ -612,14 +597,14 @@ mod test {
       slope,
       fixed,
       start: 1,
-      end: 101,
+      end: End::Period(101),
     };
     let user_1_vote_2 = Line {
       vp: Uint128::new(100_000000u128),
       slope: Uint128::new(10_000000u128),
       fixed: Uint128::new(100_000000u128),
       start: 4,
-      end: 14,
+      end: End::Period(14),
     };
 
     index

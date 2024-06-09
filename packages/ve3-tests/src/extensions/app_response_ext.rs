@@ -40,3 +40,14 @@ impl EventChecker for Result<AppResponse, anyhow::Error> {
     self.as_ref().unwrap().assert_attribute(attr)
   }
 }
+
+pub trait Valid {
+  fn assert_valid(self);
+}
+
+impl Valid for Result<AppResponse, anyhow::Error> {
+  #[track_caller]
+  fn assert_valid(self) {
+    self.unwrap();
+  }
+}

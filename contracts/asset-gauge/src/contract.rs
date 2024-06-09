@@ -158,7 +158,7 @@ fn handle_vote(
     user_index.fetch_future_slope_changes(deps.storage, sender.as_str(), block_period + 1)?;
 
   for (asset, old, new) in changes {
-    asset_index.change_vote(
+    asset_index.change_weights(
       deps.storage,
       block_period + 1,
       &asset,
@@ -192,7 +192,7 @@ fn remove_votes_of_user(
 ) -> Result<(), ContractError> {
   let user = old_lock.owner.as_str();
 
-  user_idx().remove_vote(storage, block_period + 1, user, BasicPoints::max(), old_lock.into())?;
+  user_idx().remove_line(storage, block_period + 1, user, BasicPoints::max(), old_lock.into())?;
 
   // Cancel changes applied by previous votes
   for gauge_config in config.gauges.iter() {
@@ -204,7 +204,7 @@ fn remove_votes_of_user(
       let asset_index = asset_index.idx();
 
       for (key, bps) in votes.votes {
-        asset_index.remove_vote(storage, block_period + 1, &key, bps, old_lock.into())?;
+        asset_index.remove_line(storage, block_period + 1, &key, bps, old_lock.into())?;
       }
     }
   }
@@ -220,7 +220,7 @@ fn apply_votes_of_user(
 ) -> Result<(), ContractError> {
   let user = new_lock.owner.as_str();
 
-  user_idx().add_vote(storage, block_period + 1, user, BasicPoints::max(), (&new_lock).into())?;
+  user_idx().add_line(storage, block_period + 1, user, BasicPoints::max(), (&new_lock).into())?;
 
   // Cancel changes applied by previous votes
   for gauge_config in config.gauges.iter() {
@@ -232,7 +232,7 @@ fn apply_votes_of_user(
       let asset_index = asset_index.idx();
 
       for (key, bps) in votes.votes {
-        asset_index.add_vote(storage, block_period + 1, &key, bps, (&new_lock).into())?;
+        asset_index.add_line(storage, block_period + 1, &key, bps, (&new_lock).into())?;
       }
     }
   }
@@ -254,6 +254,10 @@ fn update_vote(
 
   let old_lock = LOCK_INFO.may_load(deps.storage, &token_id)?;
   LOCK_INFO.save(deps.storage, &token_id, &new_lock)?;
+
+  // println!("update vote {token_id}");
+  // println!("------- old {old_lock:?}");
+  // println!("------- new {new_lock:?}");
 
   if let Some(old_lock) = old_lock {
     remove_votes_of_user(deps.storage, &config, block_period, &old_lock)?;
@@ -305,7 +309,9 @@ fn set_distribution(mut deps: DepsMut, env: Env) -> Result<Response, ContractErr
       };
 
     attrs.push(attr("gauge", gauge_config.name.clone()));
-    attrs.push(attr("periods", periods.iter().join(",")));
+    if !periods.is_empty() {
+      attrs.push(attr("periods", periods.iter().join(",")));
+    }
 
     if let Some(new_distribution) = distribution {
       // only write if it has assets

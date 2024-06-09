@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
   common::{
     helpers::{native, u, Addr, Cw20, Native, Uint128},
@@ -7,7 +9,7 @@ use crate::{
 };
 use cosmwasm_std::{attr, Decimal, StdError};
 use cw721::{AllNftInfoResponse, NftInfoResponse, OwnerOfResponse, TokensResponse};
-use cw_asset::AssetInfoBase;
+use cw_asset::{AssetInfo, AssetInfoBase};
 use ve3_asset_gauge::error::ContractError;
 use ve3_shared::{
   constants::{MAX_LOCK_PERIODS, WEEK},
@@ -20,6 +22,7 @@ use ve3_shared::{
     UserFirstParticipationResponse, UserInfoExtendedResponse, UserShare, UserSharesResponse,
     VotedInfoResponse,
   },
+  msgs_asset_staking::AssetDistribution,
   msgs_voting_escrow::*,
 };
 
@@ -31,10 +34,10 @@ fn test_total_vp() {
 
   suite
     .init()
-    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
       res.unwrap();
     })
     .q_ve_all_tokens(None, None, |res| {
@@ -105,11 +108,11 @@ fn test_locks_transfer() {
 
   suite
     .init()
-    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
       res.assert_attribute(attr("token_id", "1")).unwrap();
     })
-    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
     .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
@@ -123,7 +126,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .e_ve_transfer_nft_execute(user2.clone(), "1".to_string(), "user1", |res| {
+    .e_ve_transfer_nft(user2.clone(), "1".to_string(), "user1", |res| {
       res.assert_attribute(attr("new_owner", user2.clone())).unwrap();
     })
     .q_ve_total_vamp(None, |res| {
@@ -260,7 +263,7 @@ fn test_vote_asserts() {
   let allowed_cw20 = addr.lp_cw20.to_string();
 
   suite
-    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
     .init_def_staking_whitelist()
@@ -330,7 +333,7 @@ fn test_query_infos() {
   let allowed_cw20 = addr.lp_cw20.to_string();
 
   suite
-    .e_ve_create_lock_execute(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
     .init_def_staking_whitelist()
@@ -471,10 +474,10 @@ fn test_query_infos() {
         }
       );
     })
-    .e_ve_create_lock_execute(WEEK * 20, native("uluna", 4000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 20, native("uluna", 4000u128), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_create_lock_execute(WEEK * 20, native("uluna", 10000u128), "user2", |res| {
+    .e_ve_create_lock_time(WEEK * 20, native("uluna", 10000u128), "user2", |res| {
       res.unwrap();
     })
     .e_gauge_vote(
@@ -499,6 +502,24 @@ fn test_query_infos() {
     .add_periods(8)
     .e_gauge_set_distribution("user1", |res| {
       res.unwrap();
+    })
+    .q_staking_reward_distribution(|res| {
+      let res = res.unwrap();
+      assert_eq!(
+        res,
+        vec![
+          AssetDistribution {
+            asset: AssetInfo::native("lp"),
+            total_vp: u(22342),
+            distribution: Decimal::one() - Decimal::from_ratio(u(3557), u(22342 + 3557)),
+          },
+          AssetDistribution {
+            asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+            distribution: Decimal::from_ratio(u(3557), u(22342 + 3557)),
+            total_vp: u(3557)
+          }
+        ]
+      )
     })
     .q_gauge_user_shares("user1", Some(Times::Periods((75..87).collect())), |res| {
       assert_eq!(

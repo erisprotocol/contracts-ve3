@@ -2,7 +2,7 @@ use crate::{
   adapters::{asset_gauge::AssetGauge, global_config_adapter::ConfigExt},
   constants::AT_ASSET_GAUGE,
   error::SharedError,
-  helpers::assets::Assets,
+  helpers::{assets::Assets, time::Time},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, QuerierWrapper, Uint128};
@@ -140,7 +140,30 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
   #[returns(Config)]
   Config {},
+
+  #[returns(NextClaimPeriodResponse)]
+  NextClaimPeriod {
+    user: String,
+  },
+
+  #[returns(BribesResponse)]
+  Bribes {
+    period: Option<Time>,
+  },
+
+  #[returns(BribesResponse)]
+  UserClaimable {
+    user: String,
+    periods: Option<Vec<u64>>,
+  },
 }
+
+#[cw_serde]
+pub struct NextClaimPeriodResponse {
+  pub period: u64,
+}
+
+pub type BribesResponse = BribeBuckets;
 
 #[cw_serde]
 pub struct MigrateMsg {}

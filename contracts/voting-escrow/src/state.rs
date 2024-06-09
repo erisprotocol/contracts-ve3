@@ -1,12 +1,9 @@
-use std::cmp::Ordering;
-
+use crate::{error::ContractError, operation::Operation};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, DepsMut, Uint128};
 use cw_asset::Asset;
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
-use ve3_shared::msgs_voting_escrow::{AssetInfoConfig, Config, Extension, Trait};
-
-use crate::{contract::Operation, error::ContractError};
+use ve3_shared::msgs_voting_escrow::{AssetInfoConfig, Config, End, Extension, Trait};
 
 /// This structure stores points along the checkpoint history for every vAMP staker.
 #[cw_serde]
@@ -16,7 +13,7 @@ pub struct Point {
   /// The start period when the staker's voting power start to decrease
   pub start: u64,
   /// The period when the lock should expire
-  pub end: u64,
+  pub end: End,
   /// Weekly voting power decay
   pub slope: Uint128,
 
@@ -34,7 +31,7 @@ pub struct Lock {
   /// The start period when the lock was created
   pub start: u64,
   /// The period when the lock position expires
-  pub end: u64,
+  pub end: End,
   /// the last period when the lock's time was increased
   pub last_extend_lock_period: u64,
   /// owner of the lock, always synchronized with the NFT, but tracked for history purposes
@@ -81,12 +78,8 @@ impl Lock {
     &mut self,
     new_underlying_amount: Uint128,
   ) -> Result<Operation, ContractError> {
-    let add_reduce_underlying = match new_underlying_amount.cmp(&self.underlying_amount) {
-      Ordering::Greater => Operation::Add(new_underlying_amount - self.underlying_amount),
-      Ordering::Equal => Operation::None,
-      Ordering::Less => Operation::Reduce(self.underlying_amount - new_underlying_amount),
-    };
-
+    let add_reduce_underlying =
+      Operation::from_values(new_underlying_amount, self.underlying_amount);
     self.underlying_amount = new_underlying_amount;
     Ok(add_reduce_underlying)
   }

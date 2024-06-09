@@ -15,9 +15,42 @@ impl TestingSuite {
     self.addresses.ve3_voting_escrow.clone()
   }
 
-  pub fn e_ve_create_lock_execute(
+  pub fn e_ve_create_lock_time(
     &mut self,
     time: u64,
+    funds: Asset,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::CreateLock {
+      time: Some(time),
+    };
+
+    match &funds.info {
+      cw_asset::AssetInfoBase::Native(_) => {
+        let coin: Coin = funds.to_coin().unwrap();
+        let sender = self.address(sender);
+        result(self.app.execute_contract(sender, self.contract(), &msg, &[coin]));
+      },
+      cw_asset::AssetInfoBase::Cw20(addr) => {
+        let send_msg = cw20_base::msg::ExecuteMsg::Send {
+          contract: self.contract().to_string(),
+          amount: funds.amount,
+          msg: to_json_binary(&msg).unwrap(),
+        };
+
+        let sender = self.address(sender);
+        result(self.app.execute_contract(sender, addr.clone(), &send_msg, &[]));
+      },
+      _ => panic!("not supported"),
+    }
+
+    self
+  }
+
+  pub fn e_ve_create_lock_time_any(
+    &mut self,
+    time: Option<u64>,
     funds: Asset,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
@@ -48,7 +81,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_extend_lock_amount_execute(
+  pub fn e_ve_extend_lock_amount(
     &mut self,
     token_id: &str,
     sender: &str,
@@ -81,7 +114,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_merge_lock_execute(
+  pub fn e_ve_merge_lock(
     &mut self,
     token_id: &str,
     token_id_add: &str,
@@ -97,7 +130,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_split_lock_execute(
+  pub fn e_ve_split_lock(
     &mut self,
     token_id: &str,
     amount: Uint128,
@@ -115,7 +148,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_extend_lock_time_execute(
+  pub fn e_ve_extend_lock_time(
     &mut self,
     time: u64,
     token_id: &str,
@@ -131,7 +164,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_withdraw_execute(
+  pub fn e_ve_withdraw(
     &mut self,
     token_id: &str,
     sender: &str,
@@ -145,7 +178,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_receive_execute(
+  pub fn e_ve_receive(
     &mut self,
     cw20_receive_msg: Cw20ReceiveMsg,
     sender: &str,
@@ -157,7 +190,35 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_update_blacklist_execute(
+  pub fn e_ve_lock_permanent(
+    &mut self,
+    token_id: &str,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::LockPermanent {
+      token_id: token_id.to_string(),
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract(), &msg, &[]));
+    self
+  }
+
+  pub fn e_ve_unlock_permanent(
+    &mut self,
+    token_id: String,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::UnlockPermanent {
+      token_id,
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract(), &msg, &[]));
+    self
+  }
+
+  pub fn e_ve_update_blacklist(
     &mut self,
     append_addrs: Option<Vec<String>>,
     remove_addrs: Option<Vec<String>>,
@@ -173,7 +234,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_update_config_execute(
+  pub fn e_ve_update_config(
     &mut self,
     append_deposit_assets: Option<Vec<DepositAsset<String>>>,
     push_update_contracts: Option<Vec<String>>,
@@ -191,7 +252,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_transfer_nft_execute(
+  pub fn e_ve_transfer_nft(
     &mut self,
     recipient: String,
     token_id: String,
@@ -207,7 +268,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_send_nft_execute(
+  pub fn e_ve_send_nft(
     &mut self,
     contract: String,
     token_id: String,
@@ -225,7 +286,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_burn_execute(
+  pub fn e_ve_burn(
     &mut self,
     token_id: String,
     sender: &str,
@@ -239,7 +300,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_approve_execute(
+  pub fn e_ve_approve(
     &mut self,
     spender: &str,
     token_id: String,
@@ -257,7 +318,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_revoke_execute(
+  pub fn e_ve_revoke(
     &mut self,
     spender: String,
     token_id: String,
@@ -273,7 +334,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_ve_approve_all_execute(
+  pub fn e_ve_approve_all(
     &mut self,
     operator: String,
     expires: Option<Expiration>,
@@ -289,7 +350,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn ve_revoke_all_execute(
+  pub fn ve_revoke_all(
     &mut self,
     operator: String,
     sender: &str,
@@ -356,14 +417,14 @@ impl TestingSuite {
 
   pub(crate) fn q_ve_lock_info(
     &mut self,
-    token_id: String,
+    token_id: &str,
     time: Option<Time>,
     result: impl Fn(StdResult<LockInfoResponse>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract(),
       &QueryMsg::LockInfo {
-        token_id,
+        token_id: token_id.to_string(),
         time,
       },
     );

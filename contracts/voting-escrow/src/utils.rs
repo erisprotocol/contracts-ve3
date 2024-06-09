@@ -3,6 +3,7 @@ use crate::state::{Point, BLACKLIST, HISTORY, LAST_SLOPE_CHANGE, SLOPE_CHANGES};
 use cosmwasm_std::{Addr, Coin, MessageInfo, Order, StdResult, Storage, Uint128};
 use cw_asset::{Asset, AssetInfo};
 use cw_storage_plus::Bound;
+use ve3_shared::msgs_voting_escrow::End;
 use ve3_shared::{
   constants::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, WEEK},
   extensions::asset_info_ext::AssetInfoExt,
@@ -10,20 +11,24 @@ use ve3_shared::{
 };
 
 /// Checks that a timestamp is within limits.
-pub(crate) fn assert_time_limits(time: u64) -> Result<(), ContractError> {
-  if !(WEEK..=MAX_LOCK_TIME).contains(&time) {
-    Err(ContractError::LockTimeLimitsError {})
-  } else {
-    Ok(())
+pub(crate) fn assert_time_limits(time: Option<u64>) -> Result<(), ContractError> {
+  if let Some(time) = time {
+    if !(WEEK..=MAX_LOCK_TIME).contains(&time) {
+      return Err(ContractError::LockTimeLimitsError {});
+    }
   }
+  Ok(())
 }
 
-pub(crate) fn assert_periods_remaining(periods: u64) -> Result<(), ContractError> {
-  if periods < MIN_LOCK_PERIODS {
-    Err(ContractError::LockPeriodsError {})
-  } else {
-    Ok(())
+pub(crate) fn assert_periods_remaining(end: &End, start: u64) -> Result<(), ContractError> {
+  if let End::Period(end) = end {
+    let periods = end - start;
+    if periods < MIN_LOCK_PERIODS {
+      return Err(ContractError::LockPeriodsError {});
+    }
   }
+
+  Ok(())
 }
 
 pub(crate) fn assert_not_decommissioned(config: &Config) -> Result<(), ContractError> {
@@ -144,28 +149,32 @@ pub(crate) fn fetch_last_checkpoint(
 pub(crate) fn cancel_scheduled_slope(
   storage: &mut dyn Storage,
   slope: Uint128,
-  period: u64,
-) -> StdResult<u64> {
-  let end_period_key = period;
-  let last_slope_change = LAST_SLOPE_CHANGE.may_load(storage)?.unwrap_or(0);
+  end: &End,
+) -> StdResult<Option<(u64, u64)>> {
+  if let End::Period(end) = end {
+    let end = *end;
+    let last_slope_change = LAST_SLOPE_CHANGE.may_load(storage)?.unwrap_or(0);
 
-  // We do not need to schedule a slope change in the past
-  if period > last_slope_change {
-    match SLOPE_CHANGES.may_load(storage, end_period_key)? {
-      Some(old_scheduled_change) => {
-        let new_slope = old_scheduled_change.saturating_sub(slope);
-        if !new_slope.is_zero() {
-          SLOPE_CHANGES.save(storage, end_period_key, &(old_scheduled_change - slope))?;
-        } else {
-          SLOPE_CHANGES.remove(storage, end_period_key);
-        }
+    // We do not need to schedule a slope change in the past
+    if end > last_slope_change {
+      match SLOPE_CHANGES.may_load(storage, end)? {
+        Some(old_scheduled_change) => {
+          let new_slope = old_scheduled_change.saturating_sub(slope);
+          if !new_slope.is_zero() {
+            SLOPE_CHANGES.save(storage, end, &(old_scheduled_change - slope))?;
+          } else {
+            SLOPE_CHANGES.remove(storage, end);
+          }
 
-        Ok(last_slope_change)
-      },
-      _ => Ok(last_slope_change),
+          Ok(Some((last_slope_change, end)))
+        },
+        _ => Ok(Some((last_slope_change, end))),
+      }
+    } else {
+      Ok(Some((last_slope_change, end)))
     }
   } else {
-    Ok(last_slope_change)
+    Ok(None)
   }
 }
 
@@ -173,21 +182,21 @@ pub(crate) fn cancel_scheduled_slope(
 pub(crate) fn schedule_slope_change(
   storage: &mut dyn Storage,
   slope: Uint128,
-  period: u64,
+  period: &End,
 ) -> StdResult<()> {
   if !slope.is_zero() {
-    SLOPE_CHANGES
-      .update(storage, period, |slope_opt| -> StdResult<Uint128> {
+    if let End::Period(period) = period {
+      SLOPE_CHANGES.update(storage, *period, |slope_opt| -> StdResult<Uint128> {
         if let Some(pslope) = slope_opt {
           Ok(pslope + slope)
         } else {
           Ok(slope)
         }
-      })
-      .map(|_| ())
-  } else {
-    Ok(())
+      })?;
+      return Ok(());
+    }
   }
+  Ok(())
 }
 
 /// Fetches all slope changes between `last_slope_change` and `period`.

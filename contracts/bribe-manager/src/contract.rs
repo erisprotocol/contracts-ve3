@@ -2,18 +2,14 @@ use crate::{
   constants::{CONTRACT_NAME, CONTRACT_VERSION},
   easing::BribeDistributionExt,
   error::{ContractError, ContractResult},
-  state::{
-    fetch_last_claimed, ClaimContext, BRIBE_AVAILABLE, BRIBE_CLAIMED, BRIBE_CREATOR, BRIBE_TOTAL,
-    CONFIG,
-  },
+  query::_claim_periods,
+  state::{ClaimContext, BRIBE_AVAILABLE, BRIBE_CLAIMED, BRIBE_CREATOR, BRIBE_TOTAL, CONFIG},
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetInfo};
-use itertools::Itertools;
-use std::cmp::min;
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
   constants::{AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES},
@@ -206,13 +202,13 @@ fn withdraw_bribes(
     return Err(ContractError::NoBribes {});
   }
 
-  let mut global_bucket = BRIBE_AVAILABLE.load(deps.storage, period)?;
+  let mut available = BRIBE_AVAILABLE.load(deps.storage, period)?;
 
   let mut together = Assets::default();
   for bucket in user_bucket.buckets {
     for bribe in bucket.assets {
       if let Some(asset) = &bucket.asset {
-        global_bucket.remove(&bucket.gauge, asset, &bribe)?
+        available.remove(&bucket.gauge, asset, &bribe)?
       } else {
         // buckets always have some asset, except for the group result
       }
@@ -222,10 +218,10 @@ fn withdraw_bribes(
   }
   let transfer_msgs = together.transfer_msgs(user)?;
 
-  if global_bucket.is_empty() {
+  if available.is_empty() {
     BRIBE_AVAILABLE.remove(deps.storage, period);
   } else {
-    BRIBE_AVAILABLE.save(deps.storage, period, &global_bucket)?;
+    BRIBE_AVAILABLE.save(deps.storage, period, &available)?;
   }
   BRIBE_CREATOR.remove(deps.storage, (user.as_str(), period));
 
@@ -243,31 +239,7 @@ fn claim_bribes(
   let block_period = get_period(env.block.time.seconds())?;
   let asset_gauge = config.asset_gauge(&deps.querier)?;
 
-  let periods = match periods {
-    Some(periods) => periods,
-    None => {
-      // this queries the period when the user last claimed the bribes
-      let last_claim = fetch_last_claimed(deps.storage, user.as_str(), block_period)?;
-
-      let start = match last_claim {
-        // start claiming from the next period
-        Some((period, _)) => period + 1,
-        // if not yet claimed, it queries the period of the first participation in the gauges
-        None => match asset_gauge.query_first_participation(&deps.querier, user.clone())?.period {
-          Some(period) => period,
-          // if there is no participation, just start with the current block
-          None => block_period,
-        },
-      };
-
-      let end = min(start + 101, block_period);
-      // take 10 periods
-      let numbs = (start + 1)..end;
-      numbs.collect()
-    },
-  };
-
-  let periods: Vec<_> = periods.into_iter().sorted().take_while(|a| *a <= block_period).collect();
+  let periods = _claim_periods(&deps.as_ref(), user, periods, block_period, &asset_gauge)?;
 
   if periods.is_empty() {
     return Err(ContractError::NoPeriodsValid {});
@@ -306,6 +278,7 @@ fn claim_bribes(
         },
       };
 
+      // checking that not double claim
       if BRIBE_CLAIMED.has(deps.storage, (user.as_str(), share.period)) {
         return Err(ContractError::BribeAlreadyClaimed(share.period));
       }

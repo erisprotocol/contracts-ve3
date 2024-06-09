@@ -1,5 +1,7 @@
+use std::convert::TryInto;
+
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, CosmosMsg, Uint128};
+use cosmwasm_std::{Addr, Coins, CosmosMsg, StdResult, Uint128};
 use cw_asset::Asset;
 
 use crate::{error::SharedError, extensions::asset_info_ext::AssetInfoExt};
@@ -66,6 +68,14 @@ impl Assets {
         self.0.push(asset.clone());
       },
     }
+  }
+
+  pub fn get_coins(&self) -> Result<Coins, SharedError> {
+    let mut coins = Coins::default();
+    for native in self.0.iter().filter(|a| a.info.is_native()) {
+      coins.add(native.try_into()?)?;
+    }
+    Ok(coins)
   }
 
   pub fn add_multi(&mut self, assets: &Vec<Asset>) {

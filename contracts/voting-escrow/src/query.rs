@@ -5,11 +5,11 @@ use crate::utils::{calc_voting_power, fetch_last_checkpoint, fetch_slope_changes
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult, Uint128};
-use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
+use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT, MAX_LOCK_PERIODS};
 use ve3_shared::helpers::slope::calc_coefficient;
 use ve3_shared::helpers::time::{GetPeriod, Time};
 use ve3_shared::msgs_voting_escrow::{
-  LockInfoResponse, QueryMsg, VeNftCollection, VotingPowerResponse,
+  End, LockInfoResponse, QueryMsg, VeNftCollection, VotingPowerResponse,
 };
 
 /// Expose available contract queries.
@@ -43,7 +43,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::LockInfo {
       token_id,
       time,
-    } => Ok(to_json_binary(&get_token_lock_info(deps, &env, token_id, time)?)?),
+    } => Ok(to_json_binary(&get_token_lock_info(deps, &env, &token_id, time)?)?),
 
     QueryMsg::Config {} => {
       let config = CONFIG.load(deps.storage)?;
@@ -96,13 +96,13 @@ pub fn get_blacklisted_voters(
 pub fn get_token_lock_info(
   deps: Deps,
   env: &Env,
-  token_id: String,
+  token_id: &String,
   time: Option<Time>,
 ) -> Result<LockInfoResponse, ContractError> {
-  if let Some(lock) = LOCKED.may_load(deps.storage, &token_id)? {
+  if let Some(lock) = LOCKED.may_load(deps.storage, token_id)? {
     let period = time.get_period(env)?;
 
-    let last_checkpoint = fetch_last_checkpoint(deps.storage, &token_id, period)?;
+    let last_checkpoint = fetch_last_checkpoint(deps.storage, token_id, period)?;
     // The voting power point at the specified `time` was found
     let (voting_power, slope, fixed_amount) =
       if let Some(point) = last_checkpoint.map(|(_, point)| point) {
@@ -116,7 +116,11 @@ pub fn get_token_lock_info(
         (Uint128::zero(), Uint128::zero(), Uint128::zero())
       };
 
-    let coefficient = calc_coefficient(lock.end - lock.last_extend_lock_period);
+    let coefficient = if let End::Period(end) = lock.end {
+      calc_coefficient(end - lock.last_extend_lock_period)
+    } else {
+      calc_coefficient(MAX_LOCK_PERIODS)
+    };
 
     let resp = LockInfoResponse {
       from_period: period,
@@ -134,7 +138,7 @@ pub fn get_token_lock_info(
     };
     Ok(resp)
   } else {
-    Err(ContractError::LockDoesNotExist(token_id))
+    Err(ContractError::LockDoesNotExist(token_id.to_string()))
   }
 }
 
@@ -153,7 +157,7 @@ fn get_total_vamp_at_time(
     Point {
       power: Uint128::zero(),
       start: period,
-      end: period,
+      end: End::Period(period),
       slope: Default::default(),
       fixed: Uint128::zero(),
     },
@@ -200,13 +204,19 @@ fn get_token_vamp_at_time(
     // The voting power point at the specified `time` was found
     let voting_power = if point.start == period {
       point.power + point.fixed
-    } else if point.end <= period {
-      // the current period is after the voting end -> get default end power.
-      point.fixed
+    } else if let End::Period(end) = point.end {
+      if end <= period {
+        // the current period is after the voting end -> get default end power.
+        point.fixed
+      } else {
+        // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
+        calc_voting_power(&point, period) + point.fixed
+      }
     } else {
-      // The point before the intended period was found, thus we can calculate the user's voting power for the period we want
-      calc_voting_power(&point, period) + point.fixed
+      // without an end, it is full VP
+      point.fixed + point.power
     };
+
     Ok(VotingPowerResponse {
       vamp: voting_power,
     })
