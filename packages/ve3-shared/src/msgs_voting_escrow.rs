@@ -140,6 +140,7 @@ pub enum ReceiveMsg {
   },
   CreateLock {
     time: Option<u64>,
+    recipient: Option<String>,
   },
 }
 

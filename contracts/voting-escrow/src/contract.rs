@@ -224,10 +224,12 @@ fn receive(
   match from_json(&cw20_msg.msg)? {
     ReceiveMsg::CreateLock {
       time,
+      recipient,
     } => {
       let config = CONFIG.load(deps.storage)?;
       let asset_validated = validate_received_cw20(received, &config.deposit_assets)?;
-      create_lock(deps, env, nft, config, sender, asset_validated, time)
+      let recipient = addr_opt_fallback(deps.api, &recipient, sender)?;
+      create_lock(deps, env, nft, config, recipient, asset_validated, time)
     },
     ReceiveMsg::ExtendLockAmount {
       token_id,

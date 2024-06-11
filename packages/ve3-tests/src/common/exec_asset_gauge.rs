@@ -56,6 +56,30 @@ impl TestingSuite {
     self
   }
 
+  pub fn e_gauge_claim_rebase(
+    &mut self,
+    token_id: Option<&str>,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::ClaimRebase {
+      token_id: token_id.map(|id| id.to_string()),
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
+    self
+  }
+
+  pub fn e_gauge_add_rebase(
+    &mut self,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::AddRebase {};
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
+    self
+  }
   // pub fn e_gauge_clear_gauge_state(
   //   &mut self,
   //   gauge: String,
