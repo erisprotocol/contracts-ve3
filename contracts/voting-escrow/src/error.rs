@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, StdError};
+use cosmwasm_std::{DecimalRangeExceeded, OverflowError, StdError};
 use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -21,6 +21,9 @@ pub enum ContractError {
   #[error("{0}")]
   NftError(#[from] cw721_base::ContractError),
 
+  #[error("{0}")]
+  DecimalRangeExceeded(#[from] DecimalRangeExceeded),
+
   #[error("Asset not supported: {0}")]
   WrongAsset(String),
 
@@ -30,8 +33,8 @@ pub enum ContractError {
   #[error("Asset not supported: {0} expected: {1}")]
   WrongAssetExpected(String, String),
 
-  #[error("You need to provide assets to create or deposit for a lock.")]
-  LockRequiresAmount,
+  #[error("You need to provide assets for this method.")]
+  RequiresAmount,
 
   #[error("Lock does not exist: {0}")]
   LockDoesNotExist(String),

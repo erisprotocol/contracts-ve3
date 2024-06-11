@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, StdError};
+use cosmwasm_std::{DecimalRangeExceeded, OverflowError, StdError};
 use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -18,6 +18,9 @@ pub enum ContractError {
   #[error("{0}")]
   AssetError(#[from] AssetError),
 
+  #[error("{0}")]
+  DecimalRangeExceeded(#[from] DecimalRangeExceeded),
+
   #[error("User '{0}' has no voting power in period {1}")]
   ZeroVotingPower(String, u64),
 
@@ -35,4 +38,7 @@ pub enum ContractError {
 
   #[error("Gauge distribution not yet executed. gauge: {0}, period {1}")]
   GaugeDistributionNotExecuted(String, u64),
+
+  #[error("Rebases can only be claimed to a permanent lock.")]
+  RebaseClaimingOnlyForPermanent,
 }

@@ -11,10 +11,10 @@ pub fn validate_addresses(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Add
   admins.iter().map(|addr| api.addr_validate(addr)).collect()
 }
 
-pub fn addr_opt_fallback(api: &dyn Api, addr: &Option<String>, fallback: &Addr) -> StdResult<Addr> {
+pub fn addr_opt_fallback(api: &dyn Api, addr: &Option<String>, fallback: Addr) -> StdResult<Addr> {
   Ok(if let Some(addr) = addr {
     api.addr_validate(addr)?
   } else {
-    fallback.clone()
+    fallback
   })
 }

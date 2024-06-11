@@ -1348,6 +1348,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve3-connector-emission"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-asset",
+ "cw-ownable",
+ "cw-ownable-derive",
+ "cw-storage-plus 1.2.0",
+ "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thiserror",
+ "ve3-shared",
+]
+
+[[package]]
+name = "ve3-escrow-rewards"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-asset",
+ "cw-storage-plus 1.2.0",
+ "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "itertools 0.10.5",
+ "thiserror",
+ "ve3-shared",
+]
+
+[[package]]
 name = "ve3-global-config"
 version = "1.0.0"
 dependencies = [

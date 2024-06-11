@@ -24,6 +24,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::CreateLock {
       time: Some(time),
+      recipient: None,
     };
 
     match &funds.info {
@@ -57,6 +58,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::CreateLock {
       time,
+      recipient: None,
     };
 
     match &funds.info {

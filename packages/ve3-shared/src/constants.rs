@@ -11,6 +11,7 @@ pub const AT_BRIBE_MANAGER: &str = "BRIBE_MANAGER";
 pub const AT_FREE_BRIBES: &str = "FREE_BRIBES";
 pub const AT_TAKE_RECIPIENT: &str = "TAKE_RECIPIENT";
 pub const AT_FEE_COLLECTOR: &str = "FEE_COLLECTOR";
+pub const AT_TEAM_WALLET: &str = "TEAM_WALLET";
 
 const AT_ASSET_STAKING: &str = "ASSET_STAKING";
 pub fn at_asset_staking(gauge: &str) -> String {

@@ -8,6 +8,7 @@ pub enum Time {
   #[default]
   Current,
   Next,
+  Last,
   Time(u64),
   Period(u64),
 }
@@ -29,6 +30,7 @@ impl GetPeriod for Time {
     match self {
       Time::Current => get_period(env.block.time.seconds()),
       Time::Next => Ok(get_period(env.block.time.seconds())? + 1),
+      Time::Last => Ok(get_period(env.block.time.seconds())? - 1),
       Time::Time(time) => get_period(time),
       Time::Period(period) => Ok(period),
     }

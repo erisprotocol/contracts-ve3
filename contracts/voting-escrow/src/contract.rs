@@ -145,10 +145,12 @@ pub fn execute(
     } => withdraw(deps, env, nft, info.sender, token_id),
     ExecuteMsg::CreateLock {
       time,
+      recipient,
     } => {
       let config = CONFIG.load(deps.storage)?;
       let asset = validate_received_funds(&info.funds, &config.deposit_assets)?;
-      create_lock(deps, env, nft, config, info.sender, asset, time)
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender)?;
+      create_lock(deps, env, nft, config, recipient, asset, time)
     },
     ExecuteMsg::ExtendLockTime {
       time,
@@ -177,7 +179,7 @@ pub fn execute(
       amount,
       recipient,
     } => {
-      let recipient = addr_opt_fallback(deps.api, &recipient, &info.sender)?;
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
       split_lock(deps, env, nft, info.sender, token_id, amount, recipient)
     },
 

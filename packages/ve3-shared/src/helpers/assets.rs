@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coins, CosmosMsg, StdResult, Uint128};
+use cosmwasm_std::{Addr, Coins, CosmosMsg, Uint128};
 use cw_asset::Asset;
 
 use crate::{error::SharedError, extensions::asset_info_ext::AssetInfoExt};

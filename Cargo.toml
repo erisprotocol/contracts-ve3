@@ -1,8 +1,9 @@
 [workspace]
 members = [
     "contracts/voting-escrow",
+    "contracts/escrow-rewards",
     "contracts/connector-alliance",
-    # "contracts/connector-emission",
+    "contracts/connector-emission",
     "contracts/global-config",
     "contracts/asset-staking",
     "contracts/asset-gauge",
@@ -41,7 +42,7 @@ cw20-base = { git = "https://github.com/CosmWasm/cw-plus.git", default-features 
 
 cw721 = { version = "0.18.0" }
 cw721-base = { version = "0.18.0", features = ["library"] }
-cosmwasm-std = "1.5"
+cosmwasm-std = { version = "1.5", features = ["cosmwasm_1_1"]}
 cosmwasm-schema = "1.5"
 cw-storage-plus = { version = "1.2", features = ["iterator"]}
 cw-asset = "3.1"

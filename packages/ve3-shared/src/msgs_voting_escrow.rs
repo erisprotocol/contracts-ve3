@@ -38,6 +38,7 @@ pub enum ExecuteMsg {
   /// Create a vAMP position and lock ampLP for `time` amount of time
   CreateLock {
     time: Option<u64>,
+    recipient: Option<String>,
   },
   MergeLock {
     token_id: String,
@@ -73,6 +74,7 @@ pub enum ExecuteMsg {
   /// Implements the Cw20 receiver interface
   Receive(Cw20ReceiveMsg),
 
+  // OPERATOR
   /// Add or remove accounts from the blacklist
   UpdateBlacklist {
     append_addrs: Option<Vec<String>>,
@@ -128,6 +130,16 @@ pub enum ExecuteMsg {
   /// Remove previously granted ApproveAll permission
   RevokeAll {
     operator: String,
+  },
+}
+
+#[cw_serde]
+pub enum ReceiveMsg {
+  ExtendLockAmount {
+    token_id: String,
+  },
+  CreateLock {
+    time: Option<u64>,
   },
 }
 
@@ -191,16 +203,6 @@ impl From<ExecuteMsg> for CW721ExecuteMsg<Metadata, Empty> {
       _ => panic!("cannot covert {:?} to CW721ExecuteMsg", msg),
     }
   }
-}
-
-#[cw_serde]
-pub enum ReceiveMsg {
-  ExtendLockAmount {
-    token_id: String,
-  },
-  CreateLock {
-    time: Option<u64>,
-  },
 }
 
 /// This enum describes voters status.
@@ -452,8 +454,8 @@ impl From<QueryMsg> for CW721QueryMsg<Empty> {
 /// This structure is used to return a user's amount of vAMP.
 #[cw_serde]
 pub struct VotingPowerResponse {
-  /// The vAMP balance
-  pub vamp: Uint128,
+  /// The vp balance
+  pub vp: Uint128,
 }
 
 /// This structure is used to return the lock information for a vAMP position.

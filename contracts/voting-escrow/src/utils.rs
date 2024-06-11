@@ -43,7 +43,7 @@ pub(crate) fn assert_asset_allowed(
   asset: &Asset,
 ) -> Result<AssetInfoConfig, ContractError> {
   if asset.amount.is_zero() {
-    return Err(ContractError::LockRequiresAmount);
+    return Err(ContractError::RequiresAmount);
   }
 
   if let Some(asset) = config.deposit_assets.iter().find(|a| a.info == asset.info) {
@@ -99,7 +99,7 @@ pub fn validate_received_funds(
   }
 
   if fund.amount.is_zero() {
-    return Err(ContractError::LockRequiresAmount);
+    return Err(ContractError::RequiresAmount);
   }
 
   Ok(info.with_balance(fund.amount))
@@ -116,7 +116,7 @@ pub fn validate_received_cw20(
   }
 
   if asset.amount.is_zero() {
-    return Err(ContractError::LockRequiresAmount);
+    return Err(ContractError::RequiresAmount);
   }
 
   Ok(asset)

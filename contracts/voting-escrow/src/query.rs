@@ -182,7 +182,7 @@ fn get_total_vamp_at_time(
   };
 
   Ok(VotingPowerResponse {
-    vamp: voting_power,
+    vp: voting_power,
   })
 }
 
@@ -218,12 +218,12 @@ fn get_token_vamp_at_time(
     };
 
     Ok(VotingPowerResponse {
-      vamp: voting_power,
+      vp: voting_power,
     })
   } else {
     // User not found
     Ok(VotingPowerResponse {
-      vamp: Uint128::zero(),
+      vp: Uint128::zero(),
     })
   }
 }

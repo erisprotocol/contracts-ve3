@@ -326,6 +326,7 @@ impl TestingSuite {
 
     let msg = ve3_shared::msgs_asset_gauge::InstantiateMsg {
       global_config_addr: self.addresses.ve3_global_config.to_string(),
+      rebase_asset: AssetInfoBase::Native("uluna".to_string()),
       gauges: vec![
         GaugeConfig {
           name: self.gauge1(),

@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::{
   common::{
     helpers::{native, u, Addr, Cw20, Native, Uint128},
@@ -93,7 +91,7 @@ fn test_total_vp() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vamp: total_vp * u(2)
+          vp: total_vp * u(2)
         }
       )
     });
@@ -140,7 +138,7 @@ fn test_locks_transfer() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vamp: total_vp * u(2)
+          vp: total_vp * u(2)
         }
       )
     })

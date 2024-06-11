@@ -150,3 +150,13 @@ impl ConfigExt for crate::msgs_bribe_manager::Config {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
+
+impl ConfigExt for crate::msgs_connector_emission::Config {
+  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
+    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+  }
+
+  fn global_config(&self) -> GlobalConfig {
+    GlobalConfig(self.global_config_addr.clone())
+  }
+}

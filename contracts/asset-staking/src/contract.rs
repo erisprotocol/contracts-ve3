@@ -64,9 +64,9 @@ pub fn execute(
       if info.funds[0].amount.is_zero() {
         return Err(ContractError::AmountCannotBeZero {});
       }
-      let recipient = addr_opt_fallback(deps.api, &recipient, &info.sender)?;
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender)?;
       let asset = AssetInfo::native(&info.funds[0].denom);
-      stake(deps, env, info.clone(), asset, info.funds[0].amount, recipient)
+      stake(deps, env, asset, info.funds[0].amount, recipient)
     },
     ExecuteMsg::Unstake(asset) => unstake(deps, env, info, asset),
     ExecuteMsg::ClaimRewards(asset) => claim_rewards(deps, info, asset),
@@ -139,8 +139,8 @@ fn receive_cw20(
         return Err(ContractError::AmountCannotBeZero {});
       }
       let asset = AssetInfo::Cw20(info.sender.clone());
-      let recipient = addr_opt_fallback(deps.api, &recipient, &sender)?;
-      stake(deps, env, info, asset, cw20_msg.amount, recipient)
+      let recipient = addr_opt_fallback(deps.api, &recipient, sender)?;
+      stake(deps, env, asset, cw20_msg.amount, recipient)
     },
   }
 }
@@ -280,14 +280,13 @@ fn remove_assets(
 fn stake(
   mut deps: DepsMut,
   env: Env,
-  _info: MessageInfo,
   asset: AssetInfo,
   amount: Uint128,
   recipient: Addr,
 ) -> Result<Response, ContractError> {
   assert_asset_whitelisted(&deps, &asset)?;
 
-  let rewards = _claim_reward(deps.storage, recipient.clone(), asset.clone())?;
+  let rewards = _calc_reward_share(deps.storage, recipient.clone(), asset.clone())?;
   if !rewards.is_zero() {
     UNCLAIMED_REWARDS.update(
       deps.storage,
@@ -411,7 +410,7 @@ fn unstake(
     return Err(ContractError::AmountCannotBeZero {});
   }
 
-  let rewards = _claim_reward(deps.storage, sender.clone(), asset.info.clone())?;
+  let rewards = _calc_reward_share(deps.storage, sender.clone(), asset.info.clone())?;
   if !rewards.is_zero() {
     UNCLAIMED_REWARDS.update(
       deps.storage,
@@ -480,7 +479,7 @@ fn claim_rewards(
 ) -> Result<Response, ContractError> {
   let user = info.sender;
   let config = CONFIG.load(deps.storage)?;
-  let rewards = _claim_reward(deps.storage, user.clone(), asset.clone())?;
+  let rewards = _calc_reward_share(deps.storage, user.clone(), asset.clone())?;
   let unclaimed_rewards =
     UNCLAIMED_REWARDS.load(deps.storage, (user.clone(), &asset)).unwrap_or(Uint128::zero());
   let final_rewards = rewards + unclaimed_rewards;
@@ -499,7 +498,7 @@ fn claim_rewards(
   }
 }
 
-fn _claim_reward(
+fn _calc_reward_share(
   storage: &mut dyn Storage,
   user: Addr,
   asset: AssetInfo,

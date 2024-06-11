@@ -1,6 +1,8 @@
 use crate::{
-  adapters::{asset_staking::AssetStaking, global_config_adapter::ConfigExt},
-  constants::at_asset_staking,
+  adapters::{
+    asset_staking::AssetStaking, global_config_adapter::ConfigExt, voting_escrow::VotingEscrow,
+  },
+  constants::{at_asset_staking, AT_VOTING_ESCROW},
   error::SharedError,
   helpers::time::{Time, Times},
   msgs_asset_staking::AssetDistribution,
@@ -8,13 +10,14 @@ use crate::{
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, DepsMut, Uint128};
-use cw_asset::AssetInfo;
+use cw_asset::{AssetInfo, AssetInfoUnchecked};
 
 /// This structure describes the basic settings for creating a contract.
 #[cw_serde]
 pub struct InstantiateMsg {
   pub global_config_addr: String,
   pub gauges: Vec<GaugeConfig>,
+  pub rebase_asset: AssetInfoUnchecked,
 }
 
 #[cw_serde]
@@ -37,6 +40,12 @@ pub enum ExecuteMsg {
     token_id: String,
     lock_info: LockInfoResponse,
   },
+
+  ClaimRebase {
+    token_id: Option<String>,
+  },
+
+  AddRebase {},
 
   /// TunePools transforms the latest vote distribution into alloc_points which are then applied to ASTRO generators
   SetDistribution {},
@@ -142,6 +151,7 @@ pub struct MigrateMsg {}
 pub struct Config {
   pub global_config_addr: Addr,
   pub gauges: Vec<GaugeConfig>,
+  pub rebase_asset: AssetInfo,
 }
 
 impl Config {
@@ -160,6 +170,10 @@ impl Config {
     gauge: &str,
   ) -> Result<AssetStaking, SharedError> {
     self.global_config().get_address(&deps.querier, &at_asset_staking(gauge)).map(AssetStaking)
+  }
+
+  pub fn get_voting_escrow(&self, deps: &DepsMut) -> Result<VotingEscrow, SharedError> {
+    self.global_config().get_address(&deps.querier, AT_VOTING_ESCROW).map(VotingEscrow)
   }
 }
 

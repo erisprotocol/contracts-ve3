@@ -86,7 +86,7 @@ fn test_locks() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vamp: total_vp * u(2)
+          vp: total_vp * u(2)
         }
       )
     });
@@ -134,7 +134,7 @@ fn test_locks_transfer() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vamp: total_vp * u(2)
+          vp: total_vp * u(2)
         }
       )
     })

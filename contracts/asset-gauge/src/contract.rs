@@ -1,8 +1,10 @@
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
+use crate::period_index::Data;
 use crate::state::{
-  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex, UserVotes, CONFIG,
-  GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO,
+  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex, Rebase, UserVotes,
+  CONFIG, GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO, REBASE, UNCLAIMED_REBASE,
+  USER_ASSET_REWARD_RATE,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -10,19 +12,20 @@ use cosmwasm_std::{
   attr, Addr, Decimal, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
-use cw_asset::AssetInfo;
+use cw_asset::{Asset, AssetInfo};
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::convert::TryInto;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::AT_VOTING_ESCROW;
+use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::msgs_asset_gauge::{
   Config, ExecuteMsg, GaugeConfig, GaugeDistributionPeriod, InstantiateMsg,
 };
 use ve3_shared::msgs_asset_staking::AssetDistribution;
-use ve3_shared::msgs_voting_escrow::LockInfoResponse;
+use ve3_shared::msgs_voting_escrow::{End, LockInfoResponse};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -38,6 +41,15 @@ pub fn instantiate(
     &Config {
       global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
       gauges: msg.gauges,
+      rebase_asset: msg.rebase_asset.check(deps.api, None)?,
+    },
+  )?;
+
+  REBASE.save(
+    deps.storage,
+    &Rebase {
+      total_fixed: Uint128::zero(),
+      reward_rate: Decimal::zero(),
     },
   )?;
 
@@ -62,18 +74,15 @@ pub fn execute(
       lock_info,
     } => update_vote(deps, env, info.sender, token_id, lock_info),
 
-    // ExecuteMsg::ClearGaugeState {
-    //   gauge,
-    //   limit,
-    // } => {
-    //   let config = CONFIG.load(deps.storage)?;
-    //   if config.gauges.iter().any(|a| a.name == gauge) {
-    //     return Err(ContractError::CannotClearExistingGauge {});
-    //   }
-    //   // only being able to clear gauge state for non-existing gauges
-    //   AssetIndex::new(&gauge).idx().clear(deps.storage, limit);
-    //   Ok(Response::default().add_attribute("action", "gauge/clear_gauge_state"))
-    // },
+    ExecuteMsg::AddRebase {} => {
+      let config = CONFIG.load(deps.storage)?;
+      let asset = config.rebase_asset.assert_received(&info)?;
+      add_rebase(deps, asset)
+    },
+    ExecuteMsg::ClaimRebase {
+      token_id,
+    } => claim_rebase(deps, env, info.sender, token_id),
+
     ExecuteMsg::SetDistribution {} => set_distribution(deps, env),
 
     ExecuteMsg::UpdateConfig {
@@ -96,6 +105,50 @@ pub fn execute(
       Ok(Response::default().add_attribute("action", "gauge/update_config"))
     },
   }
+}
+
+fn claim_rebase(
+  deps: DepsMut,
+  env: Env,
+  user: Addr,
+  token_id: Option<String>,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  let rebase = REBASE.load(deps.storage)?;
+  let voting_escrow = config.get_voting_escrow(&deps)?;
+  let block_period = get_period(env.block.time.seconds())?;
+  let user_data = user_idx().get_latest_data(deps.storage, block_period + 1, user.as_str())?;
+
+  _calc_rebase_share(deps.storage, &rebase, &user, user_data.fixed_amount)?;
+  let rebase_amount = UNCLAIMED_REBASE.load(deps.storage, user.clone()).unwrap_or(Uint128::zero());
+  UNCLAIMED_REBASE.remove(deps.storage, user.clone());
+
+  let rebase_asset = config.rebase_asset.with_balance(rebase_amount);
+
+  let msg = match token_id {
+    Some(id) => {
+      // if id provided -> check if permanent lock
+      // if yes, add it to the permanent lock
+      let lock = LOCK_INFO.load(deps.storage, &id)?;
+      if lock.end == End::Permanent {
+        voting_escrow.create_extend_lock_amount_msg(rebase_asset, id)?
+      } else {
+        Err(ContractError::RebaseClaimingOnlyForPermanent)?
+      }
+    },
+    // otherwise create a new permanent lock
+    None => voting_escrow.create_permanent_lock_msg(rebase_asset, Some(user.to_string()))?,
+  };
+
+  Ok(
+    Response::default()
+      .add_attributes(vec![
+        ("action", "gauge/claim_rebase"),
+        ("user", user.as_ref()),
+        ("rebase_amount", &rebase_amount.to_string()),
+      ])
+      .add_message(msg),
+  )
 }
 
 fn handle_vote(
@@ -189,10 +242,10 @@ fn remove_votes_of_user(
   config: &Config,
   block_period: u64,
   old_lock: &LockInfoResponse,
-) -> Result<(), ContractError> {
+) -> Result<Data, ContractError> {
   let user = old_lock.owner.as_str();
-
-  user_idx().remove_line(storage, block_period + 1, user, BasicPoints::max(), old_lock.into())?;
+  let user_data =
+    user_idx().remove_line(storage, block_period + 1, user, BasicPoints::max(), old_lock.into())?;
 
   // Cancel changes applied by previous votes
   for gauge_config in config.gauges.iter() {
@@ -209,18 +262,18 @@ fn remove_votes_of_user(
     }
   }
 
-  Ok(())
+  Ok(user_data)
 }
 
 fn apply_votes_of_user(
   storage: &mut dyn Storage,
   config: &Config,
   block_period: u64,
-  new_lock: LockInfoResponse,
-) -> Result<(), ContractError> {
+  new_lock: &LockInfoResponse,
+) -> Result<Data, ContractError> {
   let user = new_lock.owner.as_str();
-
-  user_idx().add_line(storage, block_period + 1, user, BasicPoints::max(), (&new_lock).into())?;
+  let user_data =
+    user_idx().add_line(storage, block_period + 1, user, BasicPoints::max(), (new_lock).into())?;
 
   // Cancel changes applied by previous votes
   for gauge_config in config.gauges.iter() {
@@ -232,12 +285,12 @@ fn apply_votes_of_user(
       let asset_index = asset_index.idx();
 
       for (key, bps) in votes.votes {
-        asset_index.add_line(storage, block_period + 1, &key, bps, (&new_lock).into())?;
+        asset_index.add_line(storage, block_period + 1, &key, bps, (new_lock).into())?;
       }
     }
   }
 
-  Ok(())
+  Ok(user_data)
 }
 
 fn update_vote(
@@ -255,18 +308,92 @@ fn update_vote(
   let old_lock = LOCK_INFO.may_load(deps.storage, &token_id)?;
   LOCK_INFO.save(deps.storage, &token_id, &new_lock)?;
 
+  let mut rebase = REBASE.load(deps.storage)?;
+
   // println!("update vote {token_id}");
   // println!("------- old {old_lock:?}");
   // println!("------- new {new_lock:?}");
 
+  let is_same_owner = old_lock.as_ref().map_or(false, |a| a.owner == new_lock.owner);
+
   if let Some(old_lock) = old_lock {
-    remove_votes_of_user(deps.storage, &config, block_period, &old_lock)?;
+    let user = remove_votes_of_user(deps.storage, &config, block_period, &old_lock)?;
+
+    rebase.total_fixed = rebase.total_fixed.checked_sub(old_lock.fixed_amount)?;
+
+    if !is_same_owner || !new_lock.has_vp() {
+      _calc_rebase_share(
+        deps.storage,
+        &rebase,
+        &old_lock.owner,
+        user.fixed_amount + old_lock.fixed_amount,
+      )?;
+    }
   }
   if new_lock.has_vp() {
-    apply_votes_of_user(deps.storage, &config, block_period, new_lock)?;
+    let user = apply_votes_of_user(deps.storage, &config, block_period, &new_lock)?;
+
+    rebase.total_fixed = rebase.total_fixed.checked_add(new_lock.fixed_amount)?;
+    _calc_rebase_share(
+      deps.storage,
+      &rebase,
+      &new_lock.owner,
+      user.fixed_amount - new_lock.fixed_amount,
+    )?;
   }
 
+  REBASE.save(deps.storage, &rebase)?;
+
   Ok(Response::new().add_attribute("action", "gauge/update_vote"))
+}
+
+fn add_rebase(deps: DepsMut, asset: Asset) -> Result<Response, ContractError> {
+  let total_rebase_distributed = Decimal::from_atomics(asset.amount, 0)?;
+
+  let mut rebase = REBASE.load(deps.storage)?;
+
+  let total_shares = rebase.total_fixed;
+
+  if !total_shares.is_zero() {
+    let rate_to_update = total_rebase_distributed / Decimal::from_atomics(total_shares, 0)?;
+    if rate_to_update > Decimal::zero() {
+      rebase.reward_rate += rate_to_update;
+      REBASE.save(deps.storage, &rebase)?;
+    }
+  }
+
+  Ok(Response::default().add_attribute("action", "gauge/add_rebase"))
+}
+
+fn _calc_rebase_share(
+  storage: &mut dyn Storage,
+  rebase: &Rebase,
+  user: &Addr,
+  balance: Uint128,
+) -> Result<Uint128, ContractError> {
+  let user_reward_rate = USER_ASSET_REWARD_RATE.load(storage, user.clone());
+  let asset_reward_rate = rebase.reward_rate;
+
+  if let Ok(user_reward_rate) = user_reward_rate {
+    let user_staked = balance;
+    let rewards = ((asset_reward_rate - user_reward_rate) * Decimal::from_atomics(user_staked, 0)?)
+      .to_uint_floor();
+    if rewards.is_zero() {
+      Ok(Uint128::zero())
+    } else {
+      USER_ASSET_REWARD_RATE.save(storage, user.clone(), &asset_reward_rate)?;
+      UNCLAIMED_REBASE.update(storage, user.clone(), |balance| -> Result<_, ContractError> {
+        Ok(balance.unwrap_or(Uint128::zero()) + rewards)
+      })?;
+
+      Ok(rewards)
+    }
+  } else {
+    // If cannot find user_reward_rate, assume this is the first time they are staking and set it to the current asset_reward_rate
+    USER_ASSET_REWARD_RATE.save(storage, user.clone(), &asset_reward_rate)?;
+
+    Ok(Uint128::zero())
+  }
 }
 
 /// The function checks that the last pools tuning happened >= 14 days ago.

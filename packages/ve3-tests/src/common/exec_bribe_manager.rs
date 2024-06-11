@@ -1,9 +1,9 @@
 use super::suite::TestingSuite;
-use cosmwasm_std::{Addr, Coin, StdError, StdResult};
+use cosmwasm_std::{Addr, StdError, StdResult};
 use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked, AssetUnchecked};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
-  extensions::{asset_ext::AssetExt, asset_info_ext::AssetInfoExt},
+  extensions::asset_ext::AssetExt,
   helpers::{assets::Assets, time::Time},
   msgs_bribe_manager::*,
 };
@@ -26,13 +26,14 @@ impl TestingSuite {
     let contract = if let AssetInfo::Cw20(addr) = funds.info {
       addr
     } else {
-      Err(StdError::generic_err("not supported")).unwrap()
+      panic!("{:?}", StdError::generic_err("not supported"))
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, contract, &msg, &[]));
     self
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub fn e_bribe_add_bribe_native(
     &mut self,
     funds: Asset,
@@ -64,7 +65,7 @@ impl TestingSuite {
           sender,
           self.contract_bribe(),
           &msg,
-          &combined.get_coins().unwrap().into_iter().collect(),
+          &combined.get_coins().unwrap().into_vec(),
         ));
       },
       cw_asset::AssetInfoBase::Cw20(_) => todo!(),
