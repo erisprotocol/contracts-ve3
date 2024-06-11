@@ -8,8 +8,8 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 use ve3_shared::{
-  adapters::global_config_adapter::ConfigExt,
-  constants::{at_asset_staking, AT_TEAM_WALLET, WEEK},
+  adapters::{global_config_adapter::ConfigExt, mint_proxy::MintProxy},
+  constants::{at_asset_staking, AT_MINT_PROXY, AT_TEAM_WALLET, WEEK},
   extensions::asset_info_ext::AssetInfoExt,
   msgs_connector_emission::{Config, ExecuteMsg, InstantiateMsg, RebaseConfg},
 };
@@ -123,6 +123,19 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
       config.last_claim_s = env.block.time.seconds();
 
       let mut transfer_msgs = vec![];
+
+      let total = emission_amount + team_amount + rebase_amount;
+      match config.mint_config {
+        ve3_shared::msgs_connector_emission::MintConfig::UseBalance => {
+          // nothing to do, as we expect the balance already to be there in the contract
+        },
+        ve3_shared::msgs_connector_emission::MintConfig::MintDirect => todo!(),
+        ve3_shared::msgs_connector_emission::MintConfig::MintProxy => {
+          let mint_proxy_addr = config.global_config().get_address(&deps.querier, AT_MINT_PROXY)?;
+          let mint_proxy = MintProxy(mint_proxy_addr);
+          transfer_msgs.push(mint_proxy.mint_msg(total)?);
+        },
+      };
 
       transfer_msgs
         .push(config.emission_token.with_balance(emission_amount).transfer_msg(info.sender)?);
