@@ -1,5 +1,6 @@
 [package]
 name = "ve3-shared"
+description = "ve(3,3) msgs in cosmwasm"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
