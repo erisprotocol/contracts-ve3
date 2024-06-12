@@ -98,7 +98,6 @@ fn test_locks_transfer() {
   let mut suite = TestingSuite::def();
   let addr = suite.addresses.clone();
 
-  let user1 = addr.user1.to_string();
   let user2 = addr.user2.to_string();
 
   suite
@@ -110,7 +109,7 @@ fn test_locks_transfer() {
     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -157,7 +156,7 @@ fn test_locks_transfer() {
         }
       )
     })
-    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -168,7 +167,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -180,7 +179,7 @@ fn test_locks_transfer() {
       );
     })
     .add_one_period()
-    .q_gauge_user_info(user2.to_string(), Some(Time::Current), |res| {
+    .q_gauge_user_info("user2", Some(Time::Current), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -191,7 +190,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Current), |res| {
+    .q_gauge_user_info("user1", Some(Time::Current), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -202,7 +201,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -213,7 +212,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -225,7 +224,7 @@ fn test_locks_transfer() {
       );
     })
     .add_one_period()
-    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -236,7 +235,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -263,7 +262,7 @@ fn test_locks_exchange_rate() {
     .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| {
       res.unwrap();
     })
-    .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.2 higher
@@ -326,7 +325,7 @@ fn test_locks_lock_extension() {
     .e_ve_extend_lock_time(WEEK * 2, "1", "user1", |res| {
       res.unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.2 higher
@@ -388,7 +387,7 @@ fn test_locks_lock_extension_ampluna() {
       res.unwrap();
     })
     .add_one_period()
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.3 higher
@@ -410,7 +409,7 @@ fn test_locks_lock_extension_ampluna() {
     .e_ve_extend_lock_time(WEEK * 2, "1", "user1", |res| {
       res.unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.3 higher
@@ -508,7 +507,7 @@ fn test_locks_merge() {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LocksNeedSameEnd("3".into(), "1".into()));
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         // 1.3 higher
@@ -602,7 +601,7 @@ fn test_locks_merge() {
       );
     })
     // user info not changed
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       // merge doesnt change amount for user (in this case)
       assert_eq!(
         res.unwrap(),
@@ -757,7 +756,7 @@ fn test_locks_split() {
     .e_ve_approve("user2", "1".into(), None, "user1", |res| {
       res.unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -768,7 +767,7 @@ fn test_locks_split() {
         }
       );
     })
-    .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -782,7 +781,7 @@ fn test_locks_split() {
     .e_ve_split_lock("1", u(1000), Some("user2"), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -793,7 +792,7 @@ fn test_locks_split() {
         }
       );
     })
-    .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1127,7 +1126,7 @@ fn test_lock_permanent() {
         }
       );
     })
-    .q_gauge_user_info(addr.user1.to_string(), None, |res| {
+    .q_gauge_user_info("user1", None, |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1161,7 +1160,7 @@ fn test_lock_permanent() {
         }
       );
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1173,7 +1172,7 @@ fn test_lock_permanent() {
       )
     })
     .add_periods(30)
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1194,7 +1193,7 @@ fn test_lock_permanent() {
       res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string())).unwrap();
       res.assert_attribute_ty("transfer", attr("amount", "4000uluna")).unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Option::Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Option::Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1237,7 +1236,7 @@ fn test_lock_permanent() {
         }
       );
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1256,7 +1255,7 @@ fn test_lock_permanent() {
       res.assert_attribute(attr("to", addr.user1.to_string())).unwrap();
       res.assert_attribute(attr("amount", "3000")).unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1280,7 +1279,7 @@ fn test_lock_make_permanent() {
       res.unwrap();
     })
     .add_periods(5)
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1306,7 +1305,7 @@ fn test_lock_make_permanent() {
       res.assert_attribute(attr("fixed_power", "2000")).unwrap();
       res.assert_attribute(attr("voting_power", "18000")).unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1369,7 +1368,7 @@ fn test_lock_merge_permanent() {
     .e_ve_create_lock_time(WEEK * 10, addr.uluna(  2000), "user1", |res| {
       res.unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1381,7 +1380,7 @@ fn test_lock_merge_permanent() {
       )
     })
     .add_one_period()
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1398,7 +1397,7 @@ fn test_lock_merge_permanent() {
     .e_ve_lock_permanent("2", "user1", |res| {
       res.unwrap();
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -1416,7 +1415,7 @@ fn test_lock_merge_permanent() {
       let res = res.unwrap_err();
       assert_eq!(res.to_string(), "Generic error: Querier contract error: type: cw721_base::state::TokenInfo<ve3_shared::msgs_voting_escrow::Metadata>; key: [00, 06, 74, 6F, 6B, 65, 6E, 73, 32] not found".to_string());
     })
-    .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {

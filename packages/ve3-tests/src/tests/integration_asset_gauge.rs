@@ -97,7 +97,6 @@ fn test_total_vp() {
 fn test_locks_transfer() {
   let mut suite = TestingSuite::def();
 
-  let user1 = suite.address("user1").to_string();
   let user2 = suite.address("user2").to_string();
 
   suite
@@ -109,7 +108,7 @@ fn test_locks_transfer() {
     .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -156,7 +155,7 @@ fn test_locks_transfer() {
         }
       )
     })
-    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -167,7 +166,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -179,7 +178,7 @@ fn test_locks_transfer() {
       );
     })
     .add_one_period()
-    .q_gauge_user_info(user2.to_string(), Some(Time::Current), |res| {
+    .q_gauge_user_info("user2", Some(Time::Current), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -190,7 +189,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Current), |res| {
+    .q_gauge_user_info("user1", Some(Time::Current), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -201,7 +200,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -212,7 +211,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -224,7 +223,7 @@ fn test_locks_transfer() {
       );
     })
     .add_one_period()
-    .q_gauge_user_info(user2.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {
@@ -235,7 +234,7 @@ fn test_locks_transfer() {
         }
       );
     })
-    .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
+    .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
         res.unwrap(),
         UserInfoExtendedResponse {

@@ -117,14 +117,14 @@ impl TestingSuite {
 
   pub fn q_gauge_user_info(
     &mut self,
-    user: String,
+    user: &str,
     time: Option<Time>,
     result: impl Fn(StdResult<UserInfoExtendedResponse>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract_1(),
       &QueryMsg::UserInfo {
-        user,
+        user: self.address(user).to_string(),
         time,
       },
     );

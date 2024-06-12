@@ -19,6 +19,7 @@ use std::collections::HashSet;
 use std::convert::TryInto;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::AT_VOTING_ESCROW;
+use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
@@ -128,6 +129,10 @@ fn claim_rebase(
   let rebase_amount = UNCLAIMED_REBASE.load(deps.storage, user.clone()).unwrap_or(Uint128::zero());
   UNCLAIMED_REBASE.remove(deps.storage, user.clone());
 
+  if rebase_amount.is_zero() {
+    Err(SharedError::InsufficientBalance("no rebase amount".to_string()))?;
+  }
+
   let rebase_asset = config.rebase_asset.with_balance(rebase_amount);
 
   let msg = match token_id {
@@ -136,6 +141,10 @@ fn claim_rebase(
       // if yes, add it to the permanent lock
       let lock = LOCK_INFO.load(deps.storage, &id)?;
       if lock.end == End::Permanent {
+        if lock.asset.info != rebase_asset.info {
+          Err(ContractError::RebaseWrongTargetLockAsset)?;
+        }
+
         voting_escrow.create_extend_lock_amount_msg(rebase_asset, id)?
       } else {
         Err(ContractError::RebaseClaimingOnlyForPermanent)?

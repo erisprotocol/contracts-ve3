@@ -49,4 +49,7 @@ pub enum ContractError {
 
   #[error("Rebases can only be claimed to a permanent lock.")]
   RebaseClaimingOnlyForPermanent,
+
+  #[error("Cannot claim rebase to target lock as assets differentiate.")]
+  RebaseWrongTargetLockAsset,
 }

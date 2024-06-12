@@ -562,7 +562,7 @@ fn merge_lock(
   token_id_2: String,
 ) -> Result<Response, ContractError> {
   let (config, mut lock1, mut token1, asset_config) =
-    _get_lock_context(&deps, &sender, &token_id_1, &nft, &env, None)?;
+    _get_lock_context(&deps, &sender, &token_id_1, &nft, &env, None, true)?;
 
   let lock2 = LOCKED
     .load(deps.storage, &token_id_2)
@@ -620,7 +620,7 @@ fn split_lock(
   recipient: Addr,
 ) -> Result<Response, ContractError> {
   let (config, mut lock, mut token, asset_config) =
-    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None)?;
+    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None, true)?;
 
   let block_period = get_period(env.block.time.seconds())?;
   let start = block_period;
@@ -681,8 +681,9 @@ fn deposit_for(
   asset: Asset,
   token_id: String,
 ) -> Result<Response, ContractError> {
+  // only place to not validate ownership
   let (config, mut lock, mut token, asset_config) =
-    _get_lock_context(&deps, &sender, &token_id, &nft, &env, Some(config))?;
+    _get_lock_context(&deps, &sender, &token_id, &nft, &env, Some(config), false)?;
 
   if lock.asset.info != asset.info {
     return Err(ContractError::WrongAssetExpected(
@@ -696,6 +697,10 @@ fn deposit_for(
 
   if let End::Period(end) = &lock.end {
     if *end < block_period + MIN_LOCK_PERIODS {
+      // extension of lock is only allowed for owner
+      // but generally donations to other locks is okay
+      nft.check_can_send(deps.as_ref(), &env, &message_info(sender.clone()), &token)?;
+
       lock.end = End::Period(block_period + MIN_LOCK_PERIODS);
       new_end = Some(lock.end.clone());
     }
@@ -801,7 +806,7 @@ fn extend_lock_time(
   time: u64,
 ) -> Result<Response, ContractError> {
   let (config, mut lock, mut token, asset_config) =
-    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None)?;
+    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None, true)?;
 
   // Disable the ability to extend the lock time by less than a week
   assert_time_limits(Some(time))?;
@@ -854,7 +859,7 @@ fn lock_permanent(
   token_id: String,
 ) -> Result<Response, ContractError> {
   let (config, mut lock, mut token, asset_config) =
-    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None)?;
+    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None, true)?;
 
   if lock.end == End::Permanent {
     return Err(ContractError::LockIsPermanent("already permanent".to_string()));
@@ -891,7 +896,7 @@ fn unlock_permanent(
   token_id: String,
 ) -> Result<Response, ContractError> {
   let (config, mut lock, mut token, asset_config) =
-    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None)?;
+    _get_lock_context(&deps, &sender, &token_id, &nft, &env, None, true)?;
 
   if lock.end != End::Permanent {
     return Err(ContractError::LockIsNotPermanent);
@@ -928,6 +933,7 @@ fn _get_lock_context(
   nft: &VeNftCollection,
   env: &Env,
   config: Option<Config>,
+  validate_ownership: bool,
 ) -> Result<(Config, Lock, VeNftInfo, AssetInfoConfig), ContractError> {
   let config = if let Some(config) = config {
     config
@@ -944,7 +950,10 @@ fn _get_lock_context(
     .load(deps.storage, token_id)
     .map_err(|_| ContractError::LockDoesNotExist(token_id.to_string()))?;
   let asset_config = assert_asset_allowed(&config, &lock.asset)?;
-  nft.check_can_send(deps.as_ref(), env, &message_info(sender.clone()), &token)?;
+
+  if validate_ownership {
+    nft.check_can_send(deps.as_ref(), env, &message_info(sender.clone()), &token)?;
+  }
   Ok((config, lock, token, asset_config))
 }
 
