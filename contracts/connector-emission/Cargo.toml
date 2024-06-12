@@ -31,3 +31,10 @@ cw-ownable.workspace = true
 cw-ownable-derive.workspace = true
 thiserror.workspace = true
 ve3-shared.workspace = true
+
+# All for tokenfactory
+osmosis-std-derive = "0.13.2"
+schemars = "0.8.1"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+prost = {version = "0.11.0", default-features = false, features = ["prost-derive"]}
+prost-types = {version = "0.11.1", default-features = false}

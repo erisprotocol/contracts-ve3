@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Decimal256, Order, StdResult, Storage, Uint128};
 use cw_storage_plus::{Bound, Item, Map};
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::msgs_asset_gauge::{Config, GaugeDistributionPeriod};
@@ -15,14 +15,14 @@ pub const GAUGE_DISTRIBUTION: Map<(&str, u64), GaugeDistributionPeriod> =
 // gauge -> user -> period = votes
 pub const GAUGE_VOTE: Map<(&str, &str, u64), UserVotes> = Map::new("gauge_vote");
 
-pub const USER_ASSET_REWARD_RATE: Map<Addr, Decimal> = Map::new("user_asset_reward_rate");
+pub const USER_ASSET_REWARD_INDEX: Map<Addr, Decimal256> = Map::new("user_asset_reward_index");
 pub const UNCLAIMED_REBASE: Map<Addr, Uint128> = Map::new("unclaimed_rewards");
 pub const REBASE: Item<Rebase> = Item::new("rebase");
 
 #[cw_serde]
 pub struct Rebase {
   pub total_fixed: Uint128,
-  pub reward_rate: Decimal,
+  pub global_reward_index: Decimal256,
 }
 
 pub fn fetch_last_gauge_vote(

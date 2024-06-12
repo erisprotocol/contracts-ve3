@@ -4,12 +4,13 @@ use crate::period_index::Data;
 use crate::state::{
   fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex, Rebase, UserVotes,
   CONFIG, GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO, REBASE, UNCLAIMED_REBASE,
-  USER_ASSET_REWARD_RATE,
+  USER_ASSET_REWARD_INDEX,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  attr, Addr, Decimal, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint128,
+  attr, Addr, Decimal, Decimal256, DepsMut, Env, MessageInfo, Response, StdResult, Storage,
+  Uint128, Uint256,
 };
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetInfo};
@@ -36,12 +37,15 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+  let rebase_asset = msg.rebase_asset.check(deps.api, None)?;
+  rebase_asset.assert_native()?;
+
   CONFIG.save(
     deps.storage,
     &Config {
       global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
       gauges: msg.gauges,
-      rebase_asset: msg.rebase_asset.check(deps.api, None)?,
+      rebase_asset,
     },
   )?;
 
@@ -49,7 +53,7 @@ pub fn instantiate(
     deps.storage,
     &Rebase {
       total_fixed: Uint128::zero(),
-      reward_rate: Decimal::zero(),
+      global_reward_index: Decimal256::zero(),
     },
   )?;
 
@@ -117,9 +121,10 @@ fn claim_rebase(
   let rebase = REBASE.load(deps.storage)?;
   let voting_escrow = config.get_voting_escrow(&deps)?;
   let block_period = get_period(env.block.time.seconds())?;
-  let user_data = user_idx().get_latest_data(deps.storage, block_period + 1, user.as_str())?;
+  let fixed_amount =
+    user_idx().get_latest_data_fixed_amount(deps.storage, block_period + 1, user.as_str())?;
 
-  _calc_rebase_share(deps.storage, &rebase, &user, user_data.fixed_amount)?;
+  _calc_rebase_share(deps.storage, &rebase, &user, fixed_amount)?;
   let rebase_amount = UNCLAIMED_REBASE.load(deps.storage, user.clone()).unwrap_or(Uint128::zero());
   UNCLAIMED_REBASE.remove(deps.storage, user.clone());
 
@@ -348,16 +353,16 @@ fn update_vote(
 }
 
 fn add_rebase(deps: DepsMut, asset: Asset) -> Result<Response, ContractError> {
-  let total_rebase_distributed = Decimal::from_atomics(asset.amount, 0)?;
+  let rebase_distributed = Decimal256::from_ratio(asset.amount, 1u8);
 
   let mut rebase = REBASE.load(deps.storage)?;
 
-  let total_shares = rebase.total_fixed;
+  let total_fixed = rebase.total_fixed;
 
-  if !total_shares.is_zero() {
-    let rate_to_update = total_rebase_distributed / Decimal::from_atomics(total_shares, 0)?;
-    if rate_to_update > Decimal::zero() {
-      rebase.reward_rate += rate_to_update;
+  if !total_fixed.is_zero() {
+    let rate_to_update = rebase_distributed / Decimal256::from_ratio(total_fixed, 1u8);
+    if rate_to_update > Decimal256::zero() {
+      rebase.global_reward_index += rate_to_update;
       REBASE.save(deps.storage, &rebase)?;
     }
   }
@@ -371,17 +376,18 @@ fn _calc_rebase_share(
   user: &Addr,
   balance: Uint128,
 ) -> Result<Uint128, ContractError> {
-  let user_reward_rate = USER_ASSET_REWARD_RATE.load(storage, user.clone());
-  let asset_reward_rate = rebase.reward_rate;
+  let user_reward_index = USER_ASSET_REWARD_INDEX.load(storage, user.clone());
+  let global_reward_index = rebase.global_reward_index;
 
-  if let Ok(user_reward_rate) = user_reward_rate {
+  if let Ok(user_reward_rate) = user_reward_index {
     let user_staked = balance;
-    let rewards = ((asset_reward_rate - user_reward_rate) * Decimal::from_atomics(user_staked, 0)?)
-      .to_uint_floor();
+    let user_amount = Uint256::from(user_staked);
+    let rewards: Uint128 = ((global_reward_index - user_reward_rate) * user_amount).try_into()?;
+
     if rewards.is_zero() {
       Ok(Uint128::zero())
     } else {
-      USER_ASSET_REWARD_RATE.save(storage, user.clone(), &asset_reward_rate)?;
+      USER_ASSET_REWARD_INDEX.save(storage, user.clone(), &global_reward_index)?;
       UNCLAIMED_REBASE.update(storage, user.clone(), |balance| -> Result<_, ContractError> {
         Ok(balance.unwrap_or(Uint128::zero()) + rewards)
       })?;
@@ -390,7 +396,7 @@ fn _calc_rebase_share(
     }
   } else {
     // If cannot find user_reward_rate, assume this is the first time they are staking and set it to the current asset_reward_rate
-    USER_ASSET_REWARD_RATE.save(storage, user.clone(), &asset_reward_rate)?;
+    USER_ASSET_REWARD_INDEX.save(storage, user.clone(), &global_reward_index)?;
 
     Ok(Uint128::zero())
   }

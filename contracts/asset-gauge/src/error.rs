@@ -1,4 +1,6 @@
-use cosmwasm_std::{DecimalRangeExceeded, OverflowError, StdError};
+use cosmwasm_std::{
+  ConversionOverflowError, Decimal256RangeExceeded, DecimalRangeExceeded, OverflowError, StdError,
+};
 use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -20,6 +22,12 @@ pub enum ContractError {
 
   #[error("{0}")]
   DecimalRangeExceeded(#[from] DecimalRangeExceeded),
+
+  #[error("{0}")]
+  Decimal256RangeExceeded(#[from] Decimal256RangeExceeded),
+
+  #[error("{0}")]
+  ConversionOverflowError(#[from] ConversionOverflowError),
 
   #[error("User '{0}' has no voting power in period {1}")]
   ZeroVotingPower(String, u64),

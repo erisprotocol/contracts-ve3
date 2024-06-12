@@ -119,6 +119,16 @@ pub enum QueryMsg {
   Distributions {
     time: Option<Time>,
   },
+
+  #[returns(UserPendingRebaseResponse)]
+  UserPendingRebase {
+    user: Addr,
+  },
+}
+
+#[cw_serde]
+pub struct UserPendingRebaseResponse {
+  pub rebase: Uint128,
 }
 
 #[cw_serde]

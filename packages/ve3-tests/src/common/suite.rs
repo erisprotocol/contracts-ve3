@@ -1,4 +1,4 @@
-use super::helpers::cw20;
+use super::helpers::{cw20, native};
 use crate::common::suite_contracts::*;
 use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
 use cosmwasm_schema::cw_serde;
@@ -72,8 +72,11 @@ impl Addresses {
     AssetInfoUnchecked::cw20(self.eris_hub_cw20.to_string())
   }
 
-  pub(crate) fn ampluna<B: Into<Uint128>>(&self, a: B) -> Asset {
-    cw20(self.eris_hub_cw20.clone(), a)
+  pub(crate) fn ampluna(&self, a: u32) -> Asset {
+    cw20(self.eris_hub_cw20.clone(), Uint128::new(a.into()))
+  }
+  pub(crate) fn uluna(&self, a: u32) -> Asset {
+    native("uluna", Uint128::new(a.into()))
   }
 }
 
@@ -132,10 +135,10 @@ impl TestingSuite {
 impl TestingSuite {
   pub fn def() -> Self {
     TestingSuite::default_with_balances(vec![
-      coin(1_000_000_000u128, "uluna".to_string()),
-      coin(1_000_000_000u128, "xxx".to_string()),
-      coin(1_000_000_000u128, "usdc".to_string()),
-      coin(1_000_000_000u128, "native_lp".to_string()),
+      coin(1_000_000_000_000u128, "uluna".to_string()),
+      coin(1_000_000_000_000u128, "xxx".to_string()),
+      coin(1_000_000_000_000u128, "usdc".to_string()),
+      coin(1_000_000_000_000u128, "native_lp".to_string()),
     ])
   }
 

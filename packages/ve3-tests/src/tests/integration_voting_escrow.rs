@@ -23,14 +23,15 @@ fn test_locks() {
   let mut suite = TestingSuite::def();
 
   let user1 = suite.address("user1").to_string();
+  let addr = suite.addresses.clone();
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
       res.assert_attribute(attr("token_id", "1")).unwrap();
     })
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
     .q_ve_all_tokens(None, None, |res| {
@@ -102,11 +103,11 @@ fn test_locks_transfer() {
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
       res.assert_attribute(attr("token_id", "1")).unwrap();
     })
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
       res.assert_attribute(attr("token_id", "2")).unwrap();
     })
     .q_gauge_user_info(user1.to_string(), Some(Time::Next), |res| {
@@ -256,10 +257,10 @@ fn test_locks_exchange_rate() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000u128), "user2", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| {
       res.unwrap();
     })
     .q_gauge_user_info(addr.user2.to_string(), Some(Time::Next), |res| {
@@ -319,7 +320,7 @@ fn test_locks_lock_extension() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
     .e_ve_extend_lock_time(WEEK * 2, "1", "user1", |res| {
@@ -383,7 +384,7 @@ fn test_locks_lock_extension_ampluna() {
   let ampluna = addr.eris_hub_cw20.to_string();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -475,18 +476,18 @@ fn test_locks_merge() {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset(format!("cw20:{fake}")));
     })
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
     // 2 = wrong asset
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.unwrap();
     })
     // 3 = wrong end
-    .e_ve_create_lock_time(WEEK * 3, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 3, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -527,7 +528,7 @@ fn test_locks_merge() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: native("uluna", 1000u128),
+          asset: addr.uluna(1000),
           underlying_amount: u(1000),
           start: 74,
           end: End::Period(76),
@@ -545,7 +546,7 @@ fn test_locks_merge() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: native("uluna", 1000u128),
+          asset: addr.uluna(1000),
           underlying_amount: u(1000),
           start: 74,
           end: End::Period(76),
@@ -570,7 +571,7 @@ fn test_locks_merge() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: native("uluna", 2000u128),
+          asset: addr.uluna(2000),
           underlying_amount: u(2000),
           start: 74,
           end: End::Period(76),
@@ -589,7 +590,7 @@ fn test_locks_merge() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: native("uluna", 0u128),
+          asset: addr.uluna(0),
           underlying_amount: u(0),
           start: 74,
           end: End::Period(76),
@@ -664,7 +665,7 @@ fn test_locks_merge() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: native("uluna", 3000u128),
+          asset: addr.uluna(3000),
           underlying_amount: u(3000),
           start: 74,
           end: End::Period(77),
@@ -683,7 +684,7 @@ fn test_locks_merge() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: native("uluna", 0u128),
+          asset: addr.uluna(0),
           underlying_amount: u(0),
           start: 74,
           end: End::Period(77),
@@ -740,7 +741,7 @@ fn test_locks_split() {
   let ampluna = suite.addresses.eris_hub_cw20.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -885,7 +886,7 @@ fn test_locks_split() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 75,
-          asset: addr.ampluna(1000u128),
+          asset: addr.ampluna(1000),
           underlying_amount: u(1200),
           start: 74,
           end: End::Period(84),
@@ -903,7 +904,7 @@ fn test_locks_split() {
         LockInfoResponse {
           owner: addr.user2.clone(),
           from_period: 75,
-          asset: addr.ampluna(1000u128),
+          asset: addr.ampluna(1000),
           underlying_amount: u(1200),
           start: 75,
           end: End::Period(84),
@@ -923,7 +924,7 @@ fn test_lock_withdraw_cw20() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(10)
@@ -950,7 +951,7 @@ fn test_lock_withdraw_native() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(10)
@@ -979,7 +980,7 @@ fn test_lock_increase_cw20() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -991,11 +992,11 @@ fn test_lock_increase_cw20() {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset(format!("cw20:{0}", addr.fake_cw20)));
     })
-    .e_ve_extend_lock_amount("2", "user2", addr.ampluna(100u128), |res| {
+    .e_ve_extend_lock_amount("2", "user2", addr.ampluna(100), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .e_ve_extend_lock_amount("1", "user1", addr.ampluna(1000u128), |res| {
+    .e_ve_extend_lock_amount("1", "user1", addr.ampluna(1000), |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1023,7 +1024,7 @@ fn test_lock_increase_native() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1031,11 +1032,11 @@ fn test_lock_increase_native() {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset("xxx".to_string()));
     })
-    .e_ve_extend_lock_amount("2", "user2", native("uluna", 100u128), |res| {
+    .e_ve_extend_lock_amount("2", "user2", addr.uluna(100), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .e_ve_extend_lock_amount("1", "user1", native("uluna", 1000u128), |res| {
+    .e_ve_extend_lock_amount("1", "user1", addr.uluna(1000), |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1064,7 +1065,7 @@ fn test_lock_permanent() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time_any(None, addr.ampluna(2000u128), "user1", |res| {
+    .e_ve_create_lock_time_any(None, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1076,11 +1077,11 @@ fn test_lock_permanent() {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset(format!("cw20:{0}", addr.fake_cw20)));
     })
-    .e_ve_extend_lock_amount("2", "user2", addr.ampluna(100u128), |res| {
+    .e_ve_extend_lock_amount("2", "user2", addr.ampluna(100), |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .e_ve_extend_lock_amount("1", "user1", addr.ampluna(1000u128), |res| {
+    .e_ve_extend_lock_amount("1", "user1", addr.ampluna(1000), |res| {
       res.unwrap();
     })
     .q_ve_lock_info("1", None, |res| {
@@ -1090,7 +1091,7 @@ fn test_lock_permanent() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 79,
-          asset: addr.ampluna(3000u128),
+          asset: addr.ampluna(3000),
           underlying_amount: u(3600),
           start: 74,
           end: End::Permanent,
@@ -1114,7 +1115,7 @@ fn test_lock_permanent() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 84,
-          asset: addr.ampluna(3000u128),
+          asset: addr.ampluna(3000),
           underlying_amount: u(3600),
           start: 74,
           end: End::Permanent,
@@ -1138,7 +1139,7 @@ fn test_lock_permanent() {
       )
     })
     // .print_block("creating lock 2")
-    .e_ve_create_lock_time_any(Some(WEEK * 10), native("uluna", 4000u128), "user1", |res| {
+    .e_ve_create_lock_time_any(Some(WEEK * 10), addr.uluna(4000), "user1", |res| {
       res.unwrap();
     })
     .q_ve_lock_info("2", None, |res| {
@@ -1148,7 +1149,7 @@ fn test_lock_permanent() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 84,
-          asset: native("uluna", 4000u128),
+          asset: addr.uluna(4000),
           underlying_amount: u(4000),
           start: 84,
           end: End::Period(94),
@@ -1223,7 +1224,7 @@ fn test_lock_permanent() {
         LockInfoResponse {
           owner: addr.user1.clone(),
           from_period: 114,
-          asset: addr.ampluna(3000u128),
+          asset: addr.ampluna(3000),
           underlying_amount: u(3600),
           start: 74,
           end: End::Period(114 + MAX_LOCK_PERIODS),
@@ -1275,7 +1276,7 @@ fn test_lock_make_permanent() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1361,11 +1362,11 @@ fn test_lock_merge_permanent() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.uluna(  2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
-    .e_ve_create_lock_time(WEEK * 10, native("uluna", 2000u128), "user1", |res| {
+    .e_ve_create_lock_time(WEEK * 10, addr.uluna(  2000), "user1", |res| {
       res.unwrap();
     })
     .q_gauge_user_info(addr.user1.to_string(), Some(Time::Next), |res| {

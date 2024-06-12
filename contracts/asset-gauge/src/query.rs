@@ -1,10 +1,11 @@
 use crate::error::ContractError;
 use crate::state::{
   fetch_first_gauge_vote, fetch_last_gauge_vote, user_idx, AssetIndex, CONFIG, GAUGE_DISTRIBUTION,
+  REBASE, UNCLAIMED_REBASE, USER_ASSET_REWARD_INDEX,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult};
+use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult, Uint128, Uint256};
 use cw_asset::AssetInfoUnchecked;
 use cw_storage_plus::Bound;
 use std::str::FromStr;
@@ -13,7 +14,8 @@ use ve3_shared::helpers::governance::get_period;
 use ve3_shared::helpers::time::{GetPeriod, GetPeriods, Time, Times};
 use ve3_shared::msgs_asset_gauge::{
   GaugeDistributionPeriod, GaugeInfosResponse, GaugeVote, QueryMsg, UserFirstParticipationResponse,
-  UserInfoExtendedResponse, UserInfosResponse, UserShare, UserSharesResponse, VotedInfoResponse,
+  UserInfoExtendedResponse, UserInfosResponse, UserPendingRebaseResponse, UserShare,
+  UserSharesResponse, VotedInfoResponse,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -29,6 +31,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::UserFirstParticipation {
       user,
     } => Ok(to_json_binary(&user_first_participation(deps, user)?)?),
+
+    QueryMsg::UserPendingRebase {
+      user,
+    } => Ok(to_json_binary(&user_pending_rebase(deps, env, user)?)?),
 
     QueryMsg::UserInfo {
       user,
@@ -86,6 +92,36 @@ fn user_first_participation(
   Ok(UserFirstParticipationResponse {
     period: first_period,
   })
+}
+
+fn user_pending_rebase(
+  deps: Deps,
+  env: Env,
+  user: Addr,
+) -> Result<UserPendingRebaseResponse, ContractError> {
+  let rebase = REBASE.load(deps.storage)?;
+  let block_period = get_period(env.block.time.seconds())?;
+  let user_data = user_idx().get_latest_data(deps.storage, block_period + 1, user.as_str())?;
+
+  let balance = user_data.fixed_amount;
+  let user_reward_index = USER_ASSET_REWARD_INDEX.load(deps.storage, user.clone());
+  let global_reward_index = rebase.global_reward_index;
+
+  if let Ok(user_reward_rate) = user_reward_index {
+    let user_staked = balance;
+    let user_amount = Uint256::from(user_staked);
+    let rewards: Uint128 = ((global_reward_index - user_reward_rate) * user_amount).try_into()?;
+
+    let unclaimed = UNCLAIMED_REBASE.may_load(deps.storage, user)?.unwrap_or_default();
+
+    Ok(UserPendingRebaseResponse {
+      rebase: unclaimed + rewards,
+    })
+  } else {
+    Ok(UserPendingRebaseResponse {
+      rebase: Uint128::zero(),
+    })
+  }
 }
 
 fn user_shares(

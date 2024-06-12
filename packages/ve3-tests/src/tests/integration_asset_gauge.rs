@@ -3,7 +3,7 @@ use crate::{
     helpers::{native, u, Addr, Cw20, Native, Uint128},
     suite::TestingSuite,
   },
-  extensions::app_response_ext::EventChecker,
+  extensions::app_response_ext::{EventChecker, Valid},
 };
 use cosmwasm_std::{attr, Decimal, StdError};
 use cw721::{AllNftInfoResponse, NftInfoResponse, OwnerOfResponse, TokensResponse};
@@ -32,12 +32,8 @@ fn test_total_vp() {
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
-      res.unwrap();
-    })
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
-      res.unwrap();
-    })
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| res.assert_valid())
     .q_ve_all_tokens(None, None, |res| {
       assert_eq!(
         res.unwrap(),
@@ -332,7 +328,7 @@ fn test_query_infos() {
 
   suite
     .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
-      res.unwrap();
+      res.assert_valid()
     })
     .init_def_staking_whitelist()
     .e_gauge_vote(
@@ -340,7 +336,7 @@ fn test_query_infos() {
       vec![("native:lp".to_string(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
       "user1",
       |res| {
-        res.unwrap();
+        res.assert_valid()
       },
     )
     .q_gauge_gauge_infos(addr.gauge_1.clone(), None, None, |res| {
@@ -498,9 +494,7 @@ fn test_query_infos() {
       },
     )
     .add_periods(8)
-    .e_gauge_set_distribution("user1", |res| {
-      res.unwrap();
-    })
+    .e_gauge_set_distribution("user1", |res| res.assert_valid())
     .q_staking_reward_distribution(|res| {
       let res = res.unwrap();
       assert_eq!(

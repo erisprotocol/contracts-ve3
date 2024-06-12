@@ -407,6 +407,24 @@ impl<'a> PeriodIndex<'a> {
     }
   }
 
+  pub fn get_latest_data_fixed_amount(
+    &self,
+    storage: &dyn Storage,
+    period: u64,
+    key: &str,
+  ) -> StdResult<Uint128> {
+    // no need to query slopes for the fixed amount
+    let current_fixed = if let Some(point) = self.data.may_load(storage, (key, period))? {
+      point.fixed_amount
+    } else if let Some((_, point)) = self.fetch_last_point(storage, period, key)? {
+      point.fixed_amount
+    } else {
+      Uint128::zero()
+    };
+
+    Ok(current_fixed)
+  }
+
   pub fn get_latest_data(&self, storage: &dyn Storage, period: u64, key: &str) -> StdResult<Data> {
     let current_point = if let Some(point) = self.data.may_load(storage, (key, period))? {
       point

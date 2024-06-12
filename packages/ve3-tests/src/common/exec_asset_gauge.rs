@@ -1,6 +1,8 @@
 use cosmwasm_std::{Addr, StdResult};
+use cw_asset::Asset;
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
+  extensions::asset_ext::AssetExt,
   helpers::time::{Time, Times},
   msgs_asset_gauge::*,
   msgs_voting_escrow::LockInfoResponse,
@@ -73,11 +75,12 @@ impl TestingSuite {
   pub fn e_gauge_add_rebase(
     &mut self,
     sender: &str,
+    asset: Asset,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::AddRebase {};
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_1(), &msg, &[asset.to_coin().unwrap()]));
     self
   }
   // pub fn e_gauge_clear_gauge_state(
@@ -250,6 +253,21 @@ impl TestingSuite {
       self.contract_1(),
       &QueryMsg::Distributions {
         time,
+      },
+    );
+    result(response);
+    self
+  }
+
+  pub fn q_gauge_user_pending_rebase(
+    &mut self,
+    user: &str,
+    result: impl Fn(StdResult<UserPendingRebaseResponse>),
+  ) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(
+      self.contract_1(),
+      &QueryMsg::UserPendingRebase {
+        user: self.address(user),
       },
     );
     result(response);

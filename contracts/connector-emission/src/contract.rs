@@ -5,7 +5,7 @@ use crate::{
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 use ve3_shared::{
   adapters::{global_config_adapter::ConfigExt, mint_proxy::MintProxy},
@@ -92,7 +92,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
 fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
   let mut config = CONFIG.load(deps.storage)?;
 
-  assert_is_staking(&deps, &info, &config)?;
+  assert_asset_staking_right_gauge(&deps, &info, &config)?;
+  let asset_staking_addr = info.sender;
 
   if config.enabled {
     let diff_claim_time_seconds =
@@ -122,35 +123,53 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
 
       config.last_claim_s = env.block.time.seconds();
 
-      let mut transfer_msgs = vec![];
+      let mut msgs = vec![];
 
       let total = emission_amount + team_amount + rebase_amount;
       match config.mint_config {
         ve3_shared::msgs_connector_emission::MintConfig::UseBalance => {
           // nothing to do, as we expect the balance already to be there in the contract
         },
-        ve3_shared::msgs_connector_emission::MintConfig::MintDirect => todo!(),
+        ve3_shared::msgs_connector_emission::MintConfig::MintDirect => {
+          match &config.emission_token {
+            cw_asset::AssetInfoBase::Native(denom) => {
+              let mint_self: CosmosMsg = crate::denom::MsgMint {
+                sender: env.contract.address.to_string(),
+                amount: Some(crate::denom::Coin {
+                  denom: denom.to_string(),
+                  amount: total.to_string(),
+                }),
+                mint_to_address: env.contract.address.to_string(),
+              }
+              .into();
+              msgs.push(mint_self);
+            },
+            _ => Err(ContractError::SharedError(ve3_shared::error::SharedError::NotSupported(
+              "only native".to_string(),
+            )))?,
+          }
+        },
         ve3_shared::msgs_connector_emission::MintConfig::MintProxy => {
           let mint_proxy_addr = config.global_config().get_address(&deps.querier, AT_MINT_PROXY)?;
           let mint_proxy = MintProxy(mint_proxy_addr);
-          transfer_msgs.push(mint_proxy.mint_msg(total)?);
+          msgs.push(mint_proxy.mint_msg(total)?);
         },
       };
 
-      transfer_msgs
-        .push(config.emission_token.with_balance(emission_amount).transfer_msg(info.sender)?);
+      msgs.push(
+        config.emission_token.with_balance(emission_amount).transfer_msg(asset_staking_addr)?,
+      );
 
       if !team_amount.is_zero() {
         let team_wallet = config.global_config().get_address(&deps.querier, AT_TEAM_WALLET)?;
-        transfer_msgs
-          .push(config.emission_token.with_balance(team_amount).transfer_msg(team_wallet)?)
+        msgs.push(config.emission_token.with_balance(team_amount).transfer_msg(team_wallet)?)
       }
 
       if !rebase_amount.is_zero() {
         let asset_gauge = config.asset_gauge(&deps.querier)?;
         let rebase_asset = config.emission_token.with_balance(rebase_amount);
         let msg = asset_gauge.add_rebase_msg(rebase_asset)?;
-        transfer_msgs.push(msg);
+        msgs.push(msg);
       }
 
       return Ok(
@@ -159,14 +178,14 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
           .add_attribute("emission_amount", emission_amount)
           .add_attribute("rebase_amount", rebase_amount)
           .add_attribute("team_amount", team_amount)
-          .add_messages(transfer_msgs),
+          .add_messages(msgs),
       );
     }
   }
   Ok(Response::default().add_attribute("action", "emissions/claim_rewards_noop"))
 }
 
-fn assert_is_staking(
+fn assert_asset_staking_right_gauge(
   deps: &DepsMut,
   info: &MessageInfo,
   config: &Config,
