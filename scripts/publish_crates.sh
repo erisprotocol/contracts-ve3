@@ -10,8 +10,8 @@ if ! cargo search invalid-crate-name &> /dev/null; then
 fi
 
 # Directory containing the crates (adjust the path if needed)
-SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CRATES_DIR="$SCRIPTS_DIR/../packages"
+# SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CRATES_DIR="./packages"
 
 if [ ! -d "$CRATES_DIR" ]; then
     echo "Directory $CRATES_DIR does not exist."
@@ -23,8 +23,11 @@ for crate in "$CRATES_DIR"/*; do
     if [ -d "$crate" ]; then
         echo "Publishing crate: $crate"
         cd "$crate"
-        # Check if Cargo.toml exists in the directory
-        if [ -f "Cargo.toml" ]; then
+
+        # Check if Cargo.toml exists in the directory        
+        if [ -f ".publishignore" ]; then
+            echo "Publish ignore $crate. Skipping."
+        elif [ -f "Cargo.toml" ]; then
             # Package the crate
             cargo package
             # Publish the crate

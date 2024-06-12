@@ -13,7 +13,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.0.0"
+version = "0.9.0"
 authors = ["devs <devs@erisprotocol.com>"]
 edition = "2021"
 license       = "GPL-3.0-or-later"
@@ -36,9 +36,10 @@ overflow-checks = true
 
 [workspace.dependencies]
 cw2 = "1.1"
-cw20 = { git = "https://github.com/CosmWasm/cw-plus.git", default-features = false, tag = "v1.1.2"}
-# cw20-base = "1.1.0"
-cw20-base = { git = "https://github.com/CosmWasm/cw-plus.git", default-features = false, tag = "v1.1.2"}
+# cw20 = { git = "https://github.com/CosmWasm/cw-plus.git", default-features = false, tag = "v1.1.2"}
+# cw20-base = { git = "https://github.com/CosmWasm/cw-plus.git", default-features = false, tag = "v1.1.2"}
+cw20 = "=1.1.2"
+cw20-base = "=1.1.2"
 
 cw721 = { version = "0.18.0" }
 cw721-base = { version = "0.18.0", features = ["library"] }

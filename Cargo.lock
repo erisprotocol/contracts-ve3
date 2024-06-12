@@ -254,7 +254,7 @@ dependencies = [
  "cosmwasm-std",
  "cw-address-like",
  "cw-storage-plus 1.2.0",
- "cw20 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw20 1.1.2",
  "thiserror",
 ]
 
@@ -372,7 +372,7 @@ checksum = "1c4a657e5caacc3a0d00ee96ca8618745d050b8f757c709babafb81208d4239c"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw2 1.1.2",
  "schemars",
  "semver",
  "serde",
@@ -420,20 +420,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw2"
-version = "1.1.2"
-source = "git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2#d33824679d5b91ca0b4615a8dede7e0028947486"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-storage-plus 1.2.0",
- "schemars",
- "semver",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "cw20"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -450,18 +436,6 @@ name = "cw20"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "526e39bb20534e25a1cd0386727f0038f4da294e5e535729ba3ef54055246abd"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-utils 1.0.3",
- "schemars",
- "serde",
-]
-
-[[package]]
-name = "cw20"
-version = "1.1.2"
-source = "git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2#d33824679d5b91ca0b4615a8dede7e0028947486"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -489,13 +463,14 @@ dependencies = [
 [[package]]
 name = "cw20-base"
 version = "1.1.2"
-source = "git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2#d33824679d5b91ca0b4615a8dede7e0028947486"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17ad79e86ea3707229bf78df94e08732e8f713207b4a77b2699755596725e7d9"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "schemars",
  "semver",
  "serde",
@@ -556,7 +531,7 @@ dependencies = [
  "cw-ownable",
  "cw-storage-plus 1.2.0",
  "cw-utils 1.0.3",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw2 1.1.2",
  "cw721 0.18.0",
  "cw721-base 0.16.0",
  "schemars",
@@ -1294,14 +1269,14 @@ checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
 
 [[package]]
 name = "ve3-asset-gauge"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "itertools 0.10.5",
  "thiserror",
  "ve3-shared",
@@ -1309,15 +1284,15 @@ dependencies = [
 
 [[package]]
 name = "ve3-asset-staking"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
  "cw-storage-plus 1.2.0",
  "cw-utils 1.0.3",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "schemars",
  "semver",
  "serde",
@@ -1327,14 +1302,14 @@ dependencies = [
 
 [[package]]
 name = "ve3-bribe-manager"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "itertools 0.10.5",
  "thiserror",
  "ve3-shared",
@@ -1342,15 +1317,15 @@ dependencies = [
 
 [[package]]
 name = "ve3-connector-alliance"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
  "cw-storage-plus 1.2.0",
  "cw-utils 1.0.3",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "schemars",
  "semver",
  "serde",
@@ -1361,7 +1336,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-connector-emission"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1369,7 +1344,7 @@ dependencies = [
  "cw-ownable",
  "cw-ownable-derive",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw2 1.1.2",
  "osmosis-std-derive",
  "prost 0.11.9",
  "prost-types",
@@ -1381,14 +1356,14 @@ dependencies = [
 
 [[package]]
 name = "ve3-escrow-rewards"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "itertools 0.10.5",
  "thiserror",
  "ve3-shared",
@@ -1396,7 +1371,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-global-config"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1404,14 +1379,14 @@ dependencies = [
  "cw-ownable",
  "cw-ownable-derive",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw2 1.1.2",
  "thiserror",
  "ve3-shared",
 ]
 
 [[package]]
 name = "ve3-shared"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1419,7 +1394,7 @@ dependencies = [
  "cw-asset",
  "cw-ownable",
  "cw-storage-plus 1.2.0",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw20 1.1.2",
  "cw721 0.18.0",
  "cw721-base 0.18.0",
  "schemars",
@@ -1430,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-tests"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -1441,8 +1416,8 @@ dependencies = [
  "cw-ownable",
  "cw-storage-plus 1.2.0",
  "cw-utils 1.0.3",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "cw20-base 1.1.2",
  "cw721 0.18.0",
  "cw721-base 0.18.0",
@@ -1462,14 +1437,14 @@ dependencies = [
 
 [[package]]
 name = "ve3-voting-escrow"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-asset",
  "cw-storage-plus 1.2.0",
- "cw2 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw20 1.1.2 (git+https://github.com/CosmWasm/cw-plus.git?tag=v1.1.2)",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
  "cw721 0.18.0",
  "cw721-base 0.18.0",
  "schemars",

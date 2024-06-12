@@ -1,9 +1,13 @@
 [package]
 name = "ve3-shared"
-version = "1.0.0"
-authors = ["devs@erisprotocol.com"]
-edition = "2018"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
 
 exclude = []
 
