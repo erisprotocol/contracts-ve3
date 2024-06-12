@@ -58,7 +58,7 @@ pub fn instantiate(
     },
   )?;
 
-  Ok(Response::default())
+  Ok(Response::new())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -107,7 +107,7 @@ pub fn execute(
       }
 
       CONFIG.save(deps.storage, &config)?;
-      Ok(Response::default().add_attribute("action", "gauge/update_config"))
+      Ok(Response::new().add_attribute("action", "gauge/update_config"))
     },
   }
 }
@@ -122,8 +122,7 @@ fn claim_rebase(
   let rebase = REBASE.load(deps.storage)?;
   let voting_escrow = config.get_voting_escrow(&deps)?;
   let block_period = get_period(env.block.time.seconds())?;
-  let fixed_amount =
-    user_idx().get_latest_data_fixed_amount(deps.storage, block_period + 1, user.as_str())?;
+  let fixed_amount = user_idx().get_latest_fixed(deps.storage, block_period + 1, user.as_str())?;
 
   _calc_rebase_share(deps.storage, &rebase, &user, fixed_amount)?;
   let rebase_amount = UNCLAIMED_REBASE.load(deps.storage, user.clone()).unwrap_or(Uint128::zero());
@@ -154,15 +153,13 @@ fn claim_rebase(
     None => voting_escrow.create_permanent_lock_msg(rebase_asset, Some(user.to_string()))?,
   };
 
-  Ok(
-    Response::default()
-      .add_attributes(vec![
-        ("action", "gauge/claim_rebase"),
-        ("user", user.as_ref()),
-        ("rebase_amount", &rebase_amount.to_string()),
-      ])
-      .add_message(msg),
-  )
+  let resp = Response::new()
+    .add_attribute("action", "gauge/claim_rebase")
+    .add_attribute("user", user.as_ref())
+    .add_attribute("rebase_amount", rebase_amount.to_string())
+    .add_message(msg);
+
+  Ok(resp)
 }
 
 fn handle_vote(
@@ -246,7 +243,7 @@ fn handle_vote(
 
   Ok(
     Response::new()
-      .add_attribute("action", "vegauge/vote")
+      .add_attribute("action", "gauge/vote")
       .add_attribute("vp", current_user.total_vp()?),
   )
 }

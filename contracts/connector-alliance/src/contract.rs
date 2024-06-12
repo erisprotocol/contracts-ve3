@@ -1,16 +1,13 @@
-use crate::constants::{
-  CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION, CREATE_REPLY_ID,
-};
+use crate::constants::{CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::state::{CONFIG, VALIDATORS};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  Binary, CosmosMsg, DepsMut, Env, MessageInfo, Reply, Response, StdError, SubMsg, Uint128,
+  Binary, CosmosMsg, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
 use cw_asset::AssetInfoBase;
-use cw_utils::parse_instantiate_response_data;
 use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::{
   MsgClaimDelegationRewards, MsgDelegate, MsgRedelegate, MsgUndelegate,
@@ -23,7 +20,7 @@ use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::cosmosmsg_ext::CosmosMsgExt;
 use ve3_shared::extensions::env_ext::EnvExt;
-use ve3_shared::helpers::token_factory::{CustomExecuteMsg, DenomUnit, Metadata, TokenExecuteMsg};
+use ve3_shared::helpers::denom::MsgCreateDenom;
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
   ExecuteMsg, InstantiateMsg,
@@ -32,30 +29,54 @@ use ve3_shared::msgs_connector_alliance::{
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
   deps: DepsMut,
-  _env: Env,
+  env: Env,
   _info: MessageInfo,
   msg: InstantiateMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
+  println!("SET CONTRACT VERSION {CONTRACT_NAME} {CONTRACT_VERSION}");
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-  let create_msg = TokenExecuteMsg::CreateDenom {
+
+  let full_denom = format!("factory/{0}/{1}", env.contract.address, msg.alliance_token_denom);
+
+  let create_msg: CosmosMsg = MsgCreateDenom {
+    sender: env.contract.address.to_string(),
     subdenom: msg.alliance_token_denom.to_string(),
-  };
-  let sub_msg = SubMsg::reply_on_success(
-    CosmosMsg::Custom(CustomExecuteMsg::Token(create_msg)),
-    CREATE_REPLY_ID,
-  );
+  }
+  .into();
+
+  let total_supply = Uint128::from(1_000_000_000_000_u128);
+
+  let mint_msg: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
+    sender: env.contract.address.to_string(),
+    amount: Some(ve3_shared::helpers::denom::Coin {
+      denom: full_denom.to_string(),
+      amount: total_supply.to_string(),
+    }),
+    mint_to_address: env.contract.address.to_string(),
+  }
+  .into();
 
   let config = Config {
-    alliance_token_denom: "".to_string(),
-    alliance_token_supply: Uint128::zero(),
+    alliance_token_denom: full_denom.clone(),
+    alliance_token_supply: total_supply,
     reward_denom: msg.reward_denom,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
     gauge: msg.gauge,
   };
+
   CONFIG.save(deps.storage, &config)?;
 
   VALIDATORS.save(deps.storage, &HashSet::new())?;
-  Ok(Response::new().add_attributes(vec![("action", "instantiate")]).add_submessage(sub_msg))
+  Ok(
+    Response::new()
+      .add_attributes(vec![
+        ("action", "instantiate"),
+        ("alliance_token_denom", &full_denom),
+        ("alliance_token_total_supply", &total_supply.to_string()),
+      ])
+      .add_message(create_msg)
+      .add_message(mint_msg),
+  )
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -64,7 +85,7 @@ pub fn execute(
   env: Env,
   info: MessageInfo,
   msg: ExecuteMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   match msg {
     ExecuteMsg::ClaimRewards {} => claim_rewards(deps, env, info),
     ExecuteMsg::AllianceDelegate(msg) => alliance_delegate(deps, env, info, msg),
@@ -82,7 +103,7 @@ fn callback(
   env: Env,
   info: MessageInfo,
   msg: CallbackMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   if env.contract.address != info.sender {
     Err(SharedError::UnauthorizedCallbackOnlyCallableByContract {})?
   }
@@ -96,7 +117,7 @@ fn callback(
         asset.with_balance_query(&deps.querier, &env.contract.address)?.transfer_msg(receiver)?;
 
       Ok(
-        Response::<CustomExecuteMsg>::new()
+        Response::new()
           .add_attributes(vec![("action", "claim_rewards_callback")])
           .add_message(transfer_msg.to_specific()?),
       )
@@ -109,7 +130,7 @@ fn remove_validator(
   _env: Env,
   info: MessageInfo,
   validator: String,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
 
@@ -124,14 +145,14 @@ fn alliance_delegate(
   env: Env,
   info: MessageInfo,
   msg: AllianceDelegateMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
   if msg.delegations.is_empty() {
     return Err(ContractError::EmptyDelegation {});
   }
   let mut validators = VALIDATORS.load(deps.storage)?;
-  let mut msgs: Vec<CosmosMsg<CustomExecuteMsg>> = vec![];
+  let mut msgs: Vec<CosmosMsg> = vec![];
   for delegation in msg.delegations {
     let delegate_msg = MsgDelegate {
       amount: Some(Coin {
@@ -148,11 +169,7 @@ fn alliance_delegate(
     validators.insert(delegation.validator);
   }
   VALIDATORS.save(deps.storage, &validators)?;
-  Ok(
-    Response::<CustomExecuteMsg>::new()
-      .add_attributes(vec![("action", "alliance_delegate")])
-      .add_messages(msgs),
-  )
+  Ok(Response::new().add_attributes(vec![("action", "alliance_delegate")]).add_messages(msgs))
 }
 
 fn alliance_undelegate(
@@ -160,7 +177,7 @@ fn alliance_undelegate(
   env: Env,
   info: MessageInfo,
   msg: AllianceUndelegateMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
   if msg.undelegations.is_empty() {
@@ -190,7 +207,7 @@ fn alliance_redelegate(
   env: Env,
   info: MessageInfo,
   msg: AllianceRedelegateMsg,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
   if msg.redelegations.is_empty() {
@@ -221,17 +238,13 @@ fn alliance_redelegate(
   Ok(Response::new().add_attributes(vec![("action", "alliance_redelegate")]).add_messages(msgs))
 }
 
-fn claim_rewards(
-  deps: DepsMut,
-  env: Env,
-  info: MessageInfo,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
 
   assert_is_staking(&deps, &info, &config)?;
 
   let validators = VALIDATORS.load(deps.storage)?;
-  let sub_msgs: Vec<SubMsg<CustomExecuteMsg>> = validators
+  let sub_msgs: Vec<SubMsg> = validators
     .iter()
     .map(|v| {
       let msg = MsgClaimDelegationRewards {
@@ -249,7 +262,7 @@ fn claim_rewards(
     .collect();
 
   Ok(
-    Response::<CustomExecuteMsg>::new()
+    Response::new()
       .add_attributes(vec![("action", "claim_rewards")])
       .add_submessages(sub_msgs)
       .add_message(
@@ -264,58 +277,54 @@ fn claim_rewards(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(
-  deps: DepsMut,
-  env: Env,
-  reply: Reply,
-) -> Result<Response<CustomExecuteMsg>, ContractError> {
+pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
   match reply.id {
-    CREATE_REPLY_ID => {
-      let response = reply.result.unwrap();
-      // It works because the response data is a protobuf encoded string that contains the denom in the first slot (similar to the contract instantiation response)
-      let denom = parse_instantiate_response_data(response.data.unwrap().as_slice())
-        .map_err(|_| ContractError::Std(StdError::generic_err("parse error".to_string())))?
-        .contract_address;
-      let total_supply = Uint128::from(1_000_000_000_000_u128);
-      let sub_msg_mint =
-        SubMsg::new(CosmosMsg::Custom(CustomExecuteMsg::Token(TokenExecuteMsg::MintTokens {
-          denom: denom.clone(),
-          amount: total_supply,
-          mint_to_address: env.contract.address.to_string(),
-        })));
-      CONFIG.update(deps.storage, |mut config| -> Result<_, ContractError> {
-        config.alliance_token_denom = denom.clone();
-        config.alliance_token_supply = total_supply;
-        Ok(config)
-      })?;
-      let symbol = "ALLIANCE";
+    // CREATE_REPLY_ID => {
+    //   let response = reply.result.unwrap();
+    //   // It works because the response data is a protobuf encoded string that contains the denom in the first slot (similar to the contract instantiation response)
+    //   let denom = parse_instantiate_response_data(response.data.unwrap().as_slice())
+    //     .map_err(|_| ContractError::Std(StdError::generic_err("parse error".to_string())))?
+    //     .contract_address;
+    //   let total_supply = Uint128::from(1_000_000_000_000_u128);
+    //   let sub_msg_mint =
+    //     SubMsg::new(CosmosMsg::Custom(CustomExecuteMsg::Token(TokenExecuteMsg::MintTokens {
+    //       denom: denom.clone(),
+    //       amount: total_supply,
+    //       mint_to_address: env.contract.address.to_string(),
+    //     })));
+    //   CONFIG.update(deps.storage, |mut config| -> Result<_, ContractError> {
+    //     config.alliance_token_denom = denom.clone();
+    //     config.alliance_token_supply = total_supply;
+    //     Ok(config)
+    //   })?;
+    //   let symbol = "ALLIANCE";
 
-      let sub_msg_metadata =
-        SubMsg::new(CosmosMsg::Custom(CustomExecuteMsg::Token(TokenExecuteMsg::SetMetadata {
-          denom: denom.clone(),
-          metadata: Metadata {
-            description: "Staking token for the alliance protocol".to_string(),
-            denom_units: vec![DenomUnit {
-              denom: denom.clone(),
-              exponent: 0,
-              aliases: vec![],
-            }],
-            base: denom.to_string(),
-            display: denom.to_string(),
-            name: "Alliance Token".to_string(),
-            symbol: symbol.to_string(),
-          },
-        })));
-      Ok(
-        Response::new()
-          .add_attributes(vec![
-            ("alliance_token_denom", denom),
-            ("alliance_token_total_supply", total_supply.to_string()),
-          ])
-          .add_submessage(sub_msg_mint)
-          .add_submessage(sub_msg_metadata),
-      )
-    },
+    //   let sub_msg_metadata =
+    //     SubMsg::new(CosmosMsg::Custom(CustomExecuteMsg::Token(TokenExecuteMsg::SetMetadata {
+    //       denom: denom.clone(),
+    //       metadata: Metadata {
+    //         description: "Staking token for the alliance protocol".to_string(),
+    //         denom_units: vec![DenomUnit {
+    //           denom: denom.clone(),
+    //           exponent: 0,
+    //           aliases: vec![],
+    //         }],
+    //         base: denom.to_string(),
+    //         display: denom.to_string(),
+    //         name: "Alliance Token".to_string(),
+    //         symbol: symbol.to_string(),
+    //       },
+    //     })));
+    //   Ok(
+    //     Response::new()
+    //       .add_attributes(vec![
+    //         ("alliance_token_denom", denom),
+    //         ("alliance_token_total_supply", total_supply.to_string()),
+    //       ])
+    //       .add_submessage(sub_msg_mint)
+    //       .add_submessage(sub_msg_metadata),
+    //   )
+    // },
     CLAIM_REWARD_ERROR_REPLY_ID => {
       Ok(Response::new().add_attributes(vec![("action", "claim_reward_error")]))
     },

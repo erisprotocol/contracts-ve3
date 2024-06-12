@@ -41,7 +41,7 @@ impl TestingSuite {
     )
   }
 
-  pub fn def_gauge_vote(
+  pub fn def_gauge_1_vote(
     &mut self,
     lp: u16,
     cw20: u16,
@@ -52,6 +52,24 @@ impl TestingSuite {
     let allowed_cw20 = addr.lp_cw20.to_string();
     let msg = ve3_shared::msgs_asset_gauge::ExecuteMsg::Vote {
       gauge: addr.gauge_1.to_string(),
+      votes: vec![("native:lp".to_string(), lp), (format!("cw20:{allowed_cw20}"), cw20)],
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, addr.ve3_asset_gauge.clone(), &msg, &[]));
+    self
+  }
+
+  pub fn def_gauge_2_vote(
+    &mut self,
+    lp: u16,
+    cw20: u16,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+    let allowed_cw20 = addr.lp_cw20.to_string();
+    let msg = ve3_shared::msgs_asset_gauge::ExecuteMsg::Vote {
+      gauge: addr.gauge_2.to_string(),
       votes: vec![("native:lp".to_string(), lp), (format!("cw20:{allowed_cw20}"), cw20)],
     };
     let sender = self.address(sender);

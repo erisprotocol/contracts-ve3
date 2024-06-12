@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::colored::Colorize;
-use cosmwasm_std::{Attribute, StdError, StdResult};
+use cosmwasm_std::{Attribute, StdError};
 use cw_multi_test::AppResponse;
 
 pub trait EventChecker {
@@ -10,6 +10,7 @@ pub trait EventChecker {
 }
 
 impl EventChecker for AppResponse {
+  #[track_caller]
   fn assert_attribute_ty(&self, ty: impl Into<String>, attr: Attribute) -> String {
     let ty: String = ty.into();
     let found = self.events.iter().any(|a| {
@@ -26,6 +27,7 @@ impl EventChecker for AppResponse {
     attr.value
   }
 
+  #[track_caller]
   fn assert_attribute(&self, attr: Attribute) -> String {
     self.assert_attribute_ty("wasm", attr)
   }

@@ -311,19 +311,21 @@ fn test_rebase_claim_to_invalid_lock() {
       res.assert_error(ContractError::RebaseWrongTargetLockAsset)
     })
     .e_gauge_claim_rebase(None, "user2", |res| {
-      res.assert_attribute(attr("action", "gauge/xx"));
+      res.assert_attribute(attr("action", "gauge/claim_rebase"));
       res.assert_attribute(attr("action", "ve/create_lock"));
+      res.assert_attribute(attr("action", "mint"));
+      res.assert_attribute(attr("owner", addr.user2.to_string()));
       res.assert_attribute(attr("action", "gauge/update_vote"));
-      res.assert_attribute(attr("rebase_amount", "999"));
-      res.assert_attribute(attr("fixed_power", "999"));
-      res.assert_attribute(attr("voting_power", "8991"));
+      res.assert_attribute(attr("rebase_amount", "1999"));
+      res.assert_attribute(attr("fixed_power", "1999"));
+      res.assert_attribute(attr("voting_power", "17991"));
       res.assert_attribute(attr("token_id", "3"));
     })
     .q_gauge_user_pending_rebase("user2", |res| {
       assert_eq!(
         res.unwrap(),
         UserPendingRebaseResponse {
-          rebase: u(1999)
+          rebase: u(0)
         }
       );
     });

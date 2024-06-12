@@ -28,11 +28,11 @@ fn test_locks() {
   suite
     .init()
     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
-      res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
-      res.assert_attribute(attr("token_id", "1")).unwrap();
+      res.assert_attribute(attr("action", "ve/create_lock"));
+      res.assert_attribute(attr("token_id", "1"));
     })
     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
-      res.assert_attribute(attr("token_id", "2")).unwrap();
+      res.assert_attribute(attr("token_id", "2"));
     })
     .q_ve_all_tokens(None, None, |res| {
       assert_eq!(
@@ -103,11 +103,11 @@ fn test_locks_transfer() {
   suite
     .init()
     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
-      res.assert_attribute(attr("action", "ve/create_lock")).unwrap();
-      res.assert_attribute(attr("token_id", "1")).unwrap();
+      res.assert_attribute(attr("action", "ve/create_lock"));
+      res.assert_attribute(attr("token_id", "1"));
     })
     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
-      res.assert_attribute(attr("token_id", "2")).unwrap();
+      res.assert_attribute(attr("token_id", "2"));
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
@@ -121,7 +121,7 @@ fn test_locks_transfer() {
       );
     })
     .e_ve_transfer_nft(user2.clone(), "1".to_string(), "user1", |res| {
-      res.assert_attribute(attr("new_owner", user2.clone())).unwrap();
+      res.assert_attribute(attr("new_owner", user2.clone()));
     })
     .q_ve_total_vamp(None, |res| {
       let mut vp =
@@ -557,10 +557,10 @@ fn test_locks_merge() {
       );
     })
     .e_ve_merge_lock("1", "4", "user1", |res| {
-      res.assert_attribute(attr("action", "burn")).unwrap();
-      res.assert_attribute(attr("token_id", "4")).unwrap();
-      res.assert_attribute(attr("action", "ve/merge_lock")).unwrap();
-      res.assert_attribute(attr("merge", "1,4")).unwrap();
+      res.assert_attribute(attr("action", "burn"));
+      res.assert_attribute(attr("token_id", "4"));
+      res.assert_attribute(attr("action", "ve/merge_lock"));
+      res.assert_attribute(attr("merge", "1,4"));
     })
     // 1 is doubled
     .q_ve_lock_info("1", None, |res| {
@@ -779,7 +779,7 @@ fn test_locks_split() {
       );
     })
     .e_ve_split_lock("1", u(1000), Some("user2"), "user2", |res| {
-      res.assert_attribute(attr("token_id", "2")).unwrap();
+      res.assert_attribute(attr("token_id", "2"));
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
@@ -937,9 +937,9 @@ fn test_lock_withdraw_cw20() {
       );
     })
     .e_ve_withdraw("1", "user1", |res| {
-      res.assert_attribute(attr("action", "transfer")).unwrap();
-      res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string())).unwrap();
-      res.assert_attribute(attr("to", addr.user1.to_string())).unwrap();
+      res.assert_attribute(attr("action", "transfer"));
+      res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string()));
+      res.assert_attribute(attr("to", addr.user1.to_string()));
     });
 }
 
@@ -964,11 +964,9 @@ fn test_lock_withdraw_native() {
       );
     })
     .e_ve_withdraw("1", "user1", |res| {
-      res
-        .assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()))
-        .unwrap();
-      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string())).unwrap();
-      res.assert_attribute_ty("transfer", attr("amount", "2000uluna")).unwrap();
+      res.assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()));
+      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
+      res.assert_attribute_ty("transfer", attr("amount", "2000uluna"));
     });
 }
 
@@ -1009,10 +1007,10 @@ fn test_lock_increase_cw20() {
       );
     })
     .e_ve_withdraw("1", "user1", |res| {
-      res.assert_attribute(attr("action", "transfer")).unwrap();
-      res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string())).unwrap();
-      res.assert_attribute(attr("to", addr.user1.to_string())).unwrap();
-      res.assert_attribute(attr("amount", "3000")).unwrap();
+      res.assert_attribute(attr("action", "transfer"));
+      res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string()));
+      res.assert_attribute(attr("to", addr.user1.to_string()));
+      res.assert_attribute(attr("amount", "3000"));
     });
 }
 
@@ -1049,11 +1047,9 @@ fn test_lock_increase_native() {
       );
     })
     .e_ve_withdraw("1", "user1", |res| {
-      res
-        .assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()))
-        .unwrap();
-      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string())).unwrap();
-      res.assert_attribute_ty("transfer", attr("amount", "3000uluna")).unwrap();
+      res.assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()));
+      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
+      res.assert_attribute_ty("transfer", attr("amount", "3000uluna"));
     });
 }
 
@@ -1185,13 +1181,11 @@ fn test_lock_permanent() {
     })
     // .print_block("text withdraw 2")
     .e_ve_withdraw("2", "user1", |res| {
-      res.assert_attribute(attr("action", "burn")).unwrap();
-      res.assert_attribute(attr("token_id", "2")).unwrap();
-      res
-        .assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()))
-        .unwrap();
-      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string())).unwrap();
-      res.assert_attribute_ty("transfer", attr("amount", "4000uluna")).unwrap();
+      res.assert_attribute(attr("action", "burn"));
+      res.assert_attribute(attr("token_id", "2"));
+      res.assert_attribute_ty("transfer", attr("sender", addr.ve3_voting_escrow.to_string()));
+      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
+      res.assert_attribute_ty("transfer", attr("amount", "4000uluna"));
     })
     .q_gauge_user_info("user1", Option::Some(Time::Next), |res| {
       assert_eq!(
@@ -1249,11 +1243,11 @@ fn test_lock_permanent() {
     })
     .add_periods(104)
     .e_ve_withdraw("1", "user1", |res| {
-      res.assert_attribute(attr("action", "burn")).unwrap();
-      res.assert_attribute(attr("token_id", "1")).unwrap();
-      res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string())).unwrap();
-      res.assert_attribute(attr("to", addr.user1.to_string())).unwrap();
-      res.assert_attribute(attr("amount", "3000")).unwrap();
+      res.assert_attribute(attr("action", "burn"));
+      res.assert_attribute(attr("token_id", "1"));
+      res.assert_attribute(attr("from", addr.ve3_voting_escrow.to_string()));
+      res.assert_attribute(attr("to", addr.user1.to_string()));
+      res.assert_attribute(attr("amount", "3000"));
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(
@@ -1300,10 +1294,10 @@ fn test_lock_make_permanent() {
       );
     })
     .e_ve_lock_permanent("1", "user1", |res| {
-      res.assert_attribute(attr("action", "ve/lock_permanent")).unwrap();
-      res.assert_attribute(attr("lock_end", "permanent")).unwrap();
-      res.assert_attribute(attr("fixed_power", "2000")).unwrap();
-      res.assert_attribute(attr("voting_power", "18000")).unwrap();
+      res.assert_attribute(attr("action", "ve/lock_permanent"));
+      res.assert_attribute(attr("lock_end", "permanent"));
+      res.assert_attribute(attr("fixed_power", "2000"));
+      res.assert_attribute(attr("voting_power", "18000"));
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(

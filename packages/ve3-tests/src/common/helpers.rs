@@ -5,6 +5,13 @@ pub fn native<A: Into<String>, B: Into<Uint128>>(d: A, a: B) -> Asset {
   Asset::native(d, a)
 }
 
+pub fn native_info(d: &str) -> AssetInfo {
+  AssetInfo::native(d)
+}
+pub fn cw20_info(d: &str) -> AssetInfo {
+  AssetInfo::cw20(Addr::unchecked(d))
+}
+
 pub fn uluna(amount: u32) -> Asset {
   native("uluna", u(amount))
 }

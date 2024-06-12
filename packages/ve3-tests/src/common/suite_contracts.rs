@@ -1,8 +1,6 @@
+use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
 use cosmwasm_std::Empty;
 use cw_multi_test::{Contract, ContractWrapper};
-use ve3_shared::helpers::token_factory::CustomExecuteMsg;
-
-use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
 
 pub fn ve3_global_config() -> Box<dyn Contract<Empty>> {
   let contract = ContractWrapper::new(
@@ -48,13 +46,24 @@ pub fn ve3_bribe_manager() -> Box<dyn Contract<Empty>> {
   Box::new(contract)
 }
 
-pub fn ve3_connector_alliance() -> Box<dyn Contract<CustomExecuteMsg>> {
+pub fn ve3_connector_alliance() -> Box<dyn Contract<Empty>> {
   let contract = ContractWrapper::new(
     ve3_connector_alliance::contract::execute,
     ve3_connector_alliance::contract::instantiate,
     ve3_connector_alliance::query::query,
   )
   .with_migrate(ve3_connector_alliance::migrate::migrate);
+
+  Box::new(contract)
+}
+
+pub fn ve3_connector_emission() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    ve3_connector_emission::contract::execute,
+    ve3_connector_emission::contract::instantiate,
+    ve3_connector_emission::query::query,
+  )
+  .with_migrate(ve3_connector_emission::migrate::migrate);
 
   Box::new(contract)
 }

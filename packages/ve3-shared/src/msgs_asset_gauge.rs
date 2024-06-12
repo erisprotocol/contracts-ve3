@@ -147,7 +147,7 @@ pub struct UserShare {
   pub asset: AssetInfo,
   pub period: u64,
 
-  pub vp: Uint128,
+  pub user_vp: Uint128,
   pub total_vp: Uint128,
 }
 

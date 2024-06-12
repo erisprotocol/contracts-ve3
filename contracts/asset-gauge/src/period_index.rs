@@ -407,7 +407,7 @@ impl<'a> PeriodIndex<'a> {
     }
   }
 
-  pub fn get_latest_data_fixed_amount(
+  pub fn get_latest_fixed(
     &self,
     storage: &dyn Storage,
     period: u64,

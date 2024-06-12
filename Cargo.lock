@@ -1345,26 +1345,6 @@ dependencies = [
  "cw-ownable-derive",
  "cw-storage-plus 1.2.0",
  "cw2 1.1.2",
- "osmosis-std-derive",
- "prost 0.11.9",
- "prost-types",
- "schemars",
- "serde",
- "thiserror",
- "ve3-shared",
-]
-
-[[package]]
-name = "ve3-escrow-rewards"
-version = "0.9.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-asset",
- "cw-storage-plus 1.2.0",
- "cw2 1.1.2",
- "cw20 1.1.2",
- "itertools 0.10.5",
  "thiserror",
  "ve3-shared",
 ]
@@ -1397,6 +1377,9 @@ dependencies = [
  "cw20 1.1.2",
  "cw721 0.18.0",
  "cw721-base 0.18.0",
+ "osmosis-std-derive",
+ "prost 0.11.9",
+ "prost-types",
  "schemars",
  "semver",
  "serde",
@@ -1430,6 +1413,7 @@ dependencies = [
  "ve3-asset-staking",
  "ve3-bribe-manager",
  "ve3-connector-alliance",
+ "ve3-connector-emission",
  "ve3-global-config",
  "ve3-shared",
  "ve3-voting-escrow",

@@ -2,7 +2,6 @@ use crate::contract::{execute, instantiate};
 use crate::state::CONFIG;
 use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockStorage};
 use cosmwasm_std::{DepsMut, Empty, OwnedDeps, Response, StdResult, Uint128};
-use ve3_shared::helpers::token_factory::CustomExecuteMsg;
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceDelegation, AllianceRedelegateMsg, AllianceRedelegation,
   AllianceUndelegateMsg, Config, ExecuteMsg, InstantiateMsg,
@@ -21,7 +20,7 @@ pub(super) fn mock_dependencies() -> OwnedDeps<MockStorage, MockApi, CustomQueri
   }
 }
 
-pub fn setup_contract(deps: DepsMut) -> Response<CustomExecuteMsg> {
+pub fn setup_contract(deps: DepsMut) -> Response {
   let info = mock_info("admin", &[]);
   let env = mock_env();
 
@@ -46,10 +45,7 @@ pub fn set_alliance_asset(deps: DepsMut) {
     .unwrap();
 }
 
-pub fn alliance_delegate(
-  deps: DepsMut,
-  delegations: Vec<(&str, u128)>,
-) -> Response<CustomExecuteMsg> {
+pub fn alliance_delegate(deps: DepsMut, delegations: Vec<(&str, u128)>) -> Response {
   let info = mock_info("controller", &[]);
   let env = mock_env();
   let delegations: Vec<AllianceDelegation> = delegations
@@ -65,10 +61,7 @@ pub fn alliance_delegate(
   execute(deps, env, info, msg).unwrap()
 }
 
-pub fn alliance_undelegate(
-  deps: DepsMut,
-  delegations: Vec<(&str, u128)>,
-) -> Response<CustomExecuteMsg> {
+pub fn alliance_undelegate(deps: DepsMut, delegations: Vec<(&str, u128)>) -> Response {
   let info = mock_info("controller", &[]);
   let env = mock_env();
   let delegations: Vec<AllianceDelegation> = delegations
@@ -84,10 +77,7 @@ pub fn alliance_undelegate(
   execute(deps, env, info, msg).unwrap()
 }
 
-pub fn alliance_redelegate(
-  deps: DepsMut,
-  redelegations: Vec<(&str, &str, u128)>,
-) -> Response<CustomExecuteMsg> {
+pub fn alliance_redelegate(deps: DepsMut, redelegations: Vec<(&str, &str, u128)>) -> Response {
   let info = mock_info("controller", &[]);
   let env = mock_env();
   let redelegations: Vec<AllianceRedelegation> = redelegations

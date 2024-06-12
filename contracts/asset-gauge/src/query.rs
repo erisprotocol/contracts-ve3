@@ -176,7 +176,7 @@ fn user_shares(
             gauge: gauge.to_string(),
             asset,
             period,
-            vp,
+            user_vp: vp,
             total_vp,
           };
 

@@ -38,6 +38,7 @@ ve3-asset-gauge = {path = "../../contracts/asset-gauge"}
 ve3-asset-staking = {path = "../../contracts/asset-staking"}
 ve3-bribe-manager = {path = "../../contracts/bribe-manager"}
 ve3-connector-alliance = {path = "../../contracts/connector-alliance"}
+ve3-connector-emission = {path = "../../contracts/connector-emission"}
 ve3-global-config = {path = "../../contracts/global-config"}
 ve3-voting-escrow = {path = "../../contracts/voting-escrow"}
 

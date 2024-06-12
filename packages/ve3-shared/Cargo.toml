@@ -26,3 +26,8 @@ serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 semver.workspace = true
 cw-address-like.workspace = true
+
+# Tokenfactory
+osmosis-std-derive.workspace = true
+prost.workspace = true
+prost-types.workspace = true

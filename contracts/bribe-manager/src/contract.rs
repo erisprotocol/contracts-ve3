@@ -301,7 +301,7 @@ fn claim_bribes(
     let UserShare {
       gauge,
       asset,
-      vp,
+      user_vp: vp,
       total_vp,
       ..
     } = share;

@@ -133,9 +133,9 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
         ve3_shared::msgs_connector_emission::MintConfig::MintDirect => {
           match &config.emission_token {
             cw_asset::AssetInfoBase::Native(denom) => {
-              let mint_self: CosmosMsg = crate::denom::MsgMint {
+              let mint_self: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
                 sender: env.contract.address.to_string(),
-                amount: Some(crate::denom::Coin {
+                amount: Some(ve3_shared::helpers::denom::Coin {
                   denom: denom.to_string(),
                   amount: total.to_string(),
                 }),

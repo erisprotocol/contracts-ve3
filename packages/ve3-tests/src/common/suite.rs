@@ -1,5 +1,6 @@
-use super::helpers::{cw20, native};
+use super::helpers::{cw20, native, Uint128};
 use crate::common::suite_contracts::*;
+use crate::mocks::stargate_mock::StargateMockModule;
 use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::testing::MockStorage;
@@ -8,14 +9,13 @@ use cw20::Cw20Coin;
 use cw_asset::{Asset, AssetInfoBase, AssetInfoUnchecked, AssetUnchecked};
 use cw_multi_test::{
   App, AppBuilder, BankKeeper, DistributionKeeper, Executor, FailingModule, GovFailingModule,
-  IbcFailingModule, MockAddressGenerator, MockApiBech32, StakeKeeper, StargateFailingModule,
-  WasmKeeper,
+  IbcFailingModule, MockAddressGenerator, MockApiBech32, StakeKeeper, WasmKeeper,
 };
 use serde::Serialize;
 use std::str::FromStr;
-use ve3_shared::constants::*;
 use ve3_shared::msgs_asset_gauge::GaugeConfig;
 use ve3_shared::msgs_voting_escrow::DepositAsset;
+use ve3_shared::{constants::*, msgs_connector_alliance, msgs_connector_emission};
 
 type OsmosisTokenFactoryApp = App<
   BankKeeper,
@@ -27,7 +27,7 @@ type OsmosisTokenFactoryApp = App<
   DistributionKeeper,
   IbcFailingModule,
   GovFailingModule,
-  StargateFailingModule,
+  StargateMockModule,
 >;
 
 pub struct TestingSuite {
@@ -162,7 +162,7 @@ impl TestingSuite {
       .with_api(api)
       .with_wasm(WasmKeeper::default().with_address_generator(MockAddressGenerator))
       .with_bank(bank)
-      // .with_stargate(StargateMock {})
+      .with_stargate(StargateMockModule {})
       .build(|router, _api, storage| {
         balances.into_iter().for_each(|(account, amount)| {
           router.bank.init_balance(storage, &account, amount).unwrap()
@@ -252,16 +252,58 @@ impl TestingSuite {
     let msg = ve3_shared::msgs_bribe_manager::MigrateMsg {};
     self.migrate_contract(&addr.ve3_bribe_manager, code_id, msg);
 
-    // cannot test for alliance connector
-    // let code_id = self.app.store_code(ve3_connector_alliance());
-    // let msg = ve3_shared::msgs_connector_alliance::MigrateMsg {};
-    // self.migrate_contract(&addr.ve3_connector_alliance_1, code_id, msg);
-    // let msg = ve3_shared::msgs_connector_alliance::MigrateMsg {};
-    // self.migrate_contract(&addr.ve3_connector_alliance_2, code_id, msg);
-
     let code_id = self.app.store_code(ve3_voting_escrow());
     let msg = ve3_shared::msgs_voting_escrow::MigrateMsg {};
     self.migrate_contract(&addr.ve3_voting_escrow, code_id, msg);
+
+    // TEST ALLIANCE CONNECTOR
+    let code_id = self.app.store_code(ve3_connector_alliance());
+    let init = msgs_connector_alliance::InstantiateMsg {
+      alliance_token_denom: "test".to_string(),
+      global_config_addr: self.addresses.ve3_global_config.to_string(),
+      gauge: self.addresses.gauge_1.clone(),
+      reward_denom: "uluna".to_string(),
+    };
+    let alliance_connector = self
+      .app
+      .instantiate_contract(
+        code_id,
+        addr.creator.clone(),
+        &init,
+        &[],
+        "init-connector",
+        Some(addr.creator.to_string()),
+      )
+      .unwrap();
+    let code_id = self.app.store_code(ve3_connector_alliance());
+    let msg = ve3_shared::msgs_connector_alliance::MigrateMsg {};
+    self.migrate_contract(&alliance_connector, code_id, msg);
+
+    // TEST EMISSION CONNECTOR
+    let code_id = self.app.store_code(ve3_connector_emission());
+    let init = msgs_connector_emission::InstantiateMsg {
+      global_config_addr: self.addresses.ve3_global_config.to_string(),
+      gauge: self.addresses.gauge_1.clone(),
+      emission_token: AssetInfoBase::Native("uluna".to_string()),
+      emissions_per_week: Uint128(100),
+      mint_config: msgs_connector_emission::MintConfig::MintDirect,
+      rebase_config: msgs_connector_emission::RebaseConfg::Fixed(Decimal::percent(10)),
+      team_share: Decimal::percent(10),
+    };
+    let emission_connector = self
+      .app
+      .instantiate_contract(
+        code_id,
+        addr.creator.clone(),
+        &init,
+        &[],
+        "init-emission",
+        Some(addr.creator.to_string()),
+      )
+      .unwrap();
+    let code_id = self.app.store_code(ve3_connector_emission());
+    let msg = ve3_shared::msgs_connector_emission::MigrateMsg {};
+    self.migrate_contract(&emission_connector, code_id, msg);
 
     self
   }
@@ -309,6 +351,7 @@ impl TestingSuite {
       .unwrap()
   }
 
+  #[track_caller]
   fn migrate_contract<T: Serialize>(&mut self, contract: &Addr, code_id: u64, msg: T) {
     let creator = self.creator().clone();
     self.app.migrate_contract(creator, contract.clone(), &msg, code_id).unwrap();
