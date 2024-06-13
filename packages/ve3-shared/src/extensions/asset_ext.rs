@@ -89,7 +89,7 @@ impl AssetsExt for Vec<&Asset> {
       for asset in relevant {
         let coin: Coin = asset.try_into()?;
         if !info.funds.contains(&coin) {
-          return Err(SharedError::WrongDeposit(format!("missing {0}", coin)));
+          return Err(SharedError::WrongDeposit(format!("expected {0} coins", coin)));
         }
       }
       Ok(())

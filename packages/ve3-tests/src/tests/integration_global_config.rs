@@ -25,6 +25,10 @@ fn test_config_default() {
             Addr::unchecked("terra1yrnr2tuwnz9l95886n8d757lc70g7szefm6jzu885kafdusx3f4sg6uhup")
           ),
           ("BRIBE_MANAGER".to_string(), addr.ve3_bribe_manager.clone()),
+          (
+            "BRIBE_WHITELIST_CONTROLLER".to_string(),
+            Addr::unchecked("terra12c28vjamz0tfwjf3h9669zx4fhkpjnfd75vjsw807h38w5qkv7es0v88dv")
+          ),
           ("CONNECTOR__project".to_string(), addr.ve3_connector_alliance_2.clone()),
           ("CONNECTOR__stable".to_string(), addr.ve3_connector_alliance_1.clone()),
           (
@@ -39,6 +43,14 @@ fn test_config_default() {
             "TAKE_RECIPIENT".to_string(),
             Addr::unchecked("terra1lx7v09sx6mwazws6nd4n499ue7z28d7wyst3js6rtcu47fuwnmtqh5r9xl")
           ),
+          (
+            "VE_GUARDIAN".to_string(),
+            Addr::unchecked("terra17jpszh4mc0cxvv6enwvm646dtztcs0anwd234n867qf27umcj8cs55507e")
+          ),
+          (
+            "VOTING_ESCROW".to_string(),
+            Addr::unchecked("terra18yn206ypuxay79gjqv6msvd9t2y49w4fz8q7fyenx5aggj0ua37qw43exn")
+          ),
           // (
           //   "GAUGE_CONTROLLER".to_string(),
           //   Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
@@ -49,7 +61,11 @@ fn test_config_default() {
     .q_gc_address_list(AT_FREE_BRIBES.to_string(), |res| {
       assert_eq!(
         res.unwrap(),
-        vec![addr.ve3_asset_staking_1.clone(), addr.ve3_asset_staking_2.clone()]
+        vec![
+          addr.ve3_asset_staking_1.clone(),
+          addr.ve3_asset_staking_2.clone(),
+          addr.creator.clone()
+        ]
       )
     });
 }

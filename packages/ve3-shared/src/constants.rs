@@ -1,6 +1,7 @@
 // AT = Address Type
 pub const AT_DELEGATION_CONTROLLER: &str = "DELEGATION_CONTROLLER";
 pub const AT_ASSET_WHITELIST_CONTROLLER: &str = "ASSET_WHITELIST_CONTROLLER";
+pub const AT_BRIBE_WHITELIST_CONTROLLER: &str = "BRIBE_WHITELIST_CONTROLLER";
 // pub const AT_GAUGE_CONTROLLER: &str = "GAUGE_CONTROLLER";
 pub const AT_VE_GUARDIAN: &str = "VE_GUARDIAN";
 
@@ -27,7 +28,7 @@ pub fn at_connector(gauge: &str) -> String {
 //   format!("{AT_REWARD_DISTRIBUTION_CONTROLLER}__{gauge}")
 // }
 
-pub const DEFAULT_LIMIT: u32 = 10;
+pub const DEFAULT_LIMIT: u32 = 30;
 pub const DEFAULT_PERIODS_LIMIT: u64 = 20;
 pub const MAX_LIMIT: u32 = 100;
 

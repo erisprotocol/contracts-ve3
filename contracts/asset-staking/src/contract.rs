@@ -452,7 +452,7 @@ fn unstake(
     ),
   )?;
 
-  let msg = asset.transfer_msg(&info.sender)?;
+  let msg = asset.info.with_balance(withdraw_amount).transfer_msg(&info.sender)?;
 
   Ok(
     Response::new()

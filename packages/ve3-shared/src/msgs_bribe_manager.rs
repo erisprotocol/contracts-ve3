@@ -151,7 +151,7 @@ pub enum QueryMsg {
     period: Option<Time>,
   },
 
-  #[returns(BribesResponse)]
+  #[returns(UserClaimableResponse)]
   UserClaimable {
     user: String,
     periods: Option<Vec<u64>>,
@@ -164,6 +164,13 @@ pub struct NextClaimPeriodResponse {
 }
 
 pub type BribesResponse = BribeBuckets;
+
+#[cw_serde]
+pub struct UserClaimableResponse {
+  pub start: u64,
+  pub end: u64,
+  pub buckets: Vec<BribeBucket>,
+}
 
 #[cw_serde]
 pub struct MigrateMsg {}

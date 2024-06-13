@@ -12,7 +12,9 @@ use cw2::set_contract_version;
 use cw_asset::{Asset, AssetInfo};
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
-  constants::{AT_ASSET_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES},
+  constants::{
+    AT_ASSET_WHITELIST_CONTROLLER, AT_BRIBE_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES,
+  },
   error::SharedError,
   extensions::{
     asset_ext::{AssetExt, AssetsExt, AssetsUncheckedExt},
@@ -122,11 +124,12 @@ fn add_bribe(
     Err(SharedError::NotSupported("bribes required".to_string()))?;
   }
 
-  let has_fee = !config.fee.amount.is_zero()
-    && config.global_config().is_in_list(&deps.querier, AT_FREE_BRIBES, user)?;
+  let free_bribes = config.global_config().is_in_list(&deps.querier, AT_FREE_BRIBES, user)?;
+  let has_fee = !config.fee.amount.is_zero() && !free_bribes;
 
   let contract = env.contract.address;
 
+  // println!("{has_fee} {bribe:?}");
   match (has_fee, &bribe.info) {
     (false, AssetInfo::Native(_)) => {
       // no fee and native bribe
@@ -162,6 +165,9 @@ fn add_bribe(
 
   let bribes: Vec<(u64, Uint128)> = distribution.create_distribution(block_period, bribe.amount)?;
 
+  let start = bribes.first().map(|a| a.0).unwrap_or_default();
+  let end = bribes.last().map(|a| a.0).unwrap_or_default();
+
   assert_asset_whitelisted(&config, &bribe.info)?;
   asset_sum_equal(&bribe, &bribes)?;
   asset_future_only(block_period, &bribes)?;
@@ -180,7 +186,13 @@ fn add_bribe(
     BRIBE_CREATOR.save(deps.storage, user_key, &user_bucket)?;
   }
 
-  Ok(Response::new().add_attribute("action", "bribe/add_bribe").add_messages(msgs))
+  Ok(
+    Response::new()
+      .add_attribute("action", "bribe/add_bribe")
+      .add_attribute("start", start.to_string())
+      .add_attribute("end", end.to_string())
+      .add_messages(msgs),
+  )
 }
 
 fn withdraw_bribes(
@@ -192,7 +204,7 @@ fn withdraw_bribes(
   let block_period = get_period(env.block.time.seconds())?;
 
   if period <= block_period {
-    return Err(ContractError::BribesAlreadyDistributing {});
+    return Err(ContractError::BribesAlreadyDistributing);
   }
 
   let user = &info.sender;
@@ -242,21 +254,28 @@ fn claim_bribes(
   let periods = _claim_periods(&deps.as_ref(), user, periods, block_period, &asset_gauge)?;
 
   if periods.is_empty() {
-    return Err(ContractError::NoPeriodsValid {});
+    return Err(ContractError::NoPeriodsValid);
   }
 
   // this is ordered by period alread
   let shares =
     asset_gauge.query_user_shares(&deps.querier, user.clone(), Some(Times::Periods(periods)))?;
 
+  if shares.shares.is_empty() {
+    return Err(ContractError::NoValidShares);
+  }
+
   let mut context = ClaimContext::default();
   let mut bribe_total = Assets::default();
+
+  let mut periods = vec![];
 
   for share in shares.shares {
     // shares list sorted by period, each time we find a new one, context is updated.
     // starts with 0
     if share.period != context.period {
       context.maybe_save(deps.storage, user)?;
+      periods.push(share.period);
 
       let bribe_available = match BRIBE_AVAILABLE.may_load(deps.storage, share.period)? {
         Some(buckets) => buckets,
@@ -327,7 +346,13 @@ fn claim_bribes(
   context.maybe_save(deps.storage, user)?;
 
   let transfer_msgs = bribe_total.transfer_msgs(user)?;
-  Ok(Response::new().add_attribute("action", "bribe/claim_bribes").add_messages(transfer_msgs))
+  let periods = periods.iter().map(|asset| asset.to_string()).collect::<Vec<_>>().join(",");
+  Ok(
+    Response::new()
+      .add_attribute("action", "bribe/claim_bribes")
+      .add_attribute("periods", periods)
+      .add_messages(transfer_msgs),
+  )
 }
 
 fn whitelist_assets(
@@ -336,7 +361,12 @@ fn whitelist_assets(
   assets: Vec<AssetInfo>,
 ) -> Result<Response, ContractError> {
   let mut config = CONFIG.load(deps.storage)?;
-  assert_asset_whitelist_controller(&deps, &info, &config)?;
+  assert_bribe_whitelist_controller(&deps, &info, &config)?;
+
+  if assets.is_empty() {
+    return Err(ContractError::RequiresAssetInfos);
+  }
+
   let assets_str = assets.iter().map(|asset| asset.to_string()).collect::<Vec<_>>().join(",");
 
   for asset in assets {
@@ -359,7 +389,11 @@ fn remove_assets(
 ) -> Result<Response, ContractError> {
   let mut config = CONFIG.load(deps.storage)?;
   // Only allow the governance address to update whitelisted assets
-  assert_asset_whitelist_controller(&deps, &info, &config)?;
+  assert_bribe_whitelist_controller(&deps, &info, &config)?;
+
+  if assets.is_empty() {
+    return Err(ContractError::RequiresAssetInfos);
+  }
 
   config.whitelist.retain(|a| !assets.contains(a));
   CONFIG.save(deps.storage, &config)?;
@@ -382,7 +416,7 @@ fn asset_sum_equal(asset: &Asset, bribes: &[(u64, Uint128)]) -> Result<(), Contr
 
 fn asset_future_only(block_period: u64, bribes: &[(u64, Uint128)]) -> Result<(), ContractError> {
   if bribes.iter().any(|(period, _)| *period <= block_period) {
-    Err(ContractError::BribesAlreadyDistributing {})
+    Err(ContractError::BribesAlreadyDistributing)
   } else {
     Ok(())
   }
@@ -395,19 +429,19 @@ fn assert_asset_whitelisted(
   if config.allow_any || config.whitelist.contains(asset_info) {
     Ok(true)
   } else {
-    Err(ContractError::AssetNotWhitelisted {})
+    Err(ContractError::AssetNotWhitelisted)
   }
 }
 
 // Only governance (through a on-chain prop) can change the whitelisted assets
-fn assert_asset_whitelist_controller(
+fn assert_bribe_whitelist_controller(
   deps: &DepsMut,
   info: &MessageInfo,
   config: &Config,
 ) -> Result<(), ContractError> {
   config.global_config().assert_has_access(
     &deps.querier,
-    AT_ASSET_WHITELIST_CONTROLLER,
+    AT_BRIBE_WHITELIST_CONTROLLER,
     &info.sender,
   )?;
   Ok(())

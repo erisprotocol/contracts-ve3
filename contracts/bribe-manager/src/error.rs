@@ -31,10 +31,10 @@ pub enum ContractError {
   CheckedMultiplyRatioError(#[from] CheckedMultiplyRatioError),
 
   #[error("Asset not whitelisted")]
-  AssetNotWhitelisted {},
+  AssetNotWhitelisted,
 
   #[error("Bribes are already being distributed.")]
-  BribesAlreadyDistributing {},
+  BribesAlreadyDistributing,
 
   #[error("No bribes to withdraw.")]
   NoBribes,
@@ -46,5 +46,11 @@ pub enum ContractError {
   BribeAlreadyClaimed(u64),
 
   #[error("No valid periods for claiming provided")]
-  NoPeriodsValid {},
+  NoPeriodsValid,
+
+  #[error("No valid shares for claiming found")]
+  NoValidShares,
+
+  #[error("Sent asset infos must contain at least one.")]
+  RequiresAssetInfos,
 }

@@ -1,5 +1,6 @@
 use super::suite::TestingSuite;
-use cosmwasm_std::{Addr, StdError, StdResult};
+use cosmwasm_std::{Addr, CosmosMsg, StdError, StdResult};
+use cw20::Cw20ExecuteMsg;
 use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked, AssetUnchecked};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
@@ -53,7 +54,6 @@ impl TestingSuite {
 
     let mut combined = Assets::default();
     combined.add(&funds);
-
     if let Some(fees) = fees {
       combined.add(&fees);
     }
@@ -69,6 +69,61 @@ impl TestingSuite {
         ));
       },
       cw_asset::AssetInfoBase::Cw20(_) => todo!(),
+      _ => todo!(),
+    }
+
+    self
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn e_bribe_add_bribe_cw20(
+    &mut self,
+    funds: Asset,
+    gauge: &str,
+    for_info: AssetInfoUnchecked,
+    distribution: BribeDistribution,
+    fees: Option<Asset>,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::AddBribe {
+      bribe: funds.clone().into(),
+      gauge: gauge.to_string(),
+      for_info,
+      distribution,
+    };
+
+    let mut combined = Assets::default();
+    if let Some(fees) = fees {
+      combined.add(&fees);
+    }
+
+    match funds.info {
+      cw_asset::AssetInfoBase::Native(_) => {},
+      cw_asset::AssetInfoBase::Cw20(addr) => {
+        let sender = self.address(sender);
+
+        self
+          .app
+          .execute_contract(
+            sender.clone(),
+            addr,
+            &Cw20ExecuteMsg::IncreaseAllowance {
+              spender: self.contract_bribe().to_string(),
+              amount: funds.amount,
+              expires: Some(cw20::Expiration::AtHeight(self.app.block_info().height + 1)),
+            },
+            &[],
+          )
+          .unwrap();
+
+        result(self.app.execute_contract(
+          sender,
+          self.contract_bribe(),
+          &msg,
+          &combined.get_coins().unwrap().into_vec(),
+        ));
+      },
       _ => todo!(),
     }
 
@@ -183,12 +238,12 @@ impl TestingSuite {
     &mut self,
     user: &str,
     periods: Option<Vec<u64>>,
-    result: impl Fn(StdResult<BribesResponse>),
+    result: impl Fn(StdResult<UserClaimableResponse>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract_bribe(),
       &QueryMsg::UserClaimable {
-        user: user.to_string(),
+        user: self.address(user).to_string(),
         periods,
       },
     );

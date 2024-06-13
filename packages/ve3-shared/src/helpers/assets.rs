@@ -8,7 +8,7 @@ use crate::{error::SharedError, extensions::asset_info_ext::AssetInfoExt};
 
 #[cw_serde]
 #[derive(Default)]
-pub struct Assets(Vec<Asset>);
+pub struct Assets(pub Vec<Asset>);
 
 impl IntoIterator for Assets {
   type Item = Asset;
@@ -58,6 +58,10 @@ impl Assets {
   }
 
   pub fn add(&mut self, asset: &Asset) {
+    if asset.amount.is_zero() {
+      return;
+    }
+
     let existing = self.0.iter_mut().find(|a| a.info == asset.info);
 
     match existing {
@@ -89,16 +93,18 @@ impl Assets {
     vp: Uint128,
     total_vp: Uint128,
   ) -> Result<Vec<Asset>, SharedError> {
-    self
-      .0
-      .iter()
-      .map(|a| {
-        a.amount
-          .checked_multiply_ratio(vp, total_vp)
-          .map(|amount| a.info.with_balance(amount))
-          .map_err(SharedError::CheckedMultiplyRatioError)
-      })
-      .collect()
+    let mut results = vec![];
+    for a in &self.0 {
+      let share_amount = a.amount.checked_multiply_ratio(vp, total_vp)?;
+
+      if share_amount.is_zero() {
+        continue;
+      }
+
+      results.push(a.info.with_balance(share_amount))
+    }
+
+    Ok(results)
   }
 
   pub fn transfer_msgs(&self, to: &Addr) -> Result<Vec<CosmosMsg>, SharedError> {

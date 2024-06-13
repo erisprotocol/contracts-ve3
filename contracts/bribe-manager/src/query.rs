@@ -13,7 +13,9 @@ use ve3_shared::{
   error::SharedError,
   helpers::time::{GetPeriod, Time, Times},
   msgs_asset_gauge::UserShare,
-  msgs_bribe_manager::{BribeBuckets, BribesResponse, NextClaimPeriodResponse, QueryMsg},
+  msgs_bribe_manager::{
+    BribeBuckets, BribesResponse, NextClaimPeriodResponse, QueryMsg, UserClaimableResponse,
+  },
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -82,7 +84,8 @@ pub(crate) fn _claim_periods(
     None => {
       let start = _next_claim_period(deps, user, block_period, asset_gauge)?;
       let end = min(start + 101, block_period);
-      let numbs = (start + 1)..end;
+      let numbs = (start)..=end;
+
       numbs.collect()
     },
   };
@@ -106,14 +109,16 @@ fn user_claimable(
   env: Env,
   user: String,
   periods: Option<Vec<u64>>,
-) -> Result<BribesResponse, ContractError> {
+) -> Result<UserClaimableResponse, ContractError> {
   let user_addr = deps.api.addr_validate(&user)?;
   let block_period = Time::Current.get_period(&env)?;
   let asset_gauge = CONFIG.load(deps.storage)?.asset_gauge(&deps.querier)?;
   let periods = _claim_periods(&deps, &user_addr, periods, block_period, &asset_gauge)?;
 
   if periods.is_empty() {
-    return Ok(BribeBuckets {
+    return Ok(UserClaimableResponse {
+      start: 0,
+      end: 0,
       buckets: vec![],
     });
   }
@@ -123,6 +128,9 @@ fn user_claimable(
 
   let mut context = ClaimContext::default();
   let mut claimed = BribeBuckets::default();
+
+  let start = shares.shares.first().map(|a| a.period).unwrap_or_default();
+  let end = shares.shares.last().map(|a| a.period).unwrap_or_default();
 
   for share in shares.shares {
     // shares list sorted by period, each time we find a new one, context is updated.
@@ -178,8 +186,14 @@ fn user_claimable(
     // calculate the reward share based on the user vp compared to total vp
     let rewards = total_bribe_bucket.assets.calc_share_amounts(vp, total_vp)?;
     // add these rewards to the claimed bucket by the user
-    claimed.get(&gauge, &asset).assets.add_multi(&rewards);
+    if !rewards.is_empty() {
+      claimed.get(&gauge, &asset).assets.add_multi(&rewards);
+    }
   }
 
-  Ok(claimed)
+  Ok(UserClaimableResponse {
+    start,
+    end,
+    buckets: claimed.buckets,
+  })
 }

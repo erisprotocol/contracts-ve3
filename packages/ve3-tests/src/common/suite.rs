@@ -6,7 +6,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::{coin, Addr, Coin, Decimal, Empty, Timestamp, Uint128};
 use cw20::Cw20Coin;
-use cw_asset::{Asset, AssetInfoBase, AssetInfoUnchecked, AssetUnchecked};
+use cw_asset::{Asset, AssetInfo, AssetInfoBase, AssetInfoUnchecked, AssetUnchecked};
 use cw_multi_test::{
   App, AppBuilder, BankKeeper, DistributionKeeper, Executor, FailingModule, GovFailingModule,
   IbcFailingModule, MockAddressGenerator, MockApiBech32, StakeKeeper, WasmKeeper,
@@ -59,6 +59,7 @@ pub struct Addresses {
 
   pub fake_cw20: Addr,
   pub lp_cw20: Addr,
+  pub fee_recipient: Addr,
 
   pub active_asset_staking: Addr,
   pub active_connector_alliance: Addr,
@@ -71,12 +72,43 @@ impl Addresses {
   pub(crate) fn ampluna_info(&self) -> AssetInfoUnchecked {
     AssetInfoUnchecked::cw20(self.eris_hub_cw20.to_string())
   }
+  pub(crate) fn lp_cw_info(&self) -> AssetInfoUnchecked {
+    AssetInfoUnchecked::cw20(self.lp_cw20.to_string())
+  }
+  pub(crate) fn lp_native_info(&self) -> AssetInfoUnchecked {
+    AssetInfoUnchecked::native("lp".to_string())
+  }
 
+  pub(crate) fn ampluna_info_checked(&self) -> AssetInfo {
+    AssetInfo::cw20(self.eris_hub_cw20.clone())
+  }
+  pub(crate) fn lp_cw20_info_checked(&self) -> AssetInfo {
+    AssetInfo::cw20(self.lp_cw20.clone())
+  }
+  pub(crate) fn uluna_info_checked(&self) -> AssetInfo {
+    AssetInfo::native("uluna".to_string())
+  }
+  pub(crate) fn lp_info_checked(&self) -> AssetInfo {
+    AssetInfo::native("lp".to_string())
+  }
   pub(crate) fn ampluna(&self, a: u32) -> Asset {
     cw20(self.eris_hub_cw20.clone(), Uint128::new(a.into()))
   }
+  pub(crate) fn fake_cw20(&self, a: u32) -> Asset {
+    cw20(self.fake_cw20.clone(), Uint128::new(a.into()))
+  }
+  pub(crate) fn lp_cw20(&self, a: u32) -> Asset {
+    cw20(self.lp_cw20.clone(), Uint128::new(a.into()))
+  }
+
   pub(crate) fn uluna(&self, a: u32) -> Asset {
     native("uluna", Uint128::new(a.into()))
+  }
+  pub(crate) fn fake_native(&self, a: u32) -> Asset {
+    native("xxx", Uint128::new(a.into()))
+  }
+  pub(crate) fn lp_native(&self, a: u32) -> Asset {
+    native("lp", Uint128::new(a.into()))
   }
 }
 
@@ -138,7 +170,7 @@ impl TestingSuite {
       coin(1_000_000_000_000u128, "uluna".to_string()),
       coin(1_000_000_000_000u128, "xxx".to_string()),
       coin(1_000_000_000_000u128, "usdc".to_string()),
-      coin(1_000_000_000_000u128, "native_lp".to_string()),
+      coin(1_000_000_000_000u128, "lp".to_string()),
     ])
   }
 
@@ -148,6 +180,7 @@ impl TestingSuite {
     let creator = api.addr_make("creator");
     let user1 = api.addr_make("user1");
     let user2 = api.addr_make("user2");
+    let fee_recipient = api.addr_make("AT_FEE_COLLECTOR");
 
     let bank = BankKeeper::new();
 
@@ -191,6 +224,7 @@ impl TestingSuite {
         creator,
         user1,
         user2,
+        fee_recipient,
 
         active_asset_staking: Addr::unchecked(""),
         active_connector_alliance: Addr::unchecked(""),
@@ -417,12 +451,14 @@ impl TestingSuite {
   fn create_bribe_manager(&mut self) {
     let code_id = self.app.store_code(ve3_bribe_manager());
 
+    let ampluna = self.addresses.ampluna_info();
     let msg = ve3_shared::msgs_bribe_manager::InstantiateMsg {
       global_config_addr: self.addresses.ve3_global_config.to_string(),
       whitelist: vec![
         AssetInfoUnchecked::native("uluna"),
         AssetInfoUnchecked::native("usdc"),
         AssetInfoUnchecked::cw20(self.token1()),
+        ampluna,
       ],
       fee: AssetUnchecked::native("uluna", 10_000000u128),
     };
@@ -589,6 +625,10 @@ impl TestingSuite {
           AT_ASSET_WHITELIST_CONTROLLER.to_string(),
           self.address("AT_ASSET_WHITELIST_CONTROLLER").to_string(),
         ),
+        (
+          AT_BRIBE_WHITELIST_CONTROLLER.to_string(),
+          self.address("AT_BRIBE_WHITELIST_CONTROLLER").to_string(),
+        ),
         // (AT_GAUGE_CONTROLLER.to_string(), self.address("AT_GAUGE_CONTROLLER").to_string()),
         (AT_VE_GUARDIAN.to_string(), self.address("AT_VE_GUARDIAN").to_string()),
         // receivers
@@ -608,6 +648,7 @@ impl TestingSuite {
         vec![
           self.addresses.ve3_asset_staking_1.to_string(),
           self.addresses.ve3_asset_staking_2.to_string(),
+          self.addresses.creator.to_string(),
         ],
       )],
       "creator",

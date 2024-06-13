@@ -279,52 +279,6 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
   match reply.id {
-    // CREATE_REPLY_ID => {
-    //   let response = reply.result.unwrap();
-    //   // It works because the response data is a protobuf encoded string that contains the denom in the first slot (similar to the contract instantiation response)
-    //   let denom = parse_instantiate_response_data(response.data.unwrap().as_slice())
-    //     .map_err(|_| ContractError::Std(StdError::generic_err("parse error".to_string())))?
-    //     .contract_address;
-    //   let total_supply = Uint128::from(1_000_000_000_000_u128);
-    //   let sub_msg_mint =
-    //     SubMsg::new(CosmosMsg::Custom(CustomExecuteMsg::Token(TokenExecuteMsg::MintTokens {
-    //       denom: denom.clone(),
-    //       amount: total_supply,
-    //       mint_to_address: env.contract.address.to_string(),
-    //     })));
-    //   CONFIG.update(deps.storage, |mut config| -> Result<_, ContractError> {
-    //     config.alliance_token_denom = denom.clone();
-    //     config.alliance_token_supply = total_supply;
-    //     Ok(config)
-    //   })?;
-    //   let symbol = "ALLIANCE";
-
-    //   let sub_msg_metadata =
-    //     SubMsg::new(CosmosMsg::Custom(CustomExecuteMsg::Token(TokenExecuteMsg::SetMetadata {
-    //       denom: denom.clone(),
-    //       metadata: Metadata {
-    //         description: "Staking token for the alliance protocol".to_string(),
-    //         denom_units: vec![DenomUnit {
-    //           denom: denom.clone(),
-    //           exponent: 0,
-    //           aliases: vec![],
-    //         }],
-    //         base: denom.to_string(),
-    //         display: denom.to_string(),
-    //         name: "Alliance Token".to_string(),
-    //         symbol: symbol.to_string(),
-    //       },
-    //     })));
-    //   Ok(
-    //     Response::new()
-    //       .add_attributes(vec![
-    //         ("alliance_token_denom", denom),
-    //         ("alliance_token_total_supply", total_supply.to_string()),
-    //       ])
-    //       .add_submessage(sub_msg_mint)
-    //       .add_submessage(sub_msg_metadata),
-    //   )
-    // },
     CLAIM_REWARD_ERROR_REPLY_ID => {
       Ok(Response::new().add_attributes(vec![("action", "claim_reward_error")]))
     },
