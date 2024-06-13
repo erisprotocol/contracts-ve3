@@ -88,7 +88,7 @@ impl Addresses {
   pub(crate) fn uluna_info_checked(&self) -> AssetInfo {
     AssetInfo::native("uluna".to_string())
   }
-  pub(crate) fn lp_info_checked(&self) -> AssetInfo {
+  pub(crate) fn lp_native_info_checked(&self) -> AssetInfo {
     AssetInfo::native("lp".to_string())
   }
   pub(crate) fn ampluna(&self, a: u32) -> Asset {
@@ -454,12 +454,7 @@ impl TestingSuite {
     let ampluna = self.addresses.ampluna_info();
     let msg = ve3_shared::msgs_bribe_manager::InstantiateMsg {
       global_config_addr: self.addresses.ve3_global_config.to_string(),
-      whitelist: vec![
-        AssetInfoUnchecked::native("uluna"),
-        AssetInfoUnchecked::native("usdc"),
-        AssetInfoUnchecked::cw20(self.token1()),
-        ampluna,
-      ],
+      whitelist: vec![AssetInfoUnchecked::native("uluna"), ampluna],
       fee: AssetUnchecked::native("uluna", 10_000000u128),
     };
 
