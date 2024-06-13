@@ -1,5 +1,5 @@
 use super::suite::TestingSuite;
-use cosmwasm_std::{Addr, CosmosMsg, StdError, StdResult};
+use cosmwasm_std::{Addr, StdError, StdResult};
 use cw20::Cw20ExecuteMsg;
 use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked, AssetUnchecked};
 use cw_multi_test::{AppResponse, Executor};

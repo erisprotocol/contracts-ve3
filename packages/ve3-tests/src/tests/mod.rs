@@ -1,4 +1,5 @@
 pub mod integration_asset_gauge;
+pub mod integration_asset_gauge_distribution;
 pub mod integration_asset_gauge_rebase;
 pub mod integration_asset_gauge_vote;
 pub mod integration_asset_staking;

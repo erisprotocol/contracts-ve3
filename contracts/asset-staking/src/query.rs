@@ -1,7 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult, Uint128};
-use cw_asset::AssetInfo;
 use ve3_shared::msgs_asset_staking::{
   AllPendingRewardsQuery, AllStakedBalancesQuery, AssetInfoWithRuntime, AssetQuery,
   PendingRewardsRes, QueryMsg, StakedBalanceRes, WhitelistedAssetsDetailsResponse,
@@ -145,7 +144,7 @@ fn get_all_pending_rewards(deps: Deps, query: AllPendingRewardsQuery) -> StdResu
       Ok(PendingRewardsRes {
         rewards: pending_rewards + unclaimed_rewards,
         staked_asset: asset,
-        reward_asset: AssetInfo::Native(config.reward_info.to_string()),
+        reward_asset: config.reward_info.clone(),
       })
     })
     .collect::<StdResult<Vec<PendingRewardsRes>>>();

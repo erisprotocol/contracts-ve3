@@ -2,9 +2,9 @@
   "scripts": {
     "release": "bash scripts/build_release.sh",
     "schema": "nps schema",
-    "coverage": "cargo tarpaulin --target-dir target-tarpaulin --out lcov --frozen --locked --skip-clean",
+    "coverage": "cargo tarpaulin --target-dir target-tarpaulin --out lcov html --frozen --locked --skip-clean",
     "coverage:html": "cargo tarpaulin --target-dir target-tarpaulin --out html --frozen --locked --skip-clean",
-    "coverage:clean": "cargo tarpaulin --target-dir target-tarpaulin --out lcov --frozen --locked",
+    "coverage:clean": "cargo tarpaulin --out lcov",
     "scc": "scc contracts packages/ve3-shared",
     "upload": "bash scripts/publish_crates.sh"
   },

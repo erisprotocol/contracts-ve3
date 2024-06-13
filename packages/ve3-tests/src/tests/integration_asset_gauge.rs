@@ -11,17 +11,15 @@ use cw_asset::{AssetInfo, AssetInfoBase};
 use ve3_asset_gauge::error::ContractError;
 use ve3_shared::{
   constants::{MAX_LOCK_PERIODS, WEEK},
+  error::SharedError,
   extensions::decimal_ext::DecimalExt,
   helpers::{
     slope::adjust_vp_and_slope,
     time::{Time, Times},
   },
-  msgs_asset_gauge::{
-    UserFirstParticipationResponse, UserInfoExtendedResponse, UserShare, UserSharesResponse,
-    VotedInfoResponse,
-  },
+  msgs_asset_gauge::*,
   msgs_asset_staking::AssetDistribution,
-  msgs_voting_escrow::*,
+  msgs_voting_escrow::{Extension, Trait, VotingPowerResponse},
 };
 
 #[test]
@@ -723,5 +721,192 @@ fn test_query_infos() {
           ]
         }
       );
+    });
+}
+
+#[test]
+fn test_config() {
+  let mut suite = TestingSuite::def();
+  suite.init();
+
+  let addr = suite.addresses.clone();
+
+  suite
+    .q_gauge_config(|res| {
+      assert_eq!(
+        res.unwrap(),
+        Config {
+          global_config_addr: addr.ve3_global_config.clone(),
+          gauges: vec![
+            GaugeConfig {
+              name: addr.gauge_1.clone(),
+              min_gauge_percentage: Decimal::percent(10)
+            },
+            GaugeConfig {
+              name: addr.gauge_2.clone(),
+              min_gauge_percentage: Decimal::percent(0)
+            },
+          ],
+          rebase_asset: addr.uluna_info_checked()
+        }
+      )
+    })
+    .e_gauge_update_config(
+      Some(GaugeConfig {
+        name: "any".to_string(),
+        min_gauge_percentage: Decimal::percent(1),
+      }),
+      None,
+      "anyone",
+      |res| res.assert_error(ContractError::SharedError(SharedError::Unauthorized {})),
+    )
+    .e_gauge_update_config(
+      Some(GaugeConfig {
+        name: "any".to_string(),
+        min_gauge_percentage: Decimal::percent(21),
+      }),
+      None,
+      "creator",
+      |res| {
+        res.assert_error(ContractError::SharedError(SharedError::NotSupported(
+          "min_gauge_percentage needs to be less than 20%".to_string(),
+        )))
+      },
+    )
+    .e_gauge_update_config(
+      Some(GaugeConfig {
+        name: "any".to_string(),
+        min_gauge_percentage: Decimal::percent(1),
+      }),
+      Some(addr.gauge_1.to_string()),
+      "creator",
+      |res| res.assert_valid(),
+    )
+    .q_gauge_config(|res| {
+      assert_eq!(
+        res.unwrap(),
+        Config {
+          global_config_addr: addr.ve3_global_config.clone(),
+          gauges: vec![
+            GaugeConfig {
+              name: addr.gauge_2.clone(),
+              min_gauge_percentage: Decimal::percent(0)
+            },
+            GaugeConfig {
+              name: "any".to_string(),
+              min_gauge_percentage: Decimal::percent(1)
+            },
+          ],
+          rebase_asset: addr.uluna_info_checked()
+        }
+      )
+    });
+}
+
+#[test]
+fn test_user_infos() {
+  let mut suite = TestingSuite::def();
+  suite.init();
+
+  let addr = suite.addresses.clone();
+
+  suite
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
+    .q_gauge_user_infos(None, None, None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          (
+            addr.user1.clone(),
+            VotedInfoResponse {
+              voting_power: u(0),
+              fixed_amount: u(0),
+              slope: u(0)
+            }
+          ),
+          (
+            addr.user2.clone(),
+            VotedInfoResponse {
+              voting_power: u(0),
+              fixed_amount: u(0),
+              slope: u(0)
+            }
+          )
+        ]
+      )
+    })
+    // Next = 75
+    .q_gauge_user_infos(None, None, Some(Time::Next), |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          (
+            addr.user1.clone(),
+            VotedInfoResponse {
+              voting_power: u(172),
+              fixed_amount: u(1000),
+              slope: u(86)
+            }
+          ),
+          (
+            addr.user2.clone(),
+            VotedInfoResponse {
+              voting_power: u(206),
+              fixed_amount: u(1200),
+              slope: u(103)
+            }
+          )
+        ]
+      )
+    })
+    .q_gauge_user_infos(None, None, Some(Time::Period(76)), |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          (
+            addr.user1.clone(),
+            VotedInfoResponse {
+              voting_power: u(86),
+              fixed_amount: u(1000),
+              slope: u(86)
+            }
+          ),
+          (
+            addr.user2.clone(),
+            VotedInfoResponse {
+              voting_power: u(103),
+              fixed_amount: u(1200),
+              slope: u(103)
+            }
+          )
+        ]
+      )
+    })
+    .q_gauge_user_infos(None, Some(1), Some(Time::Period(76)), |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![(
+          addr.user1.clone(),
+          VotedInfoResponse {
+            voting_power: u(86),
+            fixed_amount: u(1000),
+            slope: u(86)
+          }
+        )]
+      )
+    })
+    .q_gauge_user_infos(Some(addr.user1.to_string()), None, Some(Time::Period(76)), |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![(
+          addr.user2.clone(),
+          VotedInfoResponse {
+            voting_power: u(103),
+            fixed_amount: u(1200),
+            slope: u(103)
+          }
+        )]
+      )
     });
 }

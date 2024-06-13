@@ -2,9 +2,9 @@ use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::period_index::Data;
 use crate::state::{
-  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex, Rebase, UserVotes,
-  CONFIG, GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO, REBASE, UNCLAIMED_REBASE,
-  USER_ASSET_REWARD_INDEX,
+  fetch_last_gauge_distribution, fetch_last_gauge_vote, user_idx, AssetIndex,
+  GaugeDistributionPeriod, Rebase, UserVotes, CONFIG, GAUGE_DISTRIBUTION, GAUGE_VOTE, LOCK_INFO,
+  REBASE, UNCLAIMED_REBASE, USER_ASSET_REWARD_INDEX,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -23,9 +23,7 @@ use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
-use ve3_shared::msgs_asset_gauge::{
-  Config, ExecuteMsg, GaugeConfig, GaugeDistributionPeriod, InstantiateMsg,
-};
+use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg};
 use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::msgs_voting_escrow::{End, LockInfoResponse};
 
@@ -98,6 +96,11 @@ pub fn execute(
       config.global_config().assert_owner(&deps.querier, &info.sender)?;
 
       if let Some(gauge) = update_gauge {
+        if gauge.min_gauge_percentage > Decimal::percent(20) {
+          Err(SharedError::NotSupported(
+            "min_gauge_percentage needs to be less than 20%".to_string(),
+          ))?
+        }
         config.gauges.retain(|a| a.name != gauge.name);
         config.gauges.push(gauge);
       }
@@ -124,7 +127,7 @@ fn claim_rebase(
   let block_period = get_period(env.block.time.seconds())?;
   let fixed_amount = user_idx().get_latest_fixed(deps.storage, block_period + 1, user.as_str())?;
 
-  _calc_rebase_share(deps.storage, &rebase, &user, fixed_amount)?;
+  calc_rebase_share(deps.storage, &rebase, &user, fixed_amount)?;
   let rebase_amount = UNCLAIMED_REBASE.load(deps.storage, user.clone()).unwrap_or(Uint128::zero());
   UNCLAIMED_REBASE.remove(deps.storage, user.clone());
 
@@ -153,7 +156,9 @@ fn claim_rebase(
     None => voting_escrow.create_permanent_lock_msg(rebase_asset, Some(user.to_string()))?,
   };
 
-  let resp = Response::new()
+  let mut resp = Response::new();
+
+  resp = resp
     .add_attribute("action", "gauge/claim_rebase")
     .add_attribute("user", user.as_ref())
     .add_attribute("rebase_amount", rebase_amount.to_string())
@@ -333,7 +338,7 @@ fn update_vote(
     rebase.total_fixed = rebase.total_fixed.checked_sub(old_lock.fixed_amount)?;
 
     if !is_same_owner || !new_lock.has_vp() {
-      _calc_rebase_share(
+      calc_rebase_share(
         deps.storage,
         &rebase,
         &old_lock.owner,
@@ -345,7 +350,7 @@ fn update_vote(
     let user = apply_votes_of_user(deps.storage, &config, block_period, &new_lock)?;
 
     rebase.total_fixed = rebase.total_fixed.checked_add(new_lock.fixed_amount)?;
-    _calc_rebase_share(
+    calc_rebase_share(
       deps.storage,
       &rebase,
       &new_lock.owner,
@@ -376,7 +381,7 @@ fn add_rebase(deps: DepsMut, asset: Asset) -> Result<Response, ContractError> {
   Ok(Response::default().add_attribute("action", "gauge/add_rebase"))
 }
 
-fn _calc_rebase_share(
+fn calc_rebase_share(
   storage: &mut dyn Storage,
   rebase: &Rebase,
   user: &Addr,

@@ -94,9 +94,11 @@ impl Addresses {
   pub(crate) fn ampluna(&self, a: u32) -> Asset {
     cw20(self.eris_hub_cw20.clone(), Uint128::new(a.into()))
   }
+  #[allow(dead_code)]
   pub(crate) fn fake_cw20(&self, a: u32) -> Asset {
     cw20(self.fake_cw20.clone(), Uint128::new(a.into()))
   }
+  #[allow(dead_code)]
   pub(crate) fn lp_cw20(&self, a: u32) -> Asset {
     cw20(self.lp_cw20.clone(), Uint128::new(a.into()))
   }
@@ -124,7 +126,7 @@ impl TestingSuite {
   pub(crate) fn user2(&mut self) -> Addr {
     self.address("user2")
   }
-
+  #[allow(dead_code)]
   pub(crate) fn token1(&mut self) -> Addr {
     self.address("token")
   }

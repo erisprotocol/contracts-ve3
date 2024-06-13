@@ -461,7 +461,7 @@ fn unstake(
         ("user", info.sender.as_ref()),
         ("asset", &asset.info.to_string()),
         ("amount", &withdraw_amount.to_string()),
-        ("shares", &share_amount.to_string()),
+        ("share", &share_amount.to_string()),
       ])
       .add_messages(asset_config.stake_config.unstake_check_received_msg(
         &deps,

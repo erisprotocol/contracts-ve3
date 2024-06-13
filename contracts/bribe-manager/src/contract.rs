@@ -12,9 +12,7 @@ use cw2::set_contract_version;
 use cw_asset::{Asset, AssetInfo};
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
-  constants::{
-    AT_ASSET_WHITELIST_CONTROLLER, AT_BRIBE_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES,
-  },
+  constants::{AT_BRIBE_WHITELIST_CONTROLLER, AT_FEE_COLLECTOR, AT_FREE_BRIBES},
   error::SharedError,
   extensions::{
     asset_ext::{AssetExt, AssetsExt, AssetsUncheckedExt},

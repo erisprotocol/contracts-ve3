@@ -231,7 +231,7 @@ impl TestingSuite {
     &mut self,
     gauge: String,
     time: Option<Time>,
-    result: impl Fn(StdResult<GaugeDistributionPeriod>),
+    result: impl Fn(StdResult<GaugeDistributionResponse>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract_1(),
@@ -247,7 +247,7 @@ impl TestingSuite {
   pub fn q_gauge_distributions(
     &mut self,
     time: Option<Time>,
-    result: impl Fn(StdResult<Vec<GaugeDistributionPeriod>>),
+    result: impl Fn(StdResult<Vec<GaugeDistributionResponse>>),
   ) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(
       self.contract_1(),

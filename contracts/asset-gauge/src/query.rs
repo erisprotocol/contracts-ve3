@@ -13,9 +13,9 @@ use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::helpers::time::{GetPeriod, GetPeriods, Time, Times};
 use ve3_shared::msgs_asset_gauge::{
-  GaugeDistributionPeriod, GaugeInfosResponse, GaugeVote, QueryMsg, UserFirstParticipationResponse,
-  UserInfoExtendedResponse, UserInfosResponse, UserPendingRebaseResponse, UserShare,
-  UserSharesResponse, VotedInfoResponse,
+  GaugeDistributionResponse, GaugeInfosResponse, GaugeVote, QueryMsg,
+  UserFirstParticipationResponse, UserInfoExtendedResponse, UserInfosResponse,
+  UserPendingRebaseResponse, UserShare, UserSharesResponse, VotedInfoResponse,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -266,23 +266,38 @@ fn distribution(
   env: Env,
   gauge: String,
   time: Option<Time>,
-) -> StdResult<GaugeDistributionPeriod> {
+) -> StdResult<GaugeDistributionResponse> {
   let period = time.get_period(&env)?;
-  GAUGE_DISTRIBUTION.load(deps.storage, (&gauge, period))
+  get_gauge_distribution(deps, gauge, period)
+}
+
+fn get_gauge_distribution(
+  deps: Deps,
+  gauge: String,
+  period: u64,
+) -> StdResult<GaugeDistributionResponse> {
+  GAUGE_DISTRIBUTION.load(deps.storage, (&gauge, period)).map(|distribution| {
+    GaugeDistributionResponse {
+      gauge,
+      period,
+      total_gauge_vp: distribution.total_gauge_vp,
+      assets: distribution.assets,
+    }
+  })
 }
 
 fn distributions(
   deps: Deps,
   env: Env,
   time: Option<Time>,
-) -> StdResult<Vec<GaugeDistributionPeriod>> {
+) -> StdResult<Vec<GaugeDistributionResponse>> {
   let config = CONFIG.load(deps.storage)?;
   let period = time.get_period(&env)?;
 
   config
     .gauges
-    .iter()
-    .map(|a| GAUGE_DISTRIBUTION.load(deps.storage, (&a.name, period)))
+    .into_iter()
+    .map(|a| get_gauge_distribution(deps, a.name, period))
     .collect::<StdResult<Vec<_>>>()
 }
 

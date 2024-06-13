@@ -109,13 +109,13 @@ pub enum QueryMsg {
     time: Option<Time>,
   },
 
-  #[returns(GaugeDistributionPeriod)]
+  #[returns(GaugeDistributionResponse)]
   Distribution {
     gauge: String,
     time: Option<Time>,
   },
 
-  #[returns(Vec<GaugeDistributionPeriod>)]
+  #[returns(Vec<GaugeDistributionResponse>)]
   Distributions {
     time: Option<Time>,
   },
@@ -219,7 +219,9 @@ pub struct GaugeVote {
 }
 
 #[cw_serde]
-pub struct GaugeDistributionPeriod {
+pub struct GaugeDistributionResponse {
+  pub gauge: String,
+  pub period: u64,
   pub total_gauge_vp: Uint128,
   pub assets: Vec<AssetDistribution>,
 }

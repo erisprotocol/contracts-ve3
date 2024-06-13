@@ -7,7 +7,7 @@ use ve3_shared::msgs_asset_staking::*;
 
 #[allow(dead_code)]
 impl TestingSuite {
-  fn contract_4(&self) -> Addr {
+  fn contract_active_staking(&self) -> Addr {
     self.addresses.active_asset_staking.clone()
   }
 
@@ -29,7 +29,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Receive(cw20_receive_msg);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -43,7 +43,7 @@ impl TestingSuite {
       recipient,
     };
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -55,7 +55,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Unstake(asset);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -67,7 +67,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::ClaimRewards(asset_info);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -79,7 +79,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::ClaimRewardsMultiple(asset_infos);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -91,7 +91,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::WhitelistAssets(asset_infos);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -103,7 +103,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::RemoveAssets(asset_infos);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -115,7 +115,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::UpdateAssetConfig(update_asset_config);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -127,7 +127,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::SetAssetRewardDistribution(asset_distributions);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -138,7 +138,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::UpdateRewards {};
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -154,7 +154,7 @@ impl TestingSuite {
       assets,
     };
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -170,7 +170,7 @@ impl TestingSuite {
       assets,
     };
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
@@ -182,12 +182,13 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Callback(callback_msg);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_4(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
   pub fn q_staking_config(&mut self, result: impl Fn(StdResult<Config>)) -> &mut Self {
-    let response = self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::Config {});
+    let response =
+      self.app.wrap().query_wasm_smart(self.contract_active_staking(), &QueryMsg::Config {});
     result(response);
     self
   }
@@ -196,8 +197,10 @@ impl TestingSuite {
     &mut self,
     result: impl Fn(StdResult<WhitelistedAssetsResponse>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::WhitelistedAssets {});
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::WhitelistedAssets {});
     result(response);
     self
   }
@@ -206,8 +209,10 @@ impl TestingSuite {
     &mut self,
     result: impl Fn(StdResult<Vec<AssetDistribution>>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::RewardDistribution {});
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::RewardDistribution {});
     result(response);
     self
   }
@@ -217,8 +222,10 @@ impl TestingSuite {
     asset_query: AssetQuery,
     result: impl Fn(StdResult<StakedBalanceRes>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::StakedBalance(asset_query));
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::StakedBalance(asset_query));
     result(response);
     self
   }
@@ -228,8 +235,10 @@ impl TestingSuite {
     asset_query: AssetQuery,
     result: impl Fn(StdResult<PendingRewardsRes>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::PendingRewards(asset_query));
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::PendingRewards(asset_query));
     result(response);
     self
   }
@@ -239,8 +248,10 @@ impl TestingSuite {
     query: AllStakedBalancesQuery,
     result: impl Fn(StdResult<Vec<StakedBalanceRes>>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::AllStakedBalances(query));
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::AllStakedBalances(query));
     result(response);
     self
   }
@@ -250,8 +261,10 @@ impl TestingSuite {
     query: AllPendingRewardsQuery,
     result: impl Fn(StdResult<Vec<PendingRewardsRes>>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::AllPendingRewards(query));
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::AllPendingRewards(query));
     result(response);
     self
   }
@@ -260,8 +273,10 @@ impl TestingSuite {
     &mut self,
     result: impl Fn(StdResult<Vec<StakedBalanceRes>>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::TotalStakedBalances {});
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::TotalStakedBalances {});
     result(response);
     self
   }
@@ -270,8 +285,10 @@ impl TestingSuite {
     &mut self,
     result: impl Fn(StdResult<WhitelistedAssetsDetailsResponse>),
   ) -> &mut Self {
-    let response =
-      self.app.wrap().query_wasm_smart(self.contract_4(), &QueryMsg::WhitelistedAssetDetails {});
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::WhitelistedAssetDetails {});
     result(response);
     self
   }

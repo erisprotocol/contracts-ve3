@@ -3,7 +3,6 @@ use crate::{
   extensions::app_response_ext::{EventChecker, Valid},
 };
 use cosmwasm_std::attr;
-use cw_asset::AssetBase;
 use ve3_bribe_manager::error::ContractError;
 use ve3_shared::{
   constants::WEEK,
