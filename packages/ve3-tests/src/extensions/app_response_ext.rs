@@ -20,7 +20,11 @@ impl EventChecker for AppResponse {
     if !found {
       let text = format!("Could not find attribute (\"{0}\", \"{1}\")", attr.key, attr.value);
       println!("{}", text.red());
-      println!("{:?}", self.events);
+
+      for event in self.events.iter() {
+        let text = format!("{:?}", event);
+        println!("{}", text.purple());
+      }
       panic!("{:?}", StdError::generic_err(text));
     }
 

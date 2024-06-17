@@ -1,6 +1,8 @@
+use crate::extensions::app_response_ext::Valid;
+
 use super::suite::TestingSuite;
-use cosmwasm_std::{Addr, Decimal};
-use cw_asset::AssetInfo;
+use cosmwasm_std::Decimal;
+use cw_asset::{AssetInfo, AssetInfoUnchecked};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::msgs_asset_staking::{AssetConfig, AssetInfoWithConfig};
 
@@ -11,16 +13,16 @@ impl TestingSuite {
     self.e_staking_whitelist_assets(
       vec![
         AssetInfoWithConfig::new(
-          AssetInfo::native("lp"),
+          AssetInfoUnchecked::native("lp"),
           Some(AssetConfig {
             yearly_take_rate: Decimal::percent(20),
             stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
-              contract: Addr::unchecked("test"),
-              reward_infos: vec![AssetInfo::native("ibcastro")],
+              contract: addr.incentive_mock.to_string(),
+              reward_infos: vec![AssetInfoUnchecked::native("astro")],
             },
           }),
         ),
-        AssetInfo::cw20(addr.lp_cw20.clone()).into(),
+        AssetInfoUnchecked::cw20(addr.lp_cw20.clone()).into(),
       ],
       "AT_ASSET_WHITELIST_CONTROLLER",
       |res| {
@@ -75,5 +77,46 @@ impl TestingSuite {
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, addr.ve3_asset_gauge.clone(), &msg, &[]));
     self
+  }
+
+  pub fn def_asset_config_astro(
+    &mut self,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+
+    self.e_staking_whitelist_assets(
+      vec![AssetInfoWithConfig::new(
+        AssetInfoUnchecked::native("lp"),
+        Some(AssetConfig {
+          yearly_take_rate: Decimal::percent(10),
+          stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
+            contract: addr.incentive_mock.to_string(),
+            reward_infos: vec![AssetInfoUnchecked::native("astro")],
+          },
+        }),
+      )],
+      "AT_ASSET_WHITELIST_CONTROLLER",
+      result,
+    )
+  }
+
+  pub fn def_asset_config_no_staking(&mut self) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+
+    self.e_staking_whitelist_assets(
+      vec![
+        AssetInfoWithConfig::new(
+          AssetInfoUnchecked::native("lp"),
+          Some(AssetConfig {
+            yearly_take_rate: Decimal::percent(10),
+            stake_config: ve3_shared::stake_config::StakeConfig::Default,
+          }),
+        ),
+        AssetInfo::cw20(addr.lp_cw20.clone()).into(),
+      ],
+      "AT_ASSET_WHITELIST_CONTROLLER",
+      |res| res.assert_valid(),
+    )
   }
 }

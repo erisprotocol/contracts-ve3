@@ -1,4 +1,4 @@
-use cosmwasm_std::{coin, Addr};
+use cosmwasm_std::Addr;
 use cw_ownable::Ownership;
 use ve3_global_config::error::ContractError;
 use ve3_shared::constants::AT_FREE_BRIBES;
@@ -7,8 +7,7 @@ use crate::common::suite::TestingSuite;
 
 #[test]
 fn test_config_default() {
-  let mut suite =
-    TestingSuite::default_with_balances(vec![coin(1_000_000_000u128, "uluna".to_string())]);
+  let mut suite = TestingSuite::def();
   suite.init();
   let addr = suite.addresses.clone();
 
@@ -72,8 +71,7 @@ fn test_config_default() {
 
 #[test]
 fn test_config_update_ownership() {
-  let mut suite =
-    TestingSuite::default_with_balances(vec![coin(1_000_000_000u128, "uluna".to_string())]);
+  let mut suite = TestingSuite::def();
   suite.init_no_config();
   let addr = suite.addresses.clone();
 
@@ -134,8 +132,7 @@ fn test_config_update_ownership() {
 
 #[test]
 fn test_config_update_addresses() {
-  let mut suite =
-    TestingSuite::default_with_balances(vec![coin(1_000_000_000u128, "uluna".to_string())]);
+  let mut suite = TestingSuite::def();
   suite.init_no_config();
   let addr = suite.addresses.clone();
 

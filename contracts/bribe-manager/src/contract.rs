@@ -189,6 +189,7 @@ fn add_bribe(
       .add_attribute("action", "bribe/add_bribe")
       .add_attribute("start", start.to_string())
       .add_attribute("end", end.to_string())
+      .add_attribute("added", bribe.to_string())
       .add_messages(msgs),
   )
 }

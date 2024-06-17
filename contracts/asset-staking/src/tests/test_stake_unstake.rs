@@ -22,7 +22,7 @@ fn test_stake_cw20() {
   assert_eq!(
     res,
     Response::default().add_attributes(vec![
-      ("action", "stake"),
+      ("action", "asset/stake"),
       ("user", "user1"),
       ("asset", "cw20:asset1"),
       ("amount", "100"),
@@ -43,7 +43,7 @@ fn test_stake_cw20() {
   assert_eq!(
     res,
     Response::default().add_attributes(vec![
-      ("action", "stake"),
+      ("action", "asset/stake"),
       ("user", "user1"),
       ("asset", "cw20:asset1"),
       ("amount", "100"),
@@ -67,8 +67,7 @@ fn test_stake_cw20() {
   assert_eq!(
     total_balances_res,
     vec![StakedBalanceRes {
-      asset: AssetInfo::Cw20(Addr::unchecked("asset1")),
-      balance: Uint128::new(200),
+      asset: Asset::cw20(Addr::unchecked("asset1"), Uint128::new(200)),
       shares: Uint128::new(200),
       config: AssetConfigRuntime {
         last_taken_s: 1571797419,
@@ -91,7 +90,7 @@ fn test_unstake_cw20() {
   assert_eq!(
     res,
     Response::default().add_attributes(vec![
-      ("action", "stake"),
+      ("action", "asset/stake"),
       ("user", "user1"),
       ("asset", "cw20:asset1"),
       ("amount", "100"),
@@ -104,7 +103,7 @@ fn test_unstake_cw20() {
     res,
     Response::default()
       .add_attributes(vec![
-        ("action", "unstake"),
+        ("action", "asset/unstake"),
         ("user", "user1"),
         ("asset", "cw20:asset1"),
         ("amount", "50"),
@@ -135,7 +134,7 @@ fn test_unstake_cw20() {
     res,
     Response::default()
       .add_attributes(vec![
-        ("action", "unstake"),
+        ("action", "asset/unstake"),
         ("user", "user1"),
         ("asset", "cw20:asset1"),
         ("amount", "50"),
@@ -176,7 +175,7 @@ fn test_stake() {
   assert_eq!(
     res,
     Response::default().add_attributes(vec![
-      ("action", "stake"),
+      ("action", "asset/stake"),
       ("user", "user1"),
       ("asset", "native:asset1"),
       ("amount", "100"),
@@ -197,7 +196,7 @@ fn test_stake() {
   assert_eq!(
     res,
     Response::default().add_attributes(vec![
-      ("action", "stake"),
+      ("action", "asset/stake"),
       ("user", "user1"),
       ("asset", "native:asset1"),
       ("amount", "100"),
@@ -220,8 +219,7 @@ fn test_stake() {
   assert_eq!(
     total_balances_res,
     vec![StakedBalanceRes {
-      asset: AssetInfo::Native("asset1".to_string()),
-      balance: Uint128::new(200),
+      asset: Asset::native("asset1".to_string(), Uint128::new(200)),
       shares: Uint128::new(200),
       config: AssetConfigRuntime {
         last_taken_s: 1571797419,
@@ -245,7 +243,7 @@ fn test_stake_invalid() {
   };
   let info = mock_info("user1", &[coin(100, "asset2")]);
   let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-  assert_eq!(err, ContractError::AssetNotWhitelisted {});
+  assert_eq!(err, ContractError::AssetNotWhitelisted);
 
   // Stake multiple assets in a single call
   let msg = ExecuteMsg::Stake {
@@ -285,7 +283,7 @@ fn test_unstake() {
     res,
     Response::default()
       .add_attributes(vec![
-        ("action", "unstake"),
+        ("action", "asset/unstake"),
         ("user", "user1"),
         ("asset", "native:asset1"),
         ("amount", "50"),
@@ -310,7 +308,7 @@ fn test_unstake() {
     res,
     Response::default()
       .add_attributes(vec![
-        ("action", "unstake"),
+        ("action", "asset/unstake"),
         ("user", "user1"),
         ("asset", "native:asset1"),
         ("amount", "50"),
@@ -357,7 +355,7 @@ fn test_unstake_invalid() {
     res,
     Response::default()
       .add_attributes(vec![
-        ("action", "unstake"),
+        ("action", "asset/unstake"),
         ("user", "user1"),
         ("asset", "native:asset1"),
         // even though user tries to withdraw 101, he will receive his max (100)

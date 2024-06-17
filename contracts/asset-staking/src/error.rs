@@ -30,11 +30,14 @@ pub enum ContractError {
   AssetAlreadyWhitelisted,
 
   #[error("Asset not whitelisted")]
-  AssetNotWhitelisted {},
+  AssetNotWhitelisted,
 
   #[error("Amount cannot be zero")]
   AmountCannotBeZero {},
 
   #[error("Invalid Distribution")]
   InvalidDistribution {},
+
+  #[error("Yearly take rate needs to be less or equal 50%")]
+  TakeRateLessOrEqual50,
 }

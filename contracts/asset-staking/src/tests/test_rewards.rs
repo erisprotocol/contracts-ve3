@@ -147,7 +147,10 @@ fn update_reward_callback() {
     .load(deps.as_ref().storage, &AssetInfo::Native("cMONKEY".to_string()))
     .unwrap_err();
 
-  assert_eq!(res, Response::new().add_attributes(vec![("action", "update_rewards_callback")]));
+  assert_eq!(
+    res,
+    Response::new().add_attributes(vec![("action", "asset/update_rewards_callback")])
+  );
 }
 
 #[test]
@@ -212,7 +215,7 @@ fn claim_user_rewards() {
     res,
     Response::new()
       .add_attributes(vec![
-        ("action", "claim_rewards"),
+        ("action", "asset/claim_rewards"),
         ("user", "user1"),
         ("asset", "native:aWHALE"),
         ("reward_amount", "100000"),
@@ -258,7 +261,7 @@ fn claim_user_rewards() {
   assert_eq!(
     res,
     Response::new().add_attributes(vec![
-      ("action", "claim_rewards"),
+      ("action", "asset/claim_rewards"),
       ("user", "user1"),
       ("asset", "native:aWHALE"),
       ("reward_amount", "0"),
@@ -285,7 +288,7 @@ fn claim_user_rewards() {
     res,
     Response::new()
       .add_attributes(vec![
-        ("action", "claim_rewards"),
+        ("action", "asset/claim_rewards"),
         ("user", "user1"),
         ("asset", "native:aWHALE"),
         ("reward_amount", "10000"),
@@ -342,7 +345,7 @@ fn claim_user_rewards_after_staking() {
     res,
     Response::new()
       .add_attributes(vec![
-        ("action", "claim_rewards"),
+        ("action", "asset/claim_rewards"),
         ("user", "user1"),
         ("asset", "native:aWHALE"),
         ("reward_amount", "100000"),
@@ -358,7 +361,7 @@ fn claim_user_rewards_after_staking() {
   assert_eq!(
     res,
     Response::new().add_attributes(vec![
-      ("action", "claim_rewards"),
+      ("action", "asset/claim_rewards"),
       ("user", "user1"),
       ("asset", "native:aWHALE"),
       ("reward_amount", "0"),

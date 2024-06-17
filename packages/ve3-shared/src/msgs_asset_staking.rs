@@ -5,9 +5,10 @@ use crate::{
   stake_config::StakeConfig,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, DepsMut, Uint128};
+use cosmwasm_std::{Addr, Api, Decimal, DepsMut, Uint128};
 use cw20::Cw20ReceiveMsg;
-use cw_asset::{Asset, AssetInfo};
+use cw_address_like::AddressLike;
+use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 
 #[cw_serde]
 pub struct Config {
@@ -41,13 +42,13 @@ pub struct AssetConfigRuntime {
   pub harvested: Uint128,
 
   pub yearly_take_rate: Decimal,
-  pub stake_config: StakeConfig,
+  pub stake_config: StakeConfig<Addr>,
 }
 
 #[cw_serde]
-pub struct AssetConfig {
+pub struct AssetConfig<T: AddressLike> {
   pub yearly_take_rate: Decimal,
-  pub stake_config: StakeConfig,
+  pub stake_config: StakeConfig<T>,
 }
 
 #[cw_serde]
@@ -59,9 +60,9 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub struct AssetInfoWithConfig {
-  pub info: AssetInfo,
-  pub config: Option<AssetConfig>,
+pub struct AssetInfoWithConfig<T: AddressLike> {
+  pub info: AssetInfoBase<T>,
+  pub config: Option<AssetConfig<T>>,
 }
 
 #[cw_serde]
@@ -71,18 +72,41 @@ pub struct AssetInfoWithRuntime {
   pub whitelisted: bool,
 }
 
-impl From<AssetInfo> for AssetInfoWithConfig {
-  fn from(val: AssetInfo) -> Self {
+impl From<AssetInfoUnchecked> for AssetInfoWithConfig<String> {
+  fn from(val: AssetInfoUnchecked) -> Self {
     AssetInfoWithConfig::new(val, None)
   }
 }
 
-impl AssetInfoWithConfig {
-  pub fn new(info: AssetInfo, config: Option<AssetConfig>) -> Self {
+impl From<AssetInfo> for AssetInfoWithConfig<String> {
+  fn from(val: AssetInfo) -> Self {
+    AssetInfoWithConfig::new(val.into(), None)
+  }
+}
+
+impl AssetInfoWithConfig<String> {
+  pub fn new(info: AssetInfoUnchecked, config: Option<AssetConfig<String>>) -> Self {
     Self {
       info,
       config,
     }
+  }
+}
+
+impl AssetInfoWithConfig<String> {
+  pub fn check(self, api: &dyn Api) -> Result<AssetInfoWithConfig<Addr>, AssetError> {
+    Ok(AssetInfoWithConfig {
+      info: self.info.check(api, None)?,
+      config: self
+        .config
+        .map(|a| -> Result<AssetConfig<Addr>, AssetError> {
+          Ok(AssetConfig {
+            yearly_take_rate: a.yearly_take_rate,
+            stake_config: a.stake_config.check(api)?,
+          })
+        })
+        .transpose()?,
+    })
   }
 }
 
@@ -126,10 +150,10 @@ pub enum ExecuteMsg {
   ClaimRewardsMultiple(Vec<AssetInfo>),
 
   // controller
-  WhitelistAssets(Vec<AssetInfoWithConfig>),
+  WhitelistAssets(Vec<AssetInfoWithConfig<String>>),
   RemoveAssets(Vec<AssetInfo>),
   // cant update multiple as we need to track bribe recapturing
-  UpdateAssetConfig(AssetInfoWithConfig),
+  UpdateAssetConfig(AssetInfoWithConfig<String>),
   SetAssetRewardDistribution(Vec<AssetDistribution>),
 
   // operator
@@ -200,8 +224,7 @@ pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct StakedBalanceRes {
-  pub asset: AssetInfo,
-  pub balance: Uint128,
+  pub asset: Asset,
   pub shares: Uint128,
   pub config: AssetConfigRuntime,
 }

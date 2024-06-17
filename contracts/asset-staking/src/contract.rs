@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::state::{
@@ -7,12 +9,12 @@ use crate::state::{
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  from_json, Addr, Decimal, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
-  Storage, Uint128,
+  attr, from_json, Addr, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Order, Response, StdError,
+  StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use cw_asset::{Asset, AssetInfo};
+use cw_asset::{Asset, AssetError, AssetInfo};
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{
   AT_ASSET_GAUGE, AT_ASSET_WHITELIST_CONTROLLER, AT_TAKE_RECIPIENT, SECONDS_PER_YEAR,
@@ -20,6 +22,7 @@ use ve3_shared::constants::{
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
+use ve3_shared::helpers::assets::Assets;
 use ve3_shared::helpers::general::addr_opt_fallback;
 use ve3_shared::msgs_asset_staking::{
   AssetConfig, AssetConfigRuntime, AssetDistribution, AssetInfoWithConfig, CallbackMsg, Config,
@@ -42,7 +45,7 @@ pub fn instantiate(
     gauge: msg.gauge,
   };
   CONFIG.save(deps.storage, &config)?;
-  Ok(Response::new().add_attributes(vec![("action", "instantiate")]))
+  Ok(Response::new().add_attributes(vec![("action", "asset/instantiate")]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -84,7 +87,7 @@ pub fn execute(
     } => distribute_bribes(deps, env, info, update, assets),
 
     // controller
-    ExecuteMsg::WhitelistAssets(assets) => whitelist_assets(deps, info, assets),
+    ExecuteMsg::WhitelistAssets(assets) => whitelist_assets(deps, env, info, assets),
     ExecuteMsg::RemoveAssets(assets) => remove_assets(deps, info, assets),
     ExecuteMsg::UpdateAssetConfig(update) => update_asset_config(deps, env, info, update),
     ExecuteMsg::SetAssetRewardDistribution(asset_reward_distribution) => {
@@ -166,62 +169,87 @@ fn set_asset_reward_distribution(
   // Simply set the asset_reward_distribution, overwriting any previous settings.
   // This means any updates should include the full existing set of AssetDistributions and not just the newly updated one.
   ASSET_REWARD_DISTRIBUTION.save(deps.storage, &asset_reward_distribution)?;
-  Ok(Response::new().add_attributes(vec![("action", "set_asset_reward_distribution")]))
+  Ok(Response::new().add_attributes(vec![("action", "asset/set_asset_reward_distribution")]))
 }
 
 fn update_asset_config(
-  deps: DepsMut,
+  mut deps: DepsMut,
   env: Env,
   info: MessageInfo,
-  update: AssetInfoWithConfig,
+  update: AssetInfoWithConfig<String>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
+  let update = update.check(deps.api)?;
   assert_asset_whitelist_controller(&deps, &info, &config)?;
   assert_asset_whitelisted(&deps, &update.info)?;
+
+  let msgs = _update_asset_config(&mut deps, &env, &update, &config)?;
+
+  Ok(
+    Response::new()
+      .add_attributes(vec![
+        ("action", "asset/update_asset_config"),
+        ("asset", &update.info.to_string()),
+      ])
+      .add_messages(msgs),
+  )
+}
+
+fn _update_asset_config(
+  deps: &mut DepsMut,
+  env: &Env,
+  update: &AssetInfoWithConfig<Addr>,
+  config: &Config,
+) -> Result<Vec<CosmosMsg>, ContractError> {
   let current = ASSET_CONFIG.may_load(deps.storage, &update.info)?.unwrap_or_default();
-
   let mut updated = current.clone();
-
-  let new_config = update.config.unwrap_or(AssetConfig {
+  let new_config = update.config.clone().unwrap_or(AssetConfig {
     yearly_take_rate: config.default_yearly_take_rate,
     stake_config: ve3_shared::stake_config::StakeConfig::Default,
   });
-
   updated.stake_config = new_config.stake_config;
   updated.yearly_take_rate = new_config.yearly_take_rate;
-  ASSET_CONFIG.save(deps.storage, &update.info, &updated)?;
 
+  if new_config.yearly_take_rate > Decimal::percent(50) {
+    return Err(ContractError::TakeRateLessOrEqual50);
+  }
+
+  ASSET_CONFIG.save(deps.storage, &update.info, &updated)?;
   let mut msgs = vec![];
   if current.stake_config != updated.stake_config {
     // if stake config changed, withdraw from one (or do nothing), deposit on the other.
-    let (balance, _) = TOTAL_BALANCES.load(deps.storage, &update.info)?;
+    let (balance, _) = TOTAL_BALANCES.may_load(deps.storage, &update.info)?.unwrap_or_default();
     let available = balance - current.taken;
     let asset = update.info.with_balance(available);
 
     let mut unstake_msgs =
-      current.stake_config.unstake_check_received_msg(&deps, &env, asset.clone())?;
-    let mut stake_msgs = updated.stake_config.stake_check_received_msg(&deps, &env, asset)?;
+      current.stake_config.unstake_check_received_msg(deps, env, asset.clone())?;
+    let mut stake_msgs = updated.stake_config.stake_check_received_msg(deps, env, asset)?;
 
     msgs.append(&mut unstake_msgs);
     msgs.append(&mut stake_msgs);
   }
 
-  Ok(
-    Response::new()
-      .add_attributes(vec![("action", "update_asset_config"), ("asset", &update.info.to_string())]),
-  )
+  Ok(msgs)
 }
 
 fn whitelist_assets(
-  deps: DepsMut,
+  mut deps: DepsMut,
+  env: Env,
   info: MessageInfo,
-  asset_configs: Vec<AssetInfoWithConfig>,
+  asset_configs: Vec<AssetInfoWithConfig<String>>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   assert_asset_whitelist_controller(&deps, &info, &config)?;
 
+  let asset_configs =
+    asset_configs.into_iter().map(|a| a.check(deps.api)).collect::<Result<Vec<_>, AssetError>>()?;
+
   let assets_str =
     asset_configs.iter().map(|asset| asset.info.to_string()).collect::<Vec<String>>().join(",");
+
+  let mut response = Response::new()
+    .add_attributes(vec![("action", "asset/whitelist_assets"), ("assets", &assets_str)]);
 
   for asset_config in asset_configs {
     if asset_config.info == config.reward_info {
@@ -237,29 +265,12 @@ fn whitelist_assets(
       Ok(rate.unwrap_or(Decimal::zero()))
     })?;
 
-    let current_config =
-      ASSET_CONFIG.may_load(deps.storage, &asset_config.info)?.unwrap_or_default();
+    let msgs = _update_asset_config(&mut deps, &env, &asset_config, &config)?;
 
-    let new_config = asset_config.config.unwrap_or(AssetConfig {
-      yearly_take_rate: config.default_yearly_take_rate,
-      stake_config: ve3_shared::stake_config::StakeConfig::Default,
-    });
-
-    ASSET_CONFIG.save(
-      deps.storage,
-      &asset_config.info,
-      &AssetConfigRuntime {
-        yearly_take_rate: new_config.yearly_take_rate,
-        stake_config: new_config.stake_config.clone(),
-
-        last_taken_s: 0,
-        taken: current_config.taken,
-        harvested: current_config.harvested,
-      },
-    )?;
+    response = response.add_messages(msgs);
   }
 
-  Ok(Response::new().add_attributes(vec![("action", "whitelist_assets"), ("assets", &assets_str)]))
+  Ok(response)
 }
 
 fn remove_assets(
@@ -274,7 +285,10 @@ fn remove_assets(
     WHITELIST.remove(deps.storage, asset);
   }
   let assets_str = assets.iter().map(|asset| asset.to_string()).collect::<Vec<String>>().join(",");
-  Ok(Response::new().add_attributes(vec![("action", "remove_assets"), ("assets", &assets_str)]))
+  Ok(
+    Response::new()
+      .add_attributes(vec![("action", "asset/remove_assets"), ("assets", &assets_str)]),
+  )
 }
 
 fn stake(
@@ -319,7 +333,7 @@ fn stake(
   Ok(
     Response::new()
       .add_attributes(vec![
-        ("action", "stake"),
+        ("action", "asset/stake"),
         ("user", recipient.as_ref()),
         ("asset", &asset.to_string()),
         ("amount", &amount.to_string()),
@@ -365,14 +379,14 @@ fn _take(
   deps: &mut DepsMut,
   env: &Env,
   asset: &AssetInfo,
-  total_balance: Uint128,
+  balance: Uint128,
   save_config: bool,
 ) -> Result<(AssetConfigRuntime, Uint128), ContractError> {
   let config = ASSET_CONFIG.may_load(deps.storage, asset)?;
 
   if let Some(mut config) = config {
     if config.yearly_take_rate.is_zero() {
-      let available = total_balance.checked_sub(config.taken)?;
+      let available = balance.checked_sub(config.taken)?;
       return Ok((config, available));
     }
 
@@ -380,8 +394,13 @@ fn _take(
     if config.last_taken_s != 0 {
       let take_diff_s = Uint128::new((env.block.time.seconds() - config.last_taken_s).into());
       // total_balance * yearly_take_rate * taken_diff_s / SECONDS_PER_YEAR
-      let take_amount =
-        config.yearly_take_rate * total_balance.multiply_ratio(take_diff_s, SECONDS_PER_YEAR);
+
+      let relevant_balance = balance.saturating_sub(config.taken);
+      let take_amount = config.yearly_take_rate
+        * relevant_balance.multiply_ratio(
+          min(take_diff_s, Uint128::new(SECONDS_PER_YEAR.into())),
+          SECONDS_PER_YEAR,
+        );
 
       config.taken = config.taken.checked_add(take_amount)?;
     }
@@ -392,11 +411,11 @@ fn _take(
       ASSET_CONFIG.save(deps.storage, asset, &config)?;
     }
 
-    let available = total_balance.checked_sub(config.taken)?;
+    let available = balance.checked_sub(config.taken)?;
     return Ok((config, available));
   }
 
-  Ok((AssetConfigRuntime::default(), total_balance))
+  Ok((AssetConfigRuntime::default(), balance))
 }
 
 fn unstake(
@@ -457,7 +476,7 @@ fn unstake(
   Ok(
     Response::new()
       .add_attributes(vec![
-        ("action", "unstake"),
+        ("action", "asset/unstake"),
         ("user", info.sender.as_ref()),
         ("asset", &asset.info.to_string()),
         ("amount", &withdraw_amount.to_string()),
@@ -485,7 +504,7 @@ fn claim_rewards(
   let final_rewards = rewards + unclaimed_rewards;
   UNCLAIMED_REWARDS.remove(deps.storage, (user.clone(), &asset));
   let response = Response::new().add_attributes(vec![
-    ("action", "claim_rewards"),
+    ("action", "asset/claim_rewards"),
     ("user", user.as_ref()),
     ("asset", &asset.to_string()),
     ("reward_amount", &final_rewards.to_string()),
@@ -538,7 +557,7 @@ fn distribute_take_rate(
     WHITELIST.keys(deps.storage, None, None, Order::Ascending).collect::<StdResult<_>>()?
   };
 
-  let mut response = Response::new().add_attributes(vec![("action", "distribute_take_rate")]);
+  let mut response = Response::new().add_attributes(vec![("action", "asset/distribute_take_rate")]);
   let recipient = config.get_address(&deps.querier, AT_TAKE_RECIPIENT)?;
   for asset in assets {
     let mut config = if update == Some(true) {
@@ -569,10 +588,13 @@ fn distribute_take_rate(
     // transfer to recipient
     let take_msg = take_asset.transfer_msg(recipient.clone())?;
 
+    // println!("unstake_msgs {unstake_msgs:?}");
+    // println!("take {take_msg:?}");
+
     response = response
       .add_messages(unstake_msgs)
       .add_message(take_msg)
-      .add_attribute("take", format!("{0}{1}", take_amount, asset));
+      .add_attribute("take", take_asset.to_string());
   }
   Ok(response)
 }
@@ -602,7 +624,11 @@ fn distribute_bribes(
     msgs.push(env.callback_msg(CallbackMsg::DistributeBribes {
       assets: Some(assets),
     })?);
-    Ok(Response::new().add_attributes(vec![("action", "distribute_bribes")]).add_messages(msgs))
+    Ok(
+      Response::new()
+        .add_attributes(vec![("action", "asset/distribute_bribes")])
+        .add_messages(msgs),
+    )
   } else {
     distribute_bribes_callback(deps, env, info, Some(assets))
   }
@@ -637,12 +663,14 @@ fn distribute_bribes_callback(
 
         msgs.extend(bribe_msgs);
       }
+
+      ASSET_BRIBES.save(deps.storage, &asset, &Assets::default())?;
     }
   }
 
   Ok(
     Response::new()
-      .add_attributes(vec![("action", "distribute_bribes_callback")])
+      .add_attributes(vec![("action", "asset/distribute_bribes_callback")])
       .add_messages(msgs),
   )
 }
@@ -665,7 +693,7 @@ fn update_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     }))?,
   ];
 
-  Ok(Response::new().add_attributes(vec![("action", "update_rewards")]).add_messages(msgs))
+  Ok(Response::new().add_attributes(vec![("action", "asset/update_rewards")]).add_messages(msgs))
 }
 
 fn update_reward_callback(
@@ -696,7 +724,7 @@ fn update_reward_callback(
 
     // If there are no shares, we stop updating the rate. This means that the emissions are not directed to any stakers.
     let (_, total_shares) =
-      TOTAL_BALANCES.load(deps.storage, &asset_distribution.asset).unwrap_or_default();
+      TOTAL_BALANCES.may_load(deps.storage, &asset_distribution.asset)?.unwrap_or_default();
     if !total_shares.is_zero() {
       let rate_to_update = total_reward_distributed / Decimal::from_atomics(total_shares, 0)?;
       if rate_to_update > Decimal::zero() {
@@ -709,7 +737,7 @@ fn update_reward_callback(
     }
   }
 
-  Ok(Response::new().add_attributes(vec![("action", "update_rewards_callback")]))
+  Ok(Response::new().add_attributes(vec![("action", "asset/update_rewards_callback")]))
 }
 
 fn track_bribes_callback(
@@ -722,22 +750,32 @@ fn track_bribes_callback(
   let mut bribes = ASSET_BRIBES.may_load(deps.storage, &asset)?.unwrap_or_default();
 
   // this just adds the newly received staking / claiming rewards to the accounting for the corresponding LP.
+
+  let mut attrs = vec![];
+
   for old_balance in initial_balances {
     let bribe_info = old_balance.info;
     let new_balance = bribe_info.query_balance(&deps.querier, env.contract.address.clone())?;
+
     if new_balance > old_balance.amount {
       let added_amount = new_balance - old_balance.amount;
-      bribes.add(&bribe_info.with_balance(added_amount));
+      let added = bribe_info.with_balance(added_amount);
+      bribes.add(&added);
+      attrs.push(attr("bribe", added.to_string()));
     }
   }
 
   ASSET_BRIBES.save(deps.storage, &asset, &bribes)?;
 
-  Ok(Response::new().add_attributes(vec![("action", "track_bribes_callback")]))
+  Ok(
+    Response::new()
+      .add_attributes(vec![("action", "asset/track_bribes_callback")])
+      .add_attributes(attrs),
+  )
 }
 
 fn assert_asset_whitelisted(deps: &DepsMut, asset: &AssetInfo) -> Result<bool, ContractError> {
-  WHITELIST.load(deps.storage, asset).map_err(|_| ContractError::AssetNotWhitelisted {})
+  WHITELIST.load(deps.storage, asset).map_err(|_| ContractError::AssetNotWhitelisted)
 }
 
 // Only governance (through a on-chain prop) can change the whitelisted assets

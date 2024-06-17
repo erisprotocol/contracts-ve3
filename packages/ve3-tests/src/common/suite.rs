@@ -1,7 +1,7 @@
-use super::helpers::{cw20, native, Uint128};
+use super::helpers::{cw20, native, u, Uint128};
 use crate::common::suite_contracts::*;
 use crate::mocks::stargate_mock::StargateMockModule;
-use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
+use crate::mocks::{alliance_rewards_mock, eris_hub_mock, incentive_mock};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::{coin, Addr, Coin, Decimal, Empty, Timestamp, Uint128};
@@ -13,6 +13,7 @@ use cw_multi_test::{
 };
 use serde::Serialize;
 use std::str::FromStr;
+use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::msgs_asset_gauge::GaugeConfig;
 use ve3_shared::msgs_voting_escrow::DepositAsset;
 use ve3_shared::{constants::*, msgs_connector_alliance, msgs_connector_emission};
@@ -60,6 +61,8 @@ pub struct Addresses {
   pub fake_cw20: Addr,
   pub lp_cw20: Addr,
   pub fee_recipient: Addr,
+
+  pub incentive_mock: Addr,
 
   pub active_asset_staking: Addr,
   pub active_connector_alliance: Addr,
@@ -173,6 +176,7 @@ impl TestingSuite {
       coin(1_000_000_000_000u128, "xxx".to_string()),
       coin(1_000_000_000_000u128, "usdc".to_string()),
       coin(1_000_000_000_000u128, "lp".to_string()),
+      coin(1_000_000_000_000u128, "astro".to_string()),
     ])
   }
 
@@ -230,6 +234,8 @@ impl TestingSuite {
 
         active_asset_staking: Addr::unchecked(""),
         active_connector_alliance: Addr::unchecked(""),
+
+        incentive_mock: Addr::unchecked(""),
 
         gauge_1: "stable".to_string(),
         gauge_2: "project".to_string(),
@@ -367,6 +373,8 @@ impl TestingSuite {
 
     self.use_connector_alliance_1();
     self.use_asset_staking_1();
+
+    self.create_incentive_mock();
 
     self
   }
@@ -546,6 +554,31 @@ impl TestingSuite {
     };
 
     self.addresses.eris_hub_cw20 = self.init_contract(code_id, msg, "eris_hub_cw20");
+  }
+
+  fn create_incentive_mock(&mut self) {
+    let code_id = self.app.store_code(incentive_mock());
+
+    let astro = AssetInfoBase::Native("astro".to_string());
+    let msg = incentive_mock::InstantiateMsg {
+      config: incentive_mock::Config {
+        emission: astro.clone(),
+        per_week: u(10000),
+      },
+    };
+
+    self.addresses.incentive_mock = self.init_contract(code_id, msg, "incentive_mock");
+
+    self
+      .app
+      .execute(
+        self.address("creator"),
+        astro
+          .with_balance(Uint128::new(1_000_000_000_000u128))
+          .transfer_msg(self.addresses.incentive_mock.to_string())
+          .unwrap(),
+      )
+      .unwrap();
   }
 
   fn create_fake_cw20(&mut self) {

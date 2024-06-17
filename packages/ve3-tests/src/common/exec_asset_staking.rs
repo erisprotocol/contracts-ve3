@@ -1,9 +1,9 @@
 use super::suite::TestingSuite;
-use cosmwasm_std::{Addr, StdResult};
+use cosmwasm_std::{to_json_binary, Addr, Coin, StdResult};
 use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo};
 use cw_multi_test::{AppResponse, Executor};
-use ve3_shared::msgs_asset_staking::*;
+use ve3_shared::{extensions::asset_ext::AssetExt, msgs_asset_staking::*};
 
 #[allow(dead_code)]
 impl TestingSuite {
@@ -36,14 +36,33 @@ impl TestingSuite {
   pub fn e_staking_stake(
     &mut self,
     recipient: Option<String>,
+    funds: Asset,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Stake {
       recipient,
     };
-    let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
+
+    match &funds.info {
+      cw_asset::AssetInfoBase::Native(_) => {
+        let coin: Coin = funds.to_coin().unwrap();
+        let sender = self.address(sender);
+        result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[coin]));
+      },
+      cw_asset::AssetInfoBase::Cw20(addr) => {
+        let send_msg = cw20_base::msg::ExecuteMsg::Send {
+          contract: self.contract_active_staking().to_string(),
+          amount: funds.amount,
+          msg: to_json_binary(&msg).unwrap(),
+        };
+
+        let sender = self.address(sender);
+        result(self.app.execute_contract(sender, addr.clone(), &send_msg, &[]));
+      },
+      _ => panic!("not supported"),
+    }
+
     self
   }
 
@@ -85,7 +104,7 @@ impl TestingSuite {
 
   pub fn e_staking_whitelist_assets(
     &mut self,
-    asset_infos: Vec<AssetInfoWithConfig>,
+    asset_infos: Vec<AssetInfoWithConfig<String>>,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
@@ -109,7 +128,7 @@ impl TestingSuite {
 
   pub fn e_staking_update_asset_config(
     &mut self,
-    update_asset_config: AssetInfoWithConfig,
+    update_asset_config: AssetInfoWithConfig<String>,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {

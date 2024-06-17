@@ -16,7 +16,7 @@ fn test_whitelist_assets() {
   assert_eq!(
     res,
     Response::default()
-      .add_attributes(vec![("action", "whitelist_assets"), ("assets", "native:asset1")])
+      .add_attributes(vec![("action", "asset/whitelist_assets"), ("assets", "native:asset1")])
   );
 
   let res = whitelist_assets(
@@ -29,7 +29,7 @@ fn test_whitelist_assets() {
   assert_eq!(
     res,
     Response::default().add_attributes(vec![
-      ("action", "whitelist_assets"),
+      ("action", "asset/whitelist_assets"),
       ("assets", "native:asset2,native:asset3")
     ])
   );
@@ -87,7 +87,7 @@ fn test_remove_assets() {
   assert_eq!(
     response,
     Response::default()
-      .add_attributes(vec![("action", "remove_assets"), ("assets", "native:asset1")])
+      .add_attributes(vec![("action", "asset/remove_assets"), ("assets", "native:asset1")])
   );
 
   WHITELIST.load(deps.as_ref().storage, &AssetInfo::Native("asset1".to_string())).unwrap_err();

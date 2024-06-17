@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coins, CosmosMsg, Uint128};
-use cw_asset::Asset;
+use cw_asset::{Asset, AssetInfo};
 
 use crate::{error::SharedError, extensions::asset_info_ext::AssetInfoExt};
 
@@ -47,6 +47,10 @@ impl Assets {
       },
       None => Err(SharedError::NotFound(format!("asset {0}", asset.info))),
     }
+  }
+
+  pub fn get(&mut self, info: &AssetInfo) -> Option<Asset> {
+    self.0.iter().find(|a| a.info == *info).cloned()
   }
 
   pub fn remove_multi(&mut self, assets: &Vec<Asset>) -> Result<(), SharedError> {

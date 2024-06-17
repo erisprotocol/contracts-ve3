@@ -1,4 +1,4 @@
-use crate::mocks::{alliance_rewards_mock, eris_hub_mock};
+use crate::mocks::{alliance_rewards_mock, eris_hub_mock, incentive_mock};
 use cosmwasm_std::Empty;
 use cw_multi_test::{Contract, ContractWrapper};
 
@@ -101,6 +101,16 @@ pub fn eris_hub_cw20_mock() -> Box<dyn Contract<Empty>> {
     eris_staking_token::execute,
     eris_staking_token::instantiate,
     eris_staking_token::query,
+  );
+
+  Box::new(contract)
+}
+
+pub fn incentive_mock() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    incentive_mock::execute,
+    incentive_mock::instantiate,
+    incentive_mock::query,
   );
 
   Box::new(contract)

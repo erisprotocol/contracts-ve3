@@ -33,7 +33,7 @@ pub fn setup_contract(deps: DepsMut) -> Response {
 }
 
 #[track_caller]
-pub fn whitelist_assets(deps: DepsMut, assets: Vec<AssetInfoWithConfig>) -> Response {
+pub fn whitelist_assets(deps: DepsMut, assets: Vec<AssetInfoWithConfig<String>>) -> Response {
   let info = mock_info("gov", &[]);
   let env = mock_env();
 
