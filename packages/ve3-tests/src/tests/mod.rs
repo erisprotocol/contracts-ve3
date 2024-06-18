@@ -1,3 +1,4 @@
+pub mod integration_alliance_connector;
 pub mod integration_asset_gauge;
 pub mod integration_asset_gauge_distribution;
 pub mod integration_asset_gauge_rebase;

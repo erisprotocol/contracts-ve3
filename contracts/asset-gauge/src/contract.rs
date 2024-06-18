@@ -9,10 +9,11 @@ use crate::state::{
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  attr, Addr, Decimal, Decimal256, DepsMut, Env, MessageInfo, Response, StdResult, Storage,
-  Uint128, Uint256,
+  attr, from_json, Addr, Decimal, Decimal256, DepsMut, Env, MessageInfo, Response, StdResult,
+  Storage, Uint128, Uint256,
 };
 use cw2::set_contract_version;
+use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo};
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -23,7 +24,7 @@ use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
-use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg};
+use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, ReceiveMsg};
 use ve3_shared::msgs_asset_staking::AssetDistribution;
 use ve3_shared::msgs_voting_escrow::{End, LockInfoResponse};
 
@@ -37,7 +38,6 @@ pub fn instantiate(
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
   let rebase_asset = msg.rebase_asset.check(deps.api, None)?;
-  rebase_asset.assert_native()?;
 
   CONFIG.save(
     deps.storage,
@@ -82,6 +82,8 @@ pub fn execute(
       let asset = config.rebase_asset.assert_received(&info)?;
       add_rebase(deps, asset)
     },
+    ExecuteMsg::Receive(cw20_msg) => receive(deps, env, info, cw20_msg),
+
     ExecuteMsg::ClaimRebase {
       token_id,
     } => claim_rebase(deps, env, info.sender, token_id),
@@ -115,6 +117,25 @@ pub fn execute(
   }
 }
 
+fn receive(
+  deps: DepsMut,
+  _env: Env,
+  info: MessageInfo,
+  cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+  let received = Asset::cw20(info.sender, cw20_msg.amount);
+
+  match from_json(&cw20_msg.msg)? {
+    ReceiveMsg::AddRebase {} => {
+      let config = CONFIG.load(deps.storage)?;
+      if received.info != config.rebase_asset {
+        return Err(ContractError::InvalidAsset("unsupported rebase cw20".to_string()));
+      }
+      add_rebase(deps, received)
+    },
+  }
+}
+
 fn claim_rebase(
   deps: DepsMut,
   env: Env,
@@ -141,7 +162,7 @@ fn claim_rebase(
     Some(id) => {
       // if id provided -> check if permanent lock
       // if yes, add it to the permanent lock
-      let lock = LOCK_INFO.load(deps.storage, &id)?;
+      let lock = LOCK_INFO.load(deps.storage, &id).map_err(|_| ContractError::LockNotFound)?;
       if lock.end == End::Permanent {
         if lock.asset.info != rebase_asset.info {
           Err(ContractError::RebaseWrongTargetLockAsset)?;

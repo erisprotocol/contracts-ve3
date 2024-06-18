@@ -46,10 +46,7 @@ fn test_config_default() {
             "VE_GUARDIAN".to_string(),
             Addr::unchecked("terra17jpszh4mc0cxvv6enwvm646dtztcs0anwd234n867qf27umcj8cs55507e")
           ),
-          (
-            "VOTING_ESCROW".to_string(),
-            Addr::unchecked("terra18yn206ypuxay79gjqv6msvd9t2y49w4fz8q7fyenx5aggj0ua37qw43exn")
-          ),
+          ("VOTING_ESCROW".to_string(), addr.ve3_voting_escrow.clone()),
           // (
           //   "GAUGE_CONTROLLER".to_string(),
           //   Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")

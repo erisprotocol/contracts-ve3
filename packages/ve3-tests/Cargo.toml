@@ -46,6 +46,10 @@ ve3-voting-escrow = {path = "../../contracts/voting-escrow"}
 # stader = { git = "https://github.com/stader-labs/lunax.git", package="staking", default-features = false, rev = "20143548e2dea807b343fe6ad60375086af35ea9"}
 
 eris-staking-token = { git = "https://github.com/erisprotocol/contracts-terra.git", default-features = false, rev = "dbcaa4db951f2bec6e239ccf94f25c85f3bed80a"}
+eris-staking-hub =  { git = "https://github.com/erisprotocol/contracts-terra.git", default-features = false, rev = "dbcaa4db951f2bec6e239ccf94f25c85f3bed80a"}
+eris =  { git = "https://github.com/erisprotocol/contracts-terra.git", default-features = false, rev = "dbcaa4db951f2bec6e239ccf94f25c85f3bed80a"}
+protobuf = "=3.2.0"
+
 
 colored = "2.1.0"
 anyhow = "1"

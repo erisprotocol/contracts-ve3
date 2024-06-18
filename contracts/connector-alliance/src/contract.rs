@@ -1,29 +1,30 @@
 use crate::constants::{CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
-use crate::state::{CONFIG, VALIDATORS};
+use crate::state::{CONFIG, STATE, VALIDATORS};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
   Binary, CosmosMsg, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
-use cw_asset::AssetInfoBase;
+use cw_asset::AssetInfo;
 use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::{
   MsgClaimDelegationRewards, MsgDelegate, MsgRedelegate, MsgUndelegate,
 };
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
+use ve3_shared::adapters::eris::ErisHub;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{at_asset_staking, AT_DELEGATION_CONTROLLER};
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
-use ve3_shared::extensions::cosmosmsg_ext::CosmosMsgExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::denom::MsgCreateDenom;
+use ve3_shared::helpers::take::{compute_balance_amount, compute_share_amount};
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
-  ExecuteMsg, InstantiateMsg,
+  ExecuteMsg, InstantiateMsg, State,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -33,49 +34,67 @@ pub fn instantiate(
   _info: MessageInfo,
   msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-  println!("SET CONTRACT VERSION {CONTRACT_NAME} {CONTRACT_VERSION}");
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-  let full_denom = format!("factory/{0}/{1}", env.contract.address, msg.alliance_token_denom);
-
-  let create_msg: CosmosMsg = MsgCreateDenom {
+  let vt_full_denom = format!("factory/{0}/{1}", env.contract.address, msg.alliance_token_denom);
+  let vt_total_supply = Uint128::from(1_000_000_000_000_u128);
+  let vt_create_msg: CosmosMsg = MsgCreateDenom {
     sender: env.contract.address.to_string(),
     subdenom: msg.alliance_token_denom.to_string(),
   }
   .into();
-
-  let total_supply = Uint128::from(1_000_000_000_000_u128);
-
-  let mint_msg: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
+  let vt_mint_msg: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
     sender: env.contract.address.to_string(),
     amount: Some(ve3_shared::helpers::denom::Coin {
-      denom: full_denom.to_string(),
-      amount: total_supply.to_string(),
+      denom: vt_full_denom.to_string(),
+      amount: vt_total_supply.to_string(),
     }),
     mint_to_address: env.contract.address.to_string(),
   }
   .into();
 
+  let zasset_full_denom = format!("factory/{0}/{1}", env.contract.address, msg.zasset_denom);
+  let zasset_create_msg: CosmosMsg = MsgCreateDenom {
+    sender: env.contract.address.to_string(),
+    subdenom: msg.zasset_denom.to_string(),
+  }
+  .into();
+
   let config = Config {
-    alliance_token_denom: full_denom.clone(),
-    alliance_token_supply: total_supply,
+    zasset_denom: zasset_full_denom.clone(),
+    alliance_token_denom: vt_full_denom.clone(),
+    alliance_token_supply: vt_total_supply,
     reward_denom: msg.reward_denom,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
     gauge: msg.gauge,
+    lst_hub_addr: deps.api.addr_validate(&msg.lst_hub_address)?,
+    lst_asset_info: msg.lst_asset_info.check(deps.api, None)?,
   };
 
+  let exchange_rate = ErisHub(&config.lst_hub_addr).query_exchange_rate(&deps.querier)?;
+
   CONFIG.save(deps.storage, &config)?;
+  STATE.save(
+    deps.storage,
+    &State {
+      last_exchange_rate: exchange_rate,
+      taken: Uint128::zero(),
+      harvested: Uint128::zero(),
+    },
+  )?;
 
   VALIDATORS.save(deps.storage, &HashSet::new())?;
   Ok(
     Response::new()
       .add_attributes(vec![
         ("action", "instantiate"),
-        ("alliance_token_denom", &full_denom),
-        ("alliance_token_total_supply", &total_supply.to_string()),
+        ("alliance_token_denom", &vt_full_denom),
+        ("alliance_token_total_supply", &vt_total_supply.to_string()),
+        ("zasset_denom", &zasset_full_denom),
       ])
-      .add_message(create_msg)
-      .add_message(mint_msg),
+      .add_message(vt_create_msg)
+      .add_message(vt_mint_msg)
+      .add_message(zasset_create_msg),
   )
 }
 
@@ -88,6 +107,10 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
   match msg {
     ExecuteMsg::ClaimRewards {} => claim_rewards(deps, env, info),
+    ExecuteMsg::Withdraw {} => unstake(deps, env, info),
+    ExecuteMsg::DistributeRebase {
+      update,
+    } => distribute_rebase(deps, env, info, update),
     ExecuteMsg::AllianceDelegate(msg) => alliance_delegate(deps, env, info, msg),
     ExecuteMsg::AllianceUndelegate(msg) => alliance_undelegate(deps, env, info, msg),
     ExecuteMsg::AllianceRedelegate(msg) => alliance_redelegate(deps, env, info, msg),
@@ -99,7 +122,7 @@ pub fn execute(
 }
 
 fn callback(
-  deps: DepsMut,
+  mut deps: DepsMut,
   env: Env,
   info: MessageInfo,
   msg: CallbackMsg,
@@ -109,20 +132,164 @@ fn callback(
   }
 
   match msg {
-    CallbackMsg::ClaimRewardsCallback {
-      asset,
-      receiver,
-    } => {
-      let transfer_msg =
-        asset.with_balance_query(&deps.querier, &env.contract.address)?.transfer_msg(receiver)?;
+    CallbackMsg::ClaimRewardsCallback {} => {
+      let config = CONFIG.load(deps.storage)?;
+      let reward_asset = AssetInfo::native(config.reward_denom);
+      let received = reward_asset.with_balance_query(&deps.querier, &env.contract.address)?;
+      let bond_msg = ErisHub(&config.lst_hub_addr).bond_msg(received.clone(), None)?;
 
       Ok(
         Response::new()
-          .add_attributes(vec![("action", "claim_rewards_callback")])
-          .add_message(transfer_msg.to_specific()?),
+          .add_attributes(vec![
+            ("action", "claim_rewards_callback"),
+            ("claimed", &received.to_string()),
+          ])
+          .add_message(bond_msg),
+      )
+    },
+    CallbackMsg::BondRewardsCallback {
+      receiver,
+      initial,
+    } => {
+      let config = CONFIG.load(deps.storage)?;
+
+      let zasset = AssetInfo::native(config.zasset_denom.clone());
+
+      let new_amount = initial.info.query_balance(&deps.querier, &env.contract.address)?;
+      let added_amount = new_amount.checked_sub(initial.amount)?;
+
+      let (_, stake_available) = _take(&mut deps, &config, initial.amount, true)?;
+      let shares = zasset.total_supply(&deps.querier)?;
+      let share_amount = compute_share_amount(shares, added_amount, stake_available);
+
+      let zasset_mint_msg: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
+        sender: env.contract.address.to_string(),
+        amount: Some(ve3_shared::helpers::denom::Coin {
+          denom: config.zasset_denom.to_string(),
+          amount: share_amount.to_string(),
+        }),
+        mint_to_address: receiver.to_string(),
+      }
+      .into();
+
+      Ok(
+        Response::new()
+          .add_attributes(vec![
+            ("action", "bond_rewards_callback"),
+            ("amount", &added_amount.to_string()),
+            ("share", &share_amount.to_string()),
+          ])
+          .add_message(zasset_mint_msg),
       )
     },
   }
+}
+
+fn _take(
+  deps: &mut DepsMut,
+  config: &Config,
+  stake_in_contract: Uint128,
+  save: bool,
+) -> Result<(State, Uint128), ContractError> {
+  let mut state = STATE.load(deps.storage)?;
+
+  let last_exchange_rate = state.last_exchange_rate;
+  let current_exchange_rate = ErisHub(&config.lst_hub_addr).query_exchange_rate(&deps.querier)?;
+
+  let stake_available = stake_in_contract.checked_add(state.harvested)?.checked_sub(state.taken)?;
+
+  if current_exchange_rate.le(&last_exchange_rate) {
+    return Ok((state, stake_available));
+  }
+
+  // no check needed, as we checked for "le" already. current_exchange_rate is also not zero
+  let exchange_rate_diff = (current_exchange_rate - last_exchange_rate) / current_exchange_rate;
+
+  let stake_to_extract = exchange_rate_diff * stake_available;
+  state.taken = state.taken.checked_add(stake_to_extract)?;
+  state.last_exchange_rate = current_exchange_rate;
+  if save {
+    STATE.save(deps.storage, &state)?;
+  }
+
+  let stake_available = stake_in_contract.checked_add(state.harvested)?.checked_sub(state.taken)?;
+
+  Ok((state, stake_available))
+}
+
+fn distribute_rebase(
+  mut deps: DepsMut,
+  env: Env,
+  _info: MessageInfo,
+  update: Option<bool>,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+
+  let mut state = if update == Some(true) {
+    let stake_balance =
+      config.lst_asset_info.with_balance_query(&deps.querier, &env.contract.address)?;
+    let (state, _) = _take(&mut deps, &config, stake_balance.amount, false)?;
+    state
+  } else {
+    STATE.load(deps.storage)?
+  };
+
+  let take_amount = state.taken.checked_sub(state.harvested)?;
+  if take_amount.is_zero() {
+    return Err(ContractError::NothingToTake);
+  }
+
+  state.harvested = state.taken;
+  STATE.save(deps.storage, &state)?;
+
+  let take_asset = config.lst_asset_info.with_balance(take_amount);
+
+  let asset_gauge = config.asset_gauge(&deps.querier)?;
+  let rebase_msg = asset_gauge.add_rebase_msg(take_asset.clone())?;
+
+  Ok(
+    Response::new()
+      .add_attributes(vec![("action", "distribute_rebase"), ("taken", &take_asset.to_string())])
+      .add_message(rebase_msg),
+  )
+}
+
+fn unstake(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+  let contract_addr = env.contract.address.clone();
+  let config = CONFIG.load(deps.storage)?;
+  let zasset = AssetInfo::native(config.zasset_denom.clone());
+  let received = zasset.assert_received(&info)?;
+  let available = config.lst_asset_info.query_balance(&deps.querier, contract_addr.clone())?;
+
+  let (_, asset_available) = _take(&mut deps, &config, available, true)?;
+
+  let share_amount = received.amount;
+  let shares = zasset.total_supply(&deps.querier)?;
+  let withdraw_amount = compute_balance_amount(shares, share_amount, asset_available);
+
+  let transfer_msg =
+    config.lst_asset_info.with_balance(withdraw_amount).transfer_msg(&info.sender)?;
+
+  let burn_msg: CosmosMsg = ve3_shared::helpers::denom::MsgBurn {
+    sender: contract_addr.to_string(),
+    amount: Some(ve3_shared::helpers::denom::Coin {
+      denom: config.zasset_denom.to_string(),
+      amount: share_amount.to_string(),
+    }),
+    burn_from_address: contract_addr.to_string(),
+  }
+  .into();
+
+  Ok(
+    Response::new()
+      .add_attributes(vec![
+        ("action", "withdraw"),
+        ("amount", &withdraw_amount.to_string()),
+        ("share", &share_amount.to_string()),
+      ])
+      .add_message(burn_msg)
+      .add_message(transfer_msg),
+  )
 }
 
 fn remove_validator(
@@ -265,14 +432,11 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
     Response::new()
       .add_attributes(vec![("action", "claim_rewards")])
       .add_submessages(sub_msgs)
-      .add_message(
-        env
-          .callback_msg(ExecuteMsg::Callback(CallbackMsg::ClaimRewardsCallback {
-            asset: AssetInfoBase::Native(config.reward_denom),
-            receiver: info.sender,
-          }))?
-          .to_specific()?,
-      ),
+      .add_message(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::ClaimRewardsCallback {}))?)
+      .add_message(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::BondRewardsCallback {
+        initial: config.lst_asset_info.with_balance_query(&deps.querier, &env.contract.address)?,
+        receiver: info.sender,
+      }))?),
   )
 }
 

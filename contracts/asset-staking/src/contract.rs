@@ -24,6 +24,7 @@ use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::assets::Assets;
 use ve3_shared::helpers::general::addr_opt_fallback;
+use ve3_shared::helpers::take::{compute_balance_amount, compute_share_amount};
 use ve3_shared::msgs_asset_staking::{
   AssetConfig, AssetConfigRuntime, AssetDistribution, AssetInfoWithConfig, CallbackMsg, Config,
   Cw20HookMsg, ExecuteMsg, InstantiateMsg,
@@ -39,7 +40,7 @@ pub fn instantiate(
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
   let config = Config {
-    reward_info: msg.reward_info,
+    reward_info: msg.reward_info.check(deps.api, None)?,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
     default_yearly_take_rate: msg.default_yearly_take_rate,
     gauge: msg.gauge,
@@ -347,34 +348,6 @@ fn stake(
   )
 }
 
-pub(crate) fn compute_share_amount(
-  shares: Uint128,
-  balance_amount: Uint128,
-  asset_available: Uint128,
-) -> Uint128 {
-  if asset_available.is_zero() {
-    balance_amount
-  } else if shares == asset_available {
-    return balance_amount;
-  } else {
-    balance_amount.multiply_ratio(shares, asset_available)
-  }
-}
-
-pub(crate) fn compute_balance_amount(
-  shares: Uint128,
-  share_amount: Uint128,
-  asset_available: Uint128,
-) -> Uint128 {
-  if shares.is_zero() {
-    Uint128::zero()
-  } else if shares == asset_available {
-    return share_amount;
-  } else {
-    share_amount.multiply_ratio(asset_available, shares)
-  }
-}
-
 fn _take(
   deps: &mut DepsMut,
   env: &Env,
@@ -382,6 +355,7 @@ fn _take(
   balance: Uint128,
   save_config: bool,
 ) -> Result<(AssetConfigRuntime, Uint128), ContractError> {
+  // balance includes the full balance including already taken out take rate
   let config = ASSET_CONFIG.may_load(deps.storage, asset)?;
 
   if let Some(mut config) = config {

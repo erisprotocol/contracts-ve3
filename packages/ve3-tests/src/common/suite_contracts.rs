@@ -106,6 +106,18 @@ pub fn eris_hub_cw20_mock() -> Box<dyn Contract<Empty>> {
   Box::new(contract)
 }
 
+pub fn eris_hub() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    eris_staking_hub::contract::execute,
+    eris_staking_hub::contract::instantiate,
+    eris_staking_hub::contract::query,
+  )
+  .with_migrate(eris_staking_hub::contract::migrate)
+  .with_reply(eris_staking_hub::contract::reply);
+
+  Box::new(contract)
+}
+
 pub fn incentive_mock() -> Box<dyn Contract<Empty>> {
   let contract = ContractWrapper::new(
     incentive_mock::execute,

@@ -1,6 +1,6 @@
 use crate::{
   common::{
-    helpers::{native, u, Addr, Cw20, Native, Uint128},
+    helpers::{native, u, Cw20, Native, Uint128},
     suite::TestingSuite,
   },
   extensions::app_response_ext::{EventChecker, Valid},
@@ -503,7 +503,7 @@ fn test_query_infos() {
             distribution: Decimal::one() - Decimal::from_ratio(u(3557), u(22342 + 3557)),
           },
           AssetDistribution {
-            asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+            asset: Cw20(addr.lp_cw20.clone()),
             distribution: Decimal::from_ratio(u(3557), u(22342 + 3557)),
             total_vp: u(3557)
           }
@@ -524,7 +524,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 75,
               user_vp: Uint128(586),
               total_vp: Uint128(586)
@@ -628,7 +628,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 80,
               user_vp: Uint128(4768),
               total_vp: Uint128(4768)
@@ -643,7 +643,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 81,
               user_vp: Uint128(4595),
               total_vp: Uint128(4595)
@@ -657,7 +657,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 82,
               user_vp: Uint128(4422),
               total_vp: Uint128(4422)
@@ -671,7 +671,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 83,
               user_vp: Uint128(4249),
               total_vp: Uint128(4249)
@@ -685,7 +685,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 84,
               user_vp: Uint128(4076),
               total_vp: Uint128(4076)
@@ -699,7 +699,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 85,
               user_vp: Uint128(3903),
               total_vp: Uint128(3903)
@@ -713,7 +713,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Cw20(Addr("terra1zwv6feuzhy6a9wekh96cd57lsarmqlwxdypdsplw6zhfncqw6ftqynf7kp")),
+              asset: Cw20(addr.lp_cw20.clone()),
               period: 86,
               user_vp: Uint128(3730),
               total_vp: Uint128(3730)

@@ -12,7 +12,7 @@ use crate::utils::{
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  attr, from_json, to_json_binary, Addr, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
+  attr, from_json, to_json_binary, Addr, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env, Event,
   MessageInfo, Response, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
@@ -544,6 +544,7 @@ fn _create_lock(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/create_lock")
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
@@ -598,6 +599,8 @@ fn merge_lock(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id_1))
+      .add_event(get_metadata_changed(&token_id_2))
       .add_attribute("action", "ve/merge_lock")
       .add_attribute("merge", format!("{0},{1}", token_id_1, token_id_2))
       .add_attribute("voting_power", lock1_info.voting_power.to_string())
@@ -653,6 +656,7 @@ fn split_lock(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/split_lock")
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
@@ -662,6 +666,10 @@ fn split_lock(
       .add_attributes(create_response.attributes)
       .add_submessages(create_response.messages),
   )
+}
+
+fn get_metadata_changed(token_id: &str) -> Event {
+  Event::new("metadata_changed").add_attribute("token_id", token_id.to_string())
 }
 
 /// Deposits an 'amount' of ampLP tokens into 'user''s lock.
@@ -722,6 +730,7 @@ fn deposit_for(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/deposit_for")
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
@@ -843,6 +852,7 @@ fn extend_lock_time(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/extend_lock_time")
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
@@ -880,6 +890,7 @@ fn lock_permanent(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/lock_permanent")
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
@@ -918,6 +929,7 @@ fn unlock_permanent(
 
   Ok(
     Response::default()
+      .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/unlock_permanent")
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())

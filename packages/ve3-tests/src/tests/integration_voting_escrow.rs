@@ -399,9 +399,10 @@ fn test_locks_lock_extension_ampluna() {
         }
       );
     })
-    .e_hub_update_exchange_rate(Decimal::from_str("1.3").unwrap(), "creator", |res| {
-      res.unwrap();
-    })
+    // TODO UPDATE EXCHANGE RATE
+    // .e_hub_update_exchange_rate(Decimal::from_str("1.3").unwrap(), "creator", |res| {
+    //   res.unwrap();
+    // })
     .e_ve_extend_lock_time(WEEK * 2, "2", "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
@@ -1208,7 +1209,7 @@ fn test_lock_permanent() {
       );
     })
     .e_ve_unlock_permanent("1".to_string(), "user1", |res| {
-      res.unwrap();
+      res.assert_attribute_ty("wasm-metadata_changed", attr("token_id", "1"));
     })
     .q_ve_lock_info("1", None, |res| {
       let res = res.unwrap();

@@ -5,6 +5,7 @@ use std::cmp::min;
 use ve3_shared::{
   constants::SECONDS_PER_YEAR,
   extensions::asset_info_ext::AssetInfoExt,
+  helpers::take::compute_balance_amount,
   msgs_asset_staking::{
     AllPendingRewardsQuery, AllStakedBalancesQuery, AssetInfoWithRuntime, AssetQuery,
     PendingRewardsRes, QueryMsg, StakedBalanceRes, WhitelistedAssetsDetailsResponse,
@@ -12,12 +13,9 @@ use ve3_shared::{
   },
 };
 
-use crate::{
-  contract::compute_balance_amount,
-  state::{
-    ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, BALANCES, CONFIG, TOTAL_BALANCES,
-    UNCLAIMED_REWARDS, USER_ASSET_REWARD_RATE, WHITELIST,
-  },
+use crate::state::{
+  ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, BALANCES, CONFIG, TOTAL_BALANCES,
+  UNCLAIMED_REWARDS, USER_ASSET_REWARD_RATE, WHITELIST,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]

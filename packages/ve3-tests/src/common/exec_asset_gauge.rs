@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, StdResult};
+use cosmwasm_std::{to_json_binary, Addr, StdResult, Uint128};
 use cw_asset::Asset;
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
@@ -8,7 +8,9 @@ use ve3_shared::{
   msgs_voting_escrow::LockInfoResponse,
 };
 
-use super::suite::TestingSuite;
+use crate::extensions::app_response_ext::Valid;
+
+use super::{helpers::u, suite::TestingSuite};
 
 impl TestingSuite {
   fn contract_1(&self) -> Addr {
@@ -69,6 +71,49 @@ impl TestingSuite {
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
+    self
+  }
+
+  #[track_caller]
+  pub fn e_gauge_add_rebase_in_ampluna(
+    &mut self,
+    amount: u32,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::AddRebase {};
+    let sender = self.address("creator");
+
+    // let res = self.app.execute_contract(
+    //   sender.clone(),
+    //   self.addresses.eris_hub.clone(),
+    //   &eris::hub::ExecuteMsg::Bond {
+    //     receiver: None,
+    //   },
+    //   &[asset.to_coin().unwrap()],
+    // );
+    // res.assert_valid();
+
+    let ampluna = self.addresses.eris_hub_cw20.clone();
+
+    // let balance: cw20::BalanceResponse = self
+    //   .app
+    //   .wrap()
+    //   .query_wasm_smart(
+    //     ampluna.clone(),
+    //     &cw20::Cw20QueryMsg::Balance {
+    //       address: sender.to_string(),
+    //     },
+    //   )
+    //   .unwrap();
+
+    let send_msg = cw20_base::msg::ExecuteMsg::Send {
+      contract: self.contract_1().to_string(),
+      amount: u(amount),
+      msg: to_json_binary(&msg).unwrap(),
+    };
+
+    result(self.app.execute_contract(sender, ampluna.clone(), &send_msg, &[]));
+
     self
   }
 

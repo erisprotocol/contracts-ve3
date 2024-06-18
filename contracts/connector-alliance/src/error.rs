@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{OverflowError, StdError};
 use cw_asset::AssetError;
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -14,9 +14,15 @@ pub enum ContractError {
   #[error("{0}")]
   AssetError(#[from] AssetError),
 
+  #[error("{0}")]
+  OverflowError(#[from] OverflowError),
+
   #[error("Empty delegation")]
   EmptyDelegation {},
 
   #[error("Invalid reply id {0}")]
   InvalidReplyId(u64),
+
+  #[error("Nothing to take")]
+  NothingToTake,
 }

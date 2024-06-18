@@ -21,6 +21,36 @@ impl TestingSuite {
     self
   }
 
+  pub fn use_connector_alliance_eris(&mut self) -> &mut TestingSuite {
+    self.addresses.active_connector_alliance = self.addresses.ve3_connector_alliance_eris.clone();
+    self
+  }
+
+  pub fn e_alliance_distribute_rebase(
+    &mut self,
+    update: Option<bool>,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::DistributeRebase {
+      update,
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    self
+  }
+
+  pub fn e_alliance_withdraw(
+    &mut self,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let msg = ExecuteMsg::Withdraw {};
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    self
+  }
+
   pub fn e_alliance_claim_rewards(
     &mut self,
     sender: &str,
@@ -102,6 +132,12 @@ impl TestingSuite {
 
   pub fn q_alliance_validators(&mut self, result: impl Fn(StdResult<HashSet<Addr>>)) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(self.contract_5(), &QueryMsg::Validators {});
+    result(response);
+    self
+  }
+
+  pub fn q_alliance_state(&mut self, result: impl Fn(StdResult<State>)) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(self.contract_5(), &QueryMsg::State {});
     result(response);
     self
   }

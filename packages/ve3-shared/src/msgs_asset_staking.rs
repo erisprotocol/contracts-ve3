@@ -54,7 +54,7 @@ pub struct AssetConfig<T: AddressLike> {
 #[cw_serde]
 pub struct InstantiateMsg {
   pub global_config_addr: String,
-  pub reward_info: AssetInfo,
+  pub reward_info: AssetInfoUnchecked,
   pub default_yearly_take_rate: Decimal,
   pub gauge: String,
 }

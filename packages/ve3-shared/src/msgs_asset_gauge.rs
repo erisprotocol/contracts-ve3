@@ -10,6 +10,7 @@ use crate::{
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, DepsMut, Uint128};
+use cw20::Cw20ReceiveMsg;
 use cw_asset::{AssetInfo, AssetInfoUnchecked};
 
 /// This structure describes the basic settings for creating a contract.
@@ -47,17 +48,21 @@ pub enum ExecuteMsg {
 
   AddRebase {},
 
+  /// Implements the Cw20 receiver interface
+  Receive(Cw20ReceiveMsg),
+
   /// TunePools transforms the latest vote distribution into alloc_points which are then applied to ASTRO generators
   SetDistribution {},
 
-  // ClearGaugeState {
-  //   gauge: String,
-  //   limit: Option<usize>,
-  // },
   UpdateConfig {
     update_gauge: Option<GaugeConfig>,
     remove_gauge: Option<String>,
   },
+}
+
+#[cw_serde]
+pub enum ReceiveMsg {
+  AddRebase {},
 }
 
 /// This structure describes the query messages available in the contract.

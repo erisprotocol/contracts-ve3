@@ -1,10 +1,13 @@
 use crate::extensions::app_response_ext::Valid;
 
 use super::suite::TestingSuite;
-use cosmwasm_std::Decimal;
+use cosmwasm_std::{Decimal, Uint128};
 use cw_asset::{AssetInfo, AssetInfoUnchecked};
 use cw_multi_test::{AppResponse, Executor};
-use ve3_shared::msgs_asset_staking::{AssetConfig, AssetInfoWithConfig};
+use ve3_shared::{
+  extensions::{asset_ext::AssetExt, asset_info_ext::AssetInfoExt},
+  msgs_asset_staking::{AssetConfig, AssetInfoWithConfig},
+};
 
 #[allow(dead_code)]
 impl TestingSuite {
@@ -118,5 +121,89 @@ impl TestingSuite {
       "AT_ASSET_WHITELIST_CONTROLLER",
       |res| res.assert_valid(),
     )
+  }
+
+  pub fn def_get_ampluna(&mut self, sender: &str, amount: u32) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+
+    let sender = self.address(sender);
+    let res = self.app.execute_contract(
+      sender.clone(),
+      self.addresses.eris_hub.clone(),
+      &eris::hub::ExecuteMsg::Bond {
+        receiver: None,
+      },
+      &[addr.uluna(amount).to_coin().unwrap()],
+    );
+    res.assert_valid();
+    self
+  }
+
+  pub fn def_change_exchange_rate(&mut self, goal: Decimal) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+    let sender = self.address("creator");
+    let contract = self.addresses.eris_hub.clone();
+
+    self
+      .app
+      .execute_contract(
+        sender.clone(),
+        contract.clone(),
+        &eris::hub::ExecuteMsg::UpdateConfig {
+          protocol_fee_contract: None,
+          protocol_reward_fee: None,
+          allow_donations: Some(true),
+          delegation_strategy: None,
+          vote_operator: None,
+          epoch_period: None,
+          unbond_period: None,
+        },
+        &[],
+      )
+      .assert_valid();
+
+    let state: eris::hub::StateResponse =
+      self.app.wrap().query_wasm_smart(contract.clone(), &eris::hub::QueryMsg::State {}).unwrap();
+
+    if state.total_uluna.is_zero() {
+      self
+        .app
+        .execute_contract(
+          sender.clone(),
+          contract.clone(),
+          &eris::hub::ExecuteMsg::Bond {
+            receiver: None,
+          },
+          &[addr.uluna(1000).to_coin().unwrap()],
+        )
+        .assert_valid();
+
+      let donation = goal * Uint128::new(1000) - Uint128::new(1000);
+
+      self
+        .app
+        .execute_contract(
+          sender.clone(),
+          contract.clone(),
+          &eris::hub::ExecuteMsg::Donate {},
+          &[addr.uluna_info_checked().with_balance(donation).to_coin().unwrap()],
+        )
+        .assert_valid();
+    } else {
+      let goal_amount = state.total_ustake * goal;
+      let missing = goal_amount - state.total_uluna;
+
+      self
+        .app
+        .execute_contract(
+          sender.clone(),
+          contract.clone(),
+          &eris::hub::ExecuteMsg::Donate {},
+          &[addr.uluna_info_checked().with_balance(missing).to_coin().unwrap()],
+        )
+        .assert_valid();
+    }
+
+    self
   }
 }

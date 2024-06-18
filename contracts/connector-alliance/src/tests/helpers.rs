@@ -20,6 +20,7 @@ pub(super) fn mock_dependencies() -> OwnedDeps<MockStorage, MockApi, CustomQueri
   }
 }
 
+#[track_caller]
 pub fn setup_contract(deps: DepsMut) -> Response {
   let info = mock_info("admin", &[]);
   let env = mock_env();
@@ -29,10 +30,14 @@ pub fn setup_contract(deps: DepsMut) -> Response {
     reward_denom: "uluna".to_string(),
     global_config_addr: "global_config".to_string(),
     gauge: "test".to_string(),
+    lst_asset_info: cw_asset::AssetInfoBase::Cw20("aluna".to_string()),
+    lst_hub_address: "hub".to_string(),
+    zasset_denom: "zluna".to_string(),
   };
   instantiate(deps, env, info, init_msg).unwrap()
 }
 
+#[track_caller]
 pub fn set_alliance_asset(deps: DepsMut) {
   CONFIG
     .update(deps.storage, |c| -> StdResult<_> {

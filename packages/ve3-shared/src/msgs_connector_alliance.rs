@@ -1,15 +1,27 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, StdResult, Uint128, WasmMsg};
-use cw_asset::AssetInfo;
+use cosmwasm_std::{
+  to_json_binary, Addr, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128, WasmMsg,
+};
+use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
+use crate::{
+  adapters::{asset_gauge::AssetGauge, global_config_adapter::ConfigExt},
+  constants::AT_ASSET_GAUGE,
+  error::SharedError,
+};
+
 #[cw_serde]
 pub struct InstantiateMsg {
-  pub alliance_token_denom: String,
   pub reward_denom: String,
+  pub zasset_denom: String,
+  pub alliance_token_denom: String,
   pub global_config_addr: String,
   pub gauge: String,
+
+  pub lst_hub_address: String,
+  pub lst_asset_info: AssetInfoUnchecked,
 }
 
 #[cw_serde]
@@ -17,8 +29,9 @@ pub struct MigrateMsg {}
 
 #[cw_serde]
 pub enum CallbackMsg {
-  ClaimRewardsCallback {
-    asset: AssetInfo,
+  ClaimRewardsCallback {},
+  BondRewardsCallback {
+    initial: Asset,
     receiver: Addr,
   },
 }
@@ -63,15 +76,39 @@ pub struct AllianceRedelegateMsg {
 
 #[cw_serde]
 pub struct Config {
+  pub global_config_addr: Addr,
+
+  pub reward_denom: String,
+  pub zasset_denom: String,
   pub alliance_token_denom: String,
   pub alliance_token_supply: Uint128,
-  pub reward_denom: String,
-  pub global_config_addr: Addr,
   pub gauge: String,
+
+  pub lst_hub_addr: Addr,
+  pub lst_asset_info: AssetInfo,
+}
+
+impl Config {
+  pub fn asset_gauge(&self, querier: &QuerierWrapper) -> Result<AssetGauge, SharedError> {
+    self.global_config().get_address(querier, AT_ASSET_GAUGE).map(AssetGauge)
+  }
+}
+
+#[cw_serde]
+pub struct State {
+  pub last_exchange_rate: Decimal,
+  pub taken: Uint128,
+  pub harvested: Uint128,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
+  DistributeRebase {
+    update: Option<bool>,
+  },
+
+  Withdraw {},
+
   // Privileged functions
   ClaimRewards {},
 
@@ -91,6 +128,9 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
   #[returns(Config)]
   Config {},
+
+  #[returns(State)]
+  State {},
 
   #[returns(HashSet<Addr>)]
   Validators {},

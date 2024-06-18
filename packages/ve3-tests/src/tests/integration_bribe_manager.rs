@@ -30,7 +30,7 @@ fn test_lock_add_bribes() {
     .e_bribe_add_bribe_native(
       addr.uluna(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       None,
       // creator part of AT_FREE_BRIBES
@@ -42,7 +42,7 @@ fn test_lock_add_bribes() {
     .e_bribe_add_bribe_native(
       addr.uluna(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       Some(addr.uluna(10000000)),
       "user1",
@@ -345,7 +345,7 @@ fn test_errors() {
     .e_bribe_add_bribe_native(
       addr.uluna(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       None,
       "user1",
@@ -371,7 +371,7 @@ fn test_errors() {
     .e_bribe_add_bribe_native(
       addr.uluna(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Specific(vec![(10u64, u(1000))]),
       None,
       // creator part of AT_FREE_BRIBES
@@ -383,7 +383,7 @@ fn test_errors() {
     .e_bribe_add_bribe_native(
       addr.uluna(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Specific(vec![
         (100u64, u(1000)),
         (100u64, u(1000)),
@@ -423,7 +423,7 @@ fn test_errors() {
     .e_bribe_add_bribe_native(
       addr.uluna(0),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       None,
       // creator part of AT_FREE_BRIBES
@@ -456,7 +456,7 @@ fn test_try_withdraw_late() {
     .e_bribe_add_bribe_native(
       addr.uluna(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       None,
       // creator part of AT_FREE_BRIBES
@@ -531,7 +531,7 @@ fn test_any_bribe() {
     .e_bribe_add_bribe_native(
       addr.lp_native(1000),
       &addr.gauge_1,
-      addr.lp_cw_info(),
+      addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       None,
       "creator",

@@ -5,7 +5,7 @@ use crate::{
   },
   extensions::app_response_ext::{EventChecker, Valid},
 };
-use cosmwasm_std::{attr, Addr, Decimal};
+use cosmwasm_std::{attr, Decimal};
 use cw_asset::{AssetInfo, AssetInfoUnchecked};
 use ve3_asset_staking::error::ContractError;
 use ve3_shared::{
