@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::suite::TestingSuite;
-use cosmwasm_std::{Addr, StdResult};
+use cosmwasm_std::{coin, Addr, StdResult};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::msgs_connector_alliance::*;
 
@@ -13,11 +13,6 @@ impl TestingSuite {
 
   pub fn use_connector_alliance_1(&mut self) -> &mut TestingSuite {
     self.addresses.active_connector_alliance = self.addresses.ve3_connector_alliance_1.clone();
-    self
-  }
-
-  pub fn use_connector_alliance_2(&mut self) -> &mut TestingSuite {
-    self.addresses.active_connector_alliance = self.addresses.ve3_connector_alliance_2.clone();
     self
   }
 
@@ -43,11 +38,17 @@ impl TestingSuite {
   pub fn e_alliance_withdraw(
     &mut self,
     sender: &str,
+    amount: u32,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Withdraw {};
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(
+      sender,
+      self.contract_5(),
+      &msg,
+      &[coin(amount.into(), self.addresses.zasset_denom.clone())],
+    ));
     self
   }
 

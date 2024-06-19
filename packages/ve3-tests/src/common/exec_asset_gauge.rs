@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, Addr, StdResult, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, StdResult};
 use cw_asset::Asset;
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
@@ -7,8 +7,6 @@ use ve3_shared::{
   msgs_asset_gauge::*,
   msgs_voting_escrow::LockInfoResponse,
 };
-
-use crate::extensions::app_response_ext::Valid;
 
 use super::{helpers::u, suite::TestingSuite};
 
@@ -93,7 +91,7 @@ impl TestingSuite {
     // );
     // res.assert_valid();
 
-    let ampluna = self.addresses.eris_hub_cw20.clone();
+    let ampluna = self.addresses.eris_hub_cw20_ampluna.clone();
 
     // let balance: cw20::BalanceResponse = self
     //   .app

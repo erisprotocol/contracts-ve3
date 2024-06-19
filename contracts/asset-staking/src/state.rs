@@ -9,8 +9,9 @@ use ve3_shared::{
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const WHITELIST: Map<&AssetInfo, bool> = Map::new("whitelist");
 
-pub const BALANCES: Map<(Addr, &AssetInfo), Uint128> = Map::new("balances");
-pub const TOTAL_BALANCES: Map<&AssetInfo, (Uint128, Uint128)> = Map::new("total_balances");
+pub const SHARES: Map<(Addr, &AssetInfo), Uint128> = Map::new("shares");
+// balance -> share
+pub const TOTAL: Map<&AssetInfo, (Uint128, Uint128)> = Map::new("total");
 
 pub const ASSET_REWARD_DISTRIBUTION: Item<Vec<AssetDistribution>> =
   Item::new("asset_reward_distribution");

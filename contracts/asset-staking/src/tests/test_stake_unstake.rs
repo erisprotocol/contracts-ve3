@@ -1,6 +1,6 @@
 use crate::contract::execute;
 use crate::error::ContractError;
-use crate::state::{BALANCES, TOTAL_BALANCES};
+use crate::state::{SHARES, TOTAL};
 use crate::tests::helpers::mock_dependencies;
 use crate::tests::helpers::{
   query_all_staked_balances, setup_contract, stake, stake_cw20, unstake, unstake_cw20,
@@ -30,7 +30,7 @@ fn test_stake_cw20() {
     ])
   );
 
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Cw20(Addr::unchecked("asset1"))),
@@ -50,7 +50,7 @@ fn test_stake_cw20() {
       ("share", "100"),
     ])
   );
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Cw20(Addr::unchecked("asset1"))),
@@ -58,7 +58,7 @@ fn test_stake_cw20() {
     .unwrap();
   assert_eq!(balance, Uint128::new(200));
 
-  let total_balance = TOTAL_BALANCES
+  let total_balance = TOTAL
     .load(deps.as_ref().storage, &AssetInfo::Cw20(Addr::unchecked("asset1")))
     .unwrap();
   assert_eq!(total_balance, (Uint128::new(200), Uint128::new(200)));
@@ -120,7 +120,7 @@ fn test_unstake_cw20() {
       }))
   );
 
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Cw20(Addr::unchecked("asset1".to_string()))),
@@ -151,7 +151,7 @@ fn test_unstake_cw20() {
       }))
   );
 
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Cw20(Addr::unchecked("asset1".to_string()))),
@@ -159,7 +159,7 @@ fn test_unstake_cw20() {
     .unwrap();
   assert_eq!(balance, Uint128::new(0));
 
-  let total_balance = TOTAL_BALANCES
+  let total_balance = TOTAL
     .load(deps.as_ref().storage, &AssetInfo::Cw20(Addr::unchecked("asset1".to_string())))
     .unwrap();
   assert_eq!(total_balance, (Uint128::zero(), Uint128::zero()));
@@ -183,7 +183,7 @@ fn test_stake() {
     ])
   );
 
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Native("asset1".to_string())),
@@ -203,7 +203,7 @@ fn test_stake() {
       ("share", "100"),
     ])
   );
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Native("asset1".to_string())),
@@ -212,7 +212,7 @@ fn test_stake() {
   assert_eq!(balance, Uint128::new(200));
 
   let total_balance =
-    TOTAL_BALANCES.load(deps.as_ref().storage, &AssetInfo::Native("asset1".to_string())).unwrap();
+    TOTAL.load(deps.as_ref().storage, &AssetInfo::Native("asset1".to_string())).unwrap();
   assert_eq!(total_balance, (Uint128::new(200), Uint128::new(200)));
 
   let total_balances_res = query_all_staked_balances(deps.as_ref());
@@ -295,7 +295,7 @@ fn test_unstake() {
       }))
   );
 
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Native("asset1".to_string())),
@@ -320,7 +320,7 @@ fn test_unstake() {
       }))
   );
 
-  let balance = BALANCES
+  let balance = SHARES
     .load(
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Native("asset1".to_string())),
@@ -329,7 +329,7 @@ fn test_unstake() {
   assert_eq!(balance, Uint128::new(0));
 
   let total_balance =
-    TOTAL_BALANCES.load(deps.as_ref().storage, &AssetInfo::Native("asset1".to_string())).unwrap();
+    TOTAL.load(deps.as_ref().storage, &AssetInfo::Native("asset1".to_string())).unwrap();
   assert_eq!(total_balance, (Uint128::new(0), Uint128::new(0)));
 }
 

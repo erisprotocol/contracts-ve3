@@ -40,7 +40,7 @@ fn test_setup_contract() {
     res,
     Response::default()
       .add_attributes(vec![
-        ("action", "instantiate"),
+        ("action", "ca/instantiate"),
         ("alliance_token_denom", &full_denom.to_string()),
         ("alliance_token_total_supply", "1000000000000"),
         ("zasset_denom", &full_denom_2.to_string()),

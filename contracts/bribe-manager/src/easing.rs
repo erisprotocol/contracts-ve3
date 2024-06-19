@@ -145,4 +145,36 @@ mod test {
 
     Ok(())
   }
+
+  #[test]
+  fn test_all() -> Result<(), ContractError> {
+    let types = vec![
+      FuncType::EaseInCubic,
+      FuncType::EaseInOutCubic,
+      FuncType::EaseOutCubic,
+      FuncType::Linear,
+      FuncType::Bezier,
+      FuncType::Parametric,
+    ];
+
+    for t in types {
+      let distribution = BribeDistribution::Func {
+        start: Some(1),
+        end: 100,
+        func_type: t.clone(),
+      }
+      .create_distribution(0, Uint128::new(100_000000))?;
+
+      println!("-----------------------");
+      println!("Type: {t:?}");
+      println!("{distribution:?}");
+
+      for (x, y) in distribution {
+        let amount = y.u128();
+        println!("{x} {amount}")
+      }
+    }
+
+    Ok(())
+  }
 }

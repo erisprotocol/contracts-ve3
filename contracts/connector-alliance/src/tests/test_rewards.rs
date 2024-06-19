@@ -99,7 +99,7 @@ fn update_reward_callback() {
     res,
     Response::new()
       .add_attributes(vec![
-        ("action", "claim_rewards_callback"),
+        ("action", "ca/claim_rewards_callback"),
         ("claimed", "native:uluna:2000000")
       ])
       .add_message(

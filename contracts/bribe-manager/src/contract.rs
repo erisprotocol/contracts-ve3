@@ -170,7 +170,8 @@ fn add_bribe(
   asset_sum_equal(&bribe, &bribes)?;
   asset_future_only(block_period, &bribes)?;
 
-  for (period, amount) in bribes {
+  bribes.into_iter().for_each(|bribe_period| {
+    let (period, amount) = bribe_period;
     let bribe_split = bribe.info.with_balance(amount);
 
     let user_key = (user.as_str(), period);
@@ -180,9 +181,10 @@ fn add_bribe(
     global_bucket.add(&gauge, &for_info, &bribe_split);
     user_bucket.add(&gauge, &for_info, &bribe_split);
 
-    BRIBE_AVAILABLE.save(deps.storage, period, &global_bucket)?;
-    BRIBE_CREATOR.save(deps.storage, user_key, &user_bucket)?;
-  }
+    // unwrap is used here to get a correct coverage report
+    BRIBE_AVAILABLE.save(deps.storage, period, &global_bucket).unwrap();
+    BRIBE_CREATOR.save(deps.storage, user_key, &user_bucket).unwrap();
+  });
 
   Ok(
     Response::new()

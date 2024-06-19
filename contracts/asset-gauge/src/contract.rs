@@ -354,19 +354,22 @@ fn update_vote(
   let is_same_owner = old_lock.as_ref().map_or(false, |a| a.owner == new_lock.owner);
 
   if let Some(old_lock) = old_lock {
-    let user = remove_votes_of_user(deps.storage, &config, block_period, &old_lock)?;
+    if old_lock.has_vp() {
+      let user = remove_votes_of_user(deps.storage, &config, block_period, &old_lock)?;
 
-    rebase.total_fixed = rebase.total_fixed.checked_sub(old_lock.fixed_amount)?;
+      rebase.total_fixed = rebase.total_fixed.checked_sub(old_lock.fixed_amount)?;
 
-    if !is_same_owner || !new_lock.has_vp() {
-      calc_rebase_share(
-        deps.storage,
-        &rebase,
-        &old_lock.owner,
-        user.fixed_amount + old_lock.fixed_amount,
-      )?;
+      if !is_same_owner || !new_lock.has_vp() {
+        calc_rebase_share(
+          deps.storage,
+          &rebase,
+          &old_lock.owner,
+          user.fixed_amount + old_lock.fixed_amount,
+        )?;
+      }
     }
   }
+
   if new_lock.has_vp() {
     let user = apply_votes_of_user(deps.storage, &config, block_period, &new_lock)?;
 
@@ -399,7 +402,11 @@ fn add_rebase(deps: DepsMut, asset: Asset) -> Result<Response, ContractError> {
     }
   }
 
-  Ok(Response::default().add_attribute("action", "gauge/add_rebase"))
+  Ok(
+    Response::default()
+      .add_attribute("action", "gauge/add_rebase")
+      .add_attribute("rebase", asset.to_string()),
+  )
 }
 
 fn calc_rebase_share(

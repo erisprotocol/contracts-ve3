@@ -368,14 +368,14 @@ impl TestingSuite {
 
   pub(crate) fn q_ve_lock_vamp(
     &mut self,
-    token_id: String,
+    token_id: &str,
     time: Option<Time>,
     result: impl Fn(StdResult<VotingPowerResponse>),
   ) -> &mut Self {
     let incentive_response = self.app.wrap().query_wasm_smart(
       self.contract(),
       &QueryMsg::LockVamp {
-        token_id,
+        token_id: token_id.to_string(),
         time,
       },
     );

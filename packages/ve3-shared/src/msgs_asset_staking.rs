@@ -146,8 +146,10 @@ pub enum ExecuteMsg {
     recipient: Option<String>,
   },
   Unstake(Asset),
-  ClaimRewards(AssetInfo),
-  ClaimRewardsMultiple(Vec<AssetInfo>),
+  ClaimReward(AssetInfo),
+  ClaimRewards {
+    assets: Option<Vec<AssetInfo>>,
+  },
 
   // controller
   WhitelistAssets(Vec<AssetInfoWithConfig<String>>),
@@ -196,6 +198,9 @@ pub enum QueryMsg {
   #[returns(Vec<PendingRewardsRes>)]
   AllPendingRewards(AllPendingRewardsQuery),
 
+  #[returns(Vec<PendingRewardsDetailRes>)]
+  AllPendingRewardsDetail(AllPendingRewardsQuery),
+
   #[returns(Vec<StakedBalanceRes>)]
   TotalStakedBalances {},
 }
@@ -231,7 +236,13 @@ pub struct StakedBalanceRes {
 
 #[cw_serde]
 pub struct PendingRewardsRes {
-  pub staked_asset: AssetInfo,
-  pub reward_asset: AssetInfo,
-  pub rewards: Uint128,
+  pub staked_asset_share: Asset,
+  pub reward_asset: Asset,
+}
+
+#[cw_serde]
+pub struct PendingRewardsDetailRes {
+  pub share: Uint128,
+  pub staked_asset: Asset,
+  pub reward_asset: Asset,
 }

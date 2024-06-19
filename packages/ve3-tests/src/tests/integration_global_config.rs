@@ -28,7 +28,7 @@ fn test_config_default() {
             "BRIBE_WHITELIST_CONTROLLER".to_string(),
             Addr::unchecked("terra12c28vjamz0tfwjf3h9669zx4fhkpjnfd75vjsw807h38w5qkv7es0v88dv")
           ),
-          ("CONNECTOR__project".to_string(), addr.ve3_connector_alliance_2.clone()),
+          ("CONNECTOR__project".to_string(), addr.ve3_connector_alliance_eris.clone()),
           ("CONNECTOR__stable".to_string(), addr.ve3_connector_alliance_1.clone()),
           (
             "DELEGATION_CONTROLLER".to_string(),

@@ -32,7 +32,7 @@ cw20-base.workspace = true
 cw721.workspace = true
 cw721-base.workspace = true
 
-cw-multi-test = { version = "1.1.0", default-features = false }
+cw-multi-test = { version = "1.1.0", default-features = false, features = ["cosmwasm_1_1", "cosmwasm_1_3"]}
 
 ve3-asset-gauge = {path = "../../contracts/asset-gauge"}
 ve3-asset-staking = {path = "../../contracts/asset-staking"}

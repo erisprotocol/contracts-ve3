@@ -11,10 +11,22 @@ use cw_asset::{Asset, AssetInfo};
 pub struct AssetStaking(pub Addr);
 
 impl AssetStaking {
-  pub fn claim_rewards_msg(&self, lp_tokens: Vec<AssetInfo>) -> Result<CosmosMsg, SharedError> {
+  pub fn claim_rewards_msg(
+    &self,
+    assets: Option<Vec<AssetInfo>>,
+  ) -> Result<CosmosMsg, SharedError> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
       contract_addr: self.0.to_string(),
-      msg: to_json_binary(&ExecuteMsg::ClaimRewardsMultiple(lp_tokens))?,
+      msg: to_json_binary(&ExecuteMsg::ClaimRewards {
+        assets,
+      })?,
+      funds: vec![],
+    }))
+  }
+  pub fn claim_reward_msg(&self, asset: AssetInfo) -> Result<CosmosMsg, SharedError> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+      contract_addr: self.0.to_string(),
+      msg: to_json_binary(&ExecuteMsg::ClaimReward(asset))?,
       funds: vec![],
     }))
   }

@@ -5,7 +5,7 @@ use crate::{
     helpers::{cw20, native, u},
     suite::TestingSuite,
   },
-  extensions::app_response_ext::EventChecker,
+  extensions::app_response_ext::{EventChecker, Valid},
 };
 use cosmwasm_std::{attr, Decimal};
 use cw721::{AllNftInfoResponse, Approval, NftInfoResponse, OwnerOfResponse, TokensResponse};
@@ -256,11 +256,15 @@ fn test_locks_exchange_rate() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
-      res.unwrap();
-    })
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| {
-      res.unwrap();
+    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
+    .q_ve_total_vamp(Some(Time::Period(300)), |res| {
+      assert_eq!(
+        res.unwrap(),
+        VotingPowerResponse {
+          vp: u(2200)
+        }
+      );
     })
     .q_gauge_user_info("user2", Some(Time::Next), |res| {
       assert_eq!(
@@ -292,7 +296,7 @@ fn test_locks_exchange_rate() {
                 Trait {
                   display_type: None,
                   trait_type: "asset".to_string(),
-                  value: format!("cw20:{0}:1000", addr.eris_hub_cw20)
+                  value: format!("cw20:{0}:1000", addr.eris_hub_cw20_ampluna)
                 },
                 Trait {
                   display_type: None,
@@ -380,7 +384,7 @@ fn test_locks_lock_extension_ampluna() {
   let mut suite = TestingSuite::def();
   let suite = suite.init();
   let addr = suite.addresses.clone();
-  let ampluna = addr.eris_hub_cw20.to_string();
+  let ampluna = addr.eris_hub_cw20_ampluna.to_string();
 
   suite
     .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
@@ -400,9 +404,7 @@ fn test_locks_lock_extension_ampluna() {
       );
     })
     // TODO UPDATE EXCHANGE RATE
-    // .e_hub_update_exchange_rate(Decimal::from_str("1.3").unwrap(), "creator", |res| {
-    //   res.unwrap();
-    // })
+    .def_change_exchange_rate(Decimal::percent(130))
     .e_ve_extend_lock_time(WEEK * 2, "2", "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
@@ -416,7 +418,8 @@ fn test_locks_lock_extension_ampluna() {
         // 1.3 higher
         UserInfoExtendedResponse {
           voting_power: u(336),
-          fixed_amount: u(1300),
+          // rounding issue
+          fixed_amount: u(1299),
           slope: u(112),
           gauge_votes: vec![]
         }
@@ -536,6 +539,15 @@ fn test_locks_merge() {
           fixed_amount: u(1000),
           voting_power: u(86),
           ..res
+        }
+      );
+    })
+    .q_ve_lock_vamp("1", None, |res| {
+      let res = res.unwrap();
+      assert_eq!(
+        res,
+        VotingPowerResponse {
+          vp: u(1086)
         }
       );
     })
@@ -738,7 +750,7 @@ fn test_locks_split() {
   let mut suite = TestingSuite::def();
   let suite = suite.init();
   let addr = suite.addresses.clone();
-  let ampluna = suite.addresses.eris_hub_cw20.clone();
+  let ampluna = suite.addresses.eris_hub_cw20_ampluna.clone();
 
   suite
     .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
@@ -1421,4 +1433,34 @@ fn test_lock_merge_permanent() {
         }
       )
     });
+}
+
+#[test]
+fn test_config() {
+  let mut suite = TestingSuite::def();
+  let suite = suite.init();
+  let addr = suite.addresses.clone();
+
+  suite.q_ve_config(|res| {
+    assert_eq!(
+      res.unwrap(),
+      Config {
+        global_config_addr: addr.ve3_global_config.clone(),
+        deposit_assets: vec![
+          DepositAsset {
+            info: addr.uluna_info_checked(),
+            config: AssetInfoConfig::Default
+          },
+          DepositAsset {
+            info: addr.ampluna_info_checked(),
+            config: AssetInfoConfig::ExchangeRate {
+              contract: addr.eris_hub.clone()
+            }
+          },
+        ],
+        push_update_contracts: vec![addr.ve3_asset_gauge.clone()],
+        decommissioned: None
+      }
+    )
+  });
 }

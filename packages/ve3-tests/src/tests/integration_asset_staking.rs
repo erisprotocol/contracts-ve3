@@ -498,7 +498,7 @@ fn test_asset_recipient() {
     .def_asset_config_astro(|res| res.assert_valid())
     .e_staking_stake(None, addr.lp_native(10_000_000), "user1", |res| res.assert_valid())
     .add_one_period()
-    .e_staking_stake(Some(addr.user1.to_string()), addr.lp_native(1_000_000), "user2", |res| {
+    .e_staking_stake(Some("user1"), addr.lp_native(1_000_000), "user2", |res| {
       res.assert_attribute(attr("action", "asset/stake"));
       res.assert_attribute(attr("amount", "1000000"));
       res.assert_attribute(attr("share", "1001921"));

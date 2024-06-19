@@ -1,6 +1,7 @@
 #[cfg(test)]
 pub mod common;
-mod extensions;
+#[cfg(test)]
+pub mod extensions;
 #[cfg(test)]
 pub mod mocks;
 #[cfg(test)]

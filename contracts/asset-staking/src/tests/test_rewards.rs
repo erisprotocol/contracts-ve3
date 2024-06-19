@@ -1,8 +1,6 @@
 use crate::contract::execute;
 use crate::error::ContractError;
-use crate::state::{
-  ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, TOTAL_BALANCES, USER_ASSET_REWARD_RATE,
-};
+use crate::state::{ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, TOTAL, USER_ASSET_REWARD_RATE};
 use crate::tests::helpers::{
   asset_distribution_1, asset_distribution_2, asset_distribution_broken_1,
   asset_distribution_broken_2, claim_rewards, mock_dependencies, query_all_rewards,
@@ -73,7 +71,7 @@ fn update_reward_callback() {
   deps.querier.bank_querier.update_balance(MOCK_CONTRACT_ADDR, vec![coin(2000000, "uluna")]);
   setup_contract(deps.as_mut());
 
-  TOTAL_BALANCES
+  TOTAL
     .save(
       deps.as_mut().storage,
       &AssetInfo::Native("aWHALE".to_string()),
@@ -81,7 +79,7 @@ fn update_reward_callback() {
     )
     .unwrap();
 
-  TOTAL_BALANCES
+  TOTAL
     .save(
       deps.as_mut().storage,
       &AssetInfo::Native("bWHALE".to_string()),
@@ -194,9 +192,8 @@ fn claim_user_rewards() {
   assert_eq!(
     rewards,
     PendingRewardsRes {
-      rewards: Uint128::new(100000),
-      reward_asset: AssetInfo::Native("uluna".to_string()),
-      staked_asset: AssetInfo::Native("aWHALE".to_string()),
+      reward_asset: Asset::native("uluna".to_string(), 100000u128),
+      staked_asset_share: Asset::native("aWHALE".to_string(), 1000000u128),
     }
   );
 
@@ -204,9 +201,8 @@ fn claim_user_rewards() {
   assert_eq!(
     all_rewards,
     vec![PendingRewardsRes {
-      rewards: Uint128::new(100000),
-      reward_asset: AssetInfo::Native("uluna".to_string()),
-      staked_asset: AssetInfo::Native("aWHALE".to_string()),
+      reward_asset: Asset::native("uluna".to_string(), 100000u128),
+      staked_asset_share: Asset::native("aWHALE".to_string(), 1000000u128),
     }]
   );
 
@@ -217,7 +213,7 @@ fn claim_user_rewards() {
       .add_attributes(vec![
         ("action", "asset/claim_rewards"),
         ("user", "user1"),
-        ("asset", "native:aWHALE"),
+        ("assets", "native:aWHALE"),
         ("reward_amount", "100000"),
       ])
       .add_message(CosmosMsg::Bank(BankMsg::Send {
@@ -241,21 +237,13 @@ fn claim_user_rewards() {
   assert_eq!(
     rewards,
     PendingRewardsRes {
-      rewards: Uint128::new(0),
-      reward_asset: AssetInfo::Native("uluna".to_string()),
-      staked_asset: AssetInfo::Native("aWHALE".to_string()),
+      reward_asset: Asset::native("uluna".to_string(), 0u128),
+      staked_asset_share: Asset::native("aWHALE".to_string(), 1000000u128),
     }
   );
 
   let all_rewards = query_all_rewards(deps.as_ref(), "user1");
-  assert_eq!(
-    all_rewards,
-    vec![PendingRewardsRes {
-      rewards: Uint128::new(0),
-      reward_asset: AssetInfo::Native("uluna".to_string()),
-      staked_asset: AssetInfo::Native("aWHALE".to_string()),
-    }]
-  );
+  assert_eq!(all_rewards, vec![]);
 
   let res = claim_rewards(deps.as_mut(), "user1", "aWHALE");
   assert_eq!(
@@ -263,7 +251,7 @@ fn claim_user_rewards() {
     Response::new().add_attributes(vec![
       ("action", "asset/claim_rewards"),
       ("user", "user1"),
-      ("asset", "native:aWHALE"),
+      ("assets", "native:aWHALE"),
       ("reward_amount", "0"),
     ])
   );
@@ -290,7 +278,7 @@ fn claim_user_rewards() {
       .add_attributes(vec![
         ("action", "asset/claim_rewards"),
         ("user", "user1"),
-        ("asset", "native:aWHALE"),
+        ("assets", "native:aWHALE"),
         ("reward_amount", "10000"),
       ])
       .add_message(CosmosMsg::Bank(BankMsg::Send {
@@ -347,7 +335,7 @@ fn claim_user_rewards_after_staking() {
       .add_attributes(vec![
         ("action", "asset/claim_rewards"),
         ("user", "user1"),
-        ("asset", "native:aWHALE"),
+        ("assets", "native:aWHALE"),
         ("reward_amount", "100000"),
       ])
       .add_message(CosmosMsg::Bank(BankMsg::Send {
@@ -363,7 +351,7 @@ fn claim_user_rewards_after_staking() {
     Response::new().add_attributes(vec![
       ("action", "asset/claim_rewards"),
       ("user", "user1"),
-      ("asset", "native:aWHALE"),
+      ("assets", "native:aWHALE"),
       ("reward_amount", "0"),
     ])
   );
@@ -443,13 +431,13 @@ fn claim_rewards_after_staking_and_unstaking() {
 
   // User 1 should not have any rewards
   let rewards = query_rewards(deps.as_ref(), "user1", "aWHALE");
-  assert_eq!(rewards.rewards, Uint128::zero());
+  assert_eq!(rewards.reward_asset.amount, Uint128::zero());
 
   // User 2 should receive all the rewards in the contract
   let rewards = query_rewards(deps.as_ref(), "user2", "aWHALE");
-  assert_eq!(rewards.rewards, Uint128::new(900000));
+  assert_eq!(rewards.reward_asset.amount, Uint128::new(900000));
   let rewards = query_rewards(deps.as_ref(), "user2", "bWHALE");
-  assert_eq!(rewards.rewards, Uint128::new(1000000));
+  assert_eq!(rewards.reward_asset.amount, Uint128::new(1000000));
 }
 
 #[test]
@@ -524,10 +512,10 @@ fn claim_rewards_after_rebalancing_emissions() {
   .unwrap();
 
   let rewards = query_rewards(deps.as_ref(), "user1", "aWHALE");
-  assert_eq!(rewards.rewards, Uint128::new(1500000));
+  assert_eq!(rewards.reward_asset.amount, Uint128::new(1500000));
   // User 2 should receive all the rewards in the contract
   let rewards = query_rewards(deps.as_ref(), "user2", "bWHALE");
-  assert_eq!(rewards.rewards, Uint128::new(500000));
+  assert_eq!(rewards.reward_asset.amount, Uint128::new(500000));
 }
 
 #[test]

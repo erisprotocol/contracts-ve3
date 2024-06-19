@@ -11,12 +11,12 @@ impl TestingSuite {
     self.addresses.active_asset_staking.clone()
   }
 
-  pub fn use_asset_staking_1(&mut self) -> &mut TestingSuite {
+  pub fn use_staking_1(&mut self) -> &mut TestingSuite {
     self.addresses.active_asset_staking = self.addresses.ve3_asset_staking_1.clone();
     self
   }
 
-  pub fn use_asset_staking_2(&mut self) -> &mut TestingSuite {
+  pub fn use_staking_2(&mut self) -> &mut TestingSuite {
     self.addresses.active_asset_staking = self.addresses.ve3_asset_staking_2.clone();
     self
   }
@@ -35,13 +35,13 @@ impl TestingSuite {
 
   pub fn e_staking_stake(
     &mut self,
-    recipient: Option<String>,
+    recipient: Option<&str>,
     funds: Asset,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Stake {
-      recipient,
+      recipient: recipient.map(|a| self.address(a).to_string()),
     };
 
     match &funds.info {
@@ -78,25 +78,27 @@ impl TestingSuite {
     self
   }
 
-  pub fn e_staking_claim_rewards(
+  pub fn e_staking_claim_reward(
     &mut self,
     asset_info: AssetInfo,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
-    let msg = ExecuteMsg::ClaimRewards(asset_info);
+    let msg = ExecuteMsg::ClaimReward(asset_info);
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
   }
 
-  pub fn e_staking_claim_rewards_multiple(
+  pub fn e_staking_claim_rewards(
     &mut self,
-    asset_infos: Vec<AssetInfo>,
+    asset_infos: Option<Vec<AssetInfo>>,
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
-    let msg = ExecuteMsg::ClaimRewardsMultiple(asset_infos);
+    let msg = ExecuteMsg::ClaimRewards {
+      assets: asset_infos,
+    };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
@@ -284,6 +286,19 @@ impl TestingSuite {
       .app
       .wrap()
       .query_wasm_smart(self.contract_active_staking(), &QueryMsg::AllPendingRewards(query));
+    result(response);
+    self
+  }
+
+  pub fn q_staking_all_pending_rewards_details(
+    &mut self,
+    query: AllPendingRewardsQuery,
+    result: impl Fn(StdResult<Vec<PendingRewardsDetailRes>>),
+  ) -> &mut Self {
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::AllPendingRewardsDetail(query));
     result(response);
     self
   }

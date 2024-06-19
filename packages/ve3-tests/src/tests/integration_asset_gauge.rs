@@ -258,9 +258,9 @@ fn test_vote_asserts() {
       res.unwrap();
     })
     .init_def_staking_whitelist()
-    .use_asset_staking_2()
+    .use_staking_2()
     .init_def_staking_whitelist()
-    .use_asset_staking_1()
+    .use_staking_1()
     .e_gauge_vote(addr.gauge_1.clone(), vec![], "user2", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::ZeroVotingPower(addr.user2.to_string(), 75));
@@ -747,7 +747,7 @@ fn test_config() {
               min_gauge_percentage: Decimal::percent(0)
             },
           ],
-          rebase_asset: addr.uluna_info_checked()
+          rebase_asset: addr.ampluna_info_checked()
         }
       )
     })
@@ -797,7 +797,7 @@ fn test_config() {
               min_gauge_percentage: Decimal::percent(1)
             },
           ],
-          rebase_asset: addr.uluna_info_checked()
+          rebase_asset: addr.ampluna_info_checked()
         }
       )
     });

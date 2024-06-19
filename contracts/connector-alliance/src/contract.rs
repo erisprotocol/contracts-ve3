@@ -87,7 +87,7 @@ pub fn instantiate(
   Ok(
     Response::new()
       .add_attributes(vec![
-        ("action", "instantiate"),
+        ("action", "ca/instantiate"),
         ("alliance_token_denom", &vt_full_denom),
         ("alliance_token_total_supply", &vt_total_supply.to_string()),
         ("zasset_denom", &zasset_full_denom),
@@ -107,7 +107,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
   match msg {
     ExecuteMsg::ClaimRewards {} => claim_rewards(deps, env, info),
-    ExecuteMsg::Withdraw {} => unstake(deps, env, info),
+    ExecuteMsg::Withdraw {} => withdraw(deps, env, info),
     ExecuteMsg::DistributeRebase {
       update,
     } => distribute_rebase(deps, env, info, update),
@@ -136,15 +136,20 @@ fn callback(
       let config = CONFIG.load(deps.storage)?;
       let reward_asset = AssetInfo::native(config.reward_denom);
       let received = reward_asset.with_balance_query(&deps.querier, &env.contract.address)?;
-      let bond_msg = ErisHub(&config.lst_hub_addr).bond_msg(received.clone(), None)?;
+
+      let mut msgs = vec![];
+      if !received.amount.is_zero() {
+        let bond_msg = ErisHub(&config.lst_hub_addr).bond_msg(received.clone(), None)?;
+        msgs.push(bond_msg)
+      }
 
       Ok(
         Response::new()
           .add_attributes(vec![
-            ("action", "claim_rewards_callback"),
+            ("action", "ca/claim_rewards_callback"),
             ("claimed", &received.to_string()),
           ])
-          .add_message(bond_msg),
+          .add_messages(msgs),
       )
     },
     CallbackMsg::BondRewardsCallback {
@@ -157,29 +162,35 @@ fn callback(
 
       let new_amount = initial.info.query_balance(&deps.querier, &env.contract.address)?;
       let added_amount = new_amount.checked_sub(initial.amount)?;
+      // let added = initial.info.with_balance(added_amount);
 
+      // println!("bond_rewards {added_amount:?}");
       let (_, stake_available) = _take(&mut deps, &config, initial.amount, true)?;
       let shares = zasset.total_supply(&deps.querier)?;
       let share_amount = compute_share_amount(shares, added_amount, stake_available);
 
-      let zasset_mint_msg: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
-        sender: env.contract.address.to_string(),
-        amount: Some(ve3_shared::helpers::denom::Coin {
-          denom: config.zasset_denom.to_string(),
-          amount: share_amount.to_string(),
-        }),
-        mint_to_address: receiver.to_string(),
+      let mut msgs = vec![];
+      if !share_amount.is_zero() {
+        let zasset_mint_msg: CosmosMsg = ve3_shared::helpers::denom::MsgMint {
+          sender: env.contract.address.to_string(),
+          amount: Some(ve3_shared::helpers::denom::Coin {
+            denom: config.zasset_denom.to_string(),
+            amount: share_amount.to_string(),
+          }),
+          mint_to_address: receiver.to_string(),
+        }
+        .into();
+        msgs.push(zasset_mint_msg)
       }
-      .into();
 
       Ok(
         Response::new()
           .add_attributes(vec![
-            ("action", "bond_rewards_callback"),
+            ("action", "ca/bond_rewards_callback"),
             ("amount", &added_amount.to_string()),
             ("share", &share_amount.to_string()),
           ])
-          .add_message(zasset_mint_msg),
+          .add_messages(msgs),
       )
     },
   }
@@ -208,6 +219,9 @@ fn _take(
   let stake_to_extract = exchange_rate_diff * stake_available;
   state.taken = state.taken.checked_add(stake_to_extract)?;
   state.last_exchange_rate = current_exchange_rate;
+
+  // println!("new_state {state:?}");
+
   if save {
     STATE.save(deps.storage, &state)?;
   }
@@ -249,12 +263,12 @@ fn distribute_rebase(
 
   Ok(
     Response::new()
-      .add_attributes(vec![("action", "distribute_rebase"), ("taken", &take_asset.to_string())])
+      .add_attributes(vec![("action", "ca/distribute_rebase"), ("taken", &take_asset.to_string())])
       .add_message(rebase_msg),
   )
 }
 
-fn unstake(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn withdraw(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
   let contract_addr = env.contract.address.clone();
   let config = CONFIG.load(deps.storage)?;
   let zasset = AssetInfo::native(config.zasset_denom.clone());
@@ -283,7 +297,7 @@ fn unstake(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, C
   Ok(
     Response::new()
       .add_attributes(vec![
-        ("action", "withdraw"),
+        ("action", "ca/withdraw"),
         ("amount", &withdraw_amount.to_string()),
         ("share", &share_amount.to_string()),
       ])
@@ -304,7 +318,7 @@ fn remove_validator(
   let mut validators = VALIDATORS.load(deps.storage)?;
   validators.remove(&validator);
   VALIDATORS.save(deps.storage, &validators)?;
-  Ok(Response::new().add_attributes(vec![("action", "remove_validator")]))
+  Ok(Response::new().add_attributes(vec![("action", "ca/remove_validator")]))
 }
 
 fn alliance_delegate(
@@ -336,7 +350,7 @@ fn alliance_delegate(
     validators.insert(delegation.validator);
   }
   VALIDATORS.save(deps.storage, &validators)?;
-  Ok(Response::new().add_attributes(vec![("action", "alliance_delegate")]).add_messages(msgs))
+  Ok(Response::new().add_attributes(vec![("action", "ca/alliance_delegate")]).add_messages(msgs))
 }
 
 fn alliance_undelegate(
@@ -366,7 +380,7 @@ fn alliance_undelegate(
     };
     msgs.push(msg);
   }
-  Ok(Response::new().add_attributes(vec![("action", "alliance_undelegate")]).add_messages(msgs))
+  Ok(Response::new().add_attributes(vec![("action", "ca/alliance_undelegate")]).add_messages(msgs))
 }
 
 fn alliance_redelegate(
@@ -402,7 +416,7 @@ fn alliance_redelegate(
     validators.insert(dst_validator);
   }
   VALIDATORS.save(deps.storage, &validators)?;
-  Ok(Response::new().add_attributes(vec![("action", "alliance_redelegate")]).add_messages(msgs))
+  Ok(Response::new().add_attributes(vec![("action", "ca/alliance_redelegate")]).add_messages(msgs))
 }
 
 fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
@@ -430,7 +444,7 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
 
   Ok(
     Response::new()
-      .add_attributes(vec![("action", "claim_rewards")])
+      .add_attributes(vec![("action", "ca/claim_rewards")])
       .add_submessages(sub_msgs)
       .add_message(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::ClaimRewardsCallback {}))?)
       .add_message(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::BondRewardsCallback {
@@ -444,7 +458,7 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
 pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
   match reply.id {
     CLAIM_REWARD_ERROR_REPLY_ID => {
-      Ok(Response::new().add_attributes(vec![("action", "claim_reward_error")]))
+      Ok(Response::new().add_attributes(vec![("action", "ca/claim_reward_error")]))
     },
     _ => Err(ContractError::InvalidReplyId(reply.id)),
   }

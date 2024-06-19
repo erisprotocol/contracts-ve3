@@ -59,9 +59,9 @@ fn test_gauge_distributions() {
     .e_ve_create_lock_time_any(None, addr.uluna(1000), "user1", |res| res.assert_valid())
     .e_ve_create_lock_time_any(None, addr.uluna(2000), "user2", |res| res.assert_valid())
     .def_staking_whitelist_recapture()
-    .use_asset_staking_2()
+    .use_staking_2()
     .def_staking_whitelist_recapture()
-    .use_asset_staking_1()
+    .use_staking_1()
     .def_gauge_1_vote(5000, 5000, "user1", |res| res.assert_valid())
     .def_gauge_1_vote(7500, 2500, "user2", |res| res.assert_valid())
     .add_one_period()
@@ -193,9 +193,9 @@ fn test_gauge_distributions_decay() {
       res.assert_valid()
     })
     .def_staking_whitelist_recapture()
-    .use_asset_staking_2()
+    .use_staking_2()
     .def_staking_whitelist_recapture()
-    .use_asset_staking_1()
+    .use_staking_1()
     .def_gauge_1_vote(5000, 5000, "user1", |res| res.assert_valid())
     .def_gauge_2_vote(10000, 0, "user1", |res| res.assert_valid())
     .add_one_period()
@@ -294,7 +294,7 @@ fn test_gauge_distributions_decay() {
         ]
       )
     })
-    .use_asset_staking_2()
+    .use_staking_2()
     .q_staking_reward_distribution(|res| {
       assert_eq!(
         res.unwrap(),

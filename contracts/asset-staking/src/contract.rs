@@ -3,14 +3,14 @@ use std::cmp::min;
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION};
 use crate::error::ContractError;
 use crate::state::{
-  ASSET_BRIBES, ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, BALANCES, CONFIG,
-  TOTAL_BALANCES, UNCLAIMED_REWARDS, USER_ASSET_REWARD_RATE, WHITELIST,
+  ASSET_BRIBES, ASSET_CONFIG, ASSET_REWARD_DISTRIBUTION, ASSET_REWARD_RATE, CONFIG, SHARES, TOTAL,
+  UNCLAIMED_REWARDS, USER_ASSET_REWARD_RATE, WHITELIST,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  attr, from_json, Addr, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Order, Response, StdError,
-  StdResult, Storage, Uint128,
+  attr, from_json, Addr, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Order, Response, StdResult,
+  Storage, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
@@ -73,7 +73,10 @@ pub fn execute(
       stake(deps, env, asset, info.funds[0].amount, recipient)
     },
     ExecuteMsg::Unstake(asset) => unstake(deps, env, info, asset),
-    ExecuteMsg::ClaimRewards(asset) => claim_rewards(deps, info, asset),
+    ExecuteMsg::ClaimReward(asset) => claim_rewards(deps, info, Some(vec![asset])),
+    ExecuteMsg::ClaimRewards {
+      assets,
+    } => claim_rewards(deps, info, assets),
 
     // bot
     ExecuteMsg::UpdateRewards {} => update_rewards(deps, env, info),
@@ -97,8 +100,6 @@ pub fn execute(
 
     // contract
     ExecuteMsg::Callback(msg) => callback(deps, env, info, msg),
-
-    _ => Err(ContractError::Std(StdError::generic_err("unsupported action"))),
   }
 }
 
@@ -219,7 +220,7 @@ fn _update_asset_config(
   let mut msgs = vec![];
   if current.stake_config != updated.stake_config {
     // if stake config changed, withdraw from one (or do nothing), deposit on the other.
-    let (balance, _) = TOTAL_BALANCES.may_load(deps.storage, &update.info)?.unwrap_or_default();
+    let (balance, _) = TOTAL.may_load(deps.storage, &update.info)?.unwrap_or_default();
     let available = balance - current.taken;
     let asset = update.info.with_balance(available);
 
@@ -310,26 +311,23 @@ fn stake(
     )?;
   }
 
-  let (balance, shares) = TOTAL_BALANCES.may_load(deps.storage, &asset)?.unwrap_or_default();
+  let (balance, shares) = TOTAL.may_load(deps.storage, &asset)?.unwrap_or_default();
   let (asset_config, asset_available) = _take(&mut deps, &env, &asset, balance, true)?;
   let share_amount = compute_share_amount(shares, amount, asset_available);
 
-  BALANCES.update(
+  SHARES.update(
     deps.storage,
     (recipient.clone(), &asset),
-    |balance| -> Result<_, ContractError> {
-      Ok(balance.unwrap_or_default().checked_add(share_amount)?)
+    |share| -> Result<_, ContractError> {
+      Ok(share.unwrap_or_default().checked_add(share_amount)?)
     },
   )?;
 
-  TOTAL_BALANCES.save(
+  TOTAL.save(
     deps.storage,
     &asset,
     &(balance.checked_add(amount)?, shares.checked_add(share_amount)?),
   )?;
-
-  let asset_reward_rate = ASSET_REWARD_RATE.load(deps.storage, &asset).unwrap_or(Decimal::zero());
-  USER_ASSET_REWARD_RATE.save(deps.storage, (recipient.clone(), &asset), &asset_reward_rate)?;
 
   Ok(
     Response::new()
@@ -412,14 +410,14 @@ fn unstake(
     )?;
   }
 
-  let (balance, shares) = TOTAL_BALANCES.may_load(deps.storage, &asset.info)?.unwrap_or_default();
+  let (balance, shares) = TOTAL.may_load(deps.storage, &asset.info)?.unwrap_or_default();
   let (asset_config, asset_available) = _take(&mut deps, &env, &asset.info, balance, true)?;
 
   let mut withdraw_amount = asset.amount;
   let mut share_amount = compute_share_amount(shares, withdraw_amount, asset_available);
 
   let current_user_share =
-    BALANCES.may_load(deps.storage, (sender.clone(), &asset.info))?.unwrap_or_default();
+    SHARES.may_load(deps.storage, (sender.clone(), &asset.info))?.unwrap_or_default();
 
   if current_user_share.is_zero() {
     return Err(ContractError::AmountCannotBeZero {});
@@ -430,9 +428,9 @@ fn unstake(
     withdraw_amount = compute_balance_amount(shares, share_amount, asset_available)
   }
 
-  BALANCES.save(deps.storage, (sender, &asset.info), &(current_user_share - share_amount))?;
+  SHARES.save(deps.storage, (sender, &asset.info), &(current_user_share - share_amount))?;
 
-  TOTAL_BALANCES.save(
+  TOTAL.save(
     deps.storage,
     &asset.info,
     &(
@@ -468,23 +466,41 @@ fn unstake(
 fn claim_rewards(
   deps: DepsMut,
   info: MessageInfo,
-  asset: AssetInfo,
+  assets: Option<Vec<AssetInfo>>,
 ) -> Result<Response, ContractError> {
   let user = info.sender;
   let config = CONFIG.load(deps.storage)?;
-  let rewards = _calc_reward_share(deps.storage, user.clone(), asset.clone())?;
-  let unclaimed_rewards =
-    UNCLAIMED_REWARDS.load(deps.storage, (user.clone(), &asset)).unwrap_or(Uint128::zero());
-  let final_rewards = rewards + unclaimed_rewards;
-  UNCLAIMED_REWARDS.remove(deps.storage, (user.clone(), &asset));
+
+  let assets = if let Some(assets) = assets {
+    assets
+  } else {
+    USER_ASSET_REWARD_RATE
+      .prefix(user.clone())
+      .keys(deps.storage, None, None, Order::Ascending)
+      .collect::<StdResult<Vec<_>>>()?
+  };
+
+  let assets_str = assets.iter().map(|asset| asset.to_string()).collect::<Vec<String>>().join(",");
+
+  let mut total_rewards = Uint128::zero();
+  for asset in assets {
+    let rewards = _calc_reward_share(deps.storage, user.clone(), asset.clone())?;
+    let unclaimed_rewards =
+      UNCLAIMED_REWARDS.load(deps.storage, (user.clone(), &asset)).unwrap_or(Uint128::zero());
+    UNCLAIMED_REWARDS.remove(deps.storage, (user.clone(), &asset));
+
+    total_rewards += rewards;
+    total_rewards += unclaimed_rewards;
+  }
+
   let response = Response::new().add_attributes(vec![
     ("action", "asset/claim_rewards"),
     ("user", user.as_ref()),
-    ("asset", &asset.to_string()),
-    ("reward_amount", &final_rewards.to_string()),
+    ("assets", &assets_str),
+    ("reward_amount", &total_rewards.to_string()),
   ]);
-  if !final_rewards.is_zero() {
-    let rewards_asset = config.reward_info.with_balance(final_rewards);
+  if !total_rewards.is_zero() {
+    let rewards_asset = config.reward_info.with_balance(total_rewards);
     Ok(response.add_message(rewards_asset.transfer_msg(&user)?))
   } else {
     Ok(response)
@@ -500,7 +516,13 @@ fn _calc_reward_share(
   let asset_reward_rate = ASSET_REWARD_RATE.load(storage, &asset)?;
 
   if let Ok(user_reward_rate) = user_reward_rate {
-    let user_staked = BALANCES.load(storage, (user.clone(), &asset))?;
+    let user_staked = SHARES.may_load(storage, (user.clone(), &asset))?.unwrap_or_default();
+
+    if user_staked.is_zero() {
+      USER_ASSET_REWARD_RATE.save(storage, (user, &asset), &asset_reward_rate)?;
+      return Ok(Uint128::zero());
+    }
+
     let rewards = ((asset_reward_rate - user_reward_rate) * Decimal::from_atomics(user_staked, 0)?)
       .to_uint_floor();
     if rewards.is_zero() {
@@ -536,7 +558,7 @@ fn distribute_take_rate(
   for asset in assets {
     let mut config = if update == Some(true) {
       // if it should also update extraction, take the asset config from the result.
-      let (balance, _) = TOTAL_BALANCES.may_load(deps.storage, &asset)?.unwrap_or_default();
+      let (balance, _) = TOTAL.may_load(deps.storage, &asset)?.unwrap_or_default();
       // no need to save, as we will save it anyways
       let (config, _) = _take(&mut deps, &env, &asset, balance, false)?;
       config
@@ -698,7 +720,7 @@ fn update_reward_callback(
 
     // If there are no shares, we stop updating the rate. This means that the emissions are not directed to any stakers.
     let (_, total_shares) =
-      TOTAL_BALANCES.may_load(deps.storage, &asset_distribution.asset)?.unwrap_or_default();
+      TOTAL.may_load(deps.storage, &asset_distribution.asset)?.unwrap_or_default();
     if !total_shares.is_zero() {
       let rate_to_update = total_reward_distributed / Decimal::from_atomics(total_shares, 0)?;
       if rate_to_update > Decimal::zero() {

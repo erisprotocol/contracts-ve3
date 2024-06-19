@@ -1,7 +1,7 @@
 use super::helpers::{cw20, native, u, Uint128};
 use crate::common::suite_contracts::*;
 use crate::mocks::stargate_mock::StargateMockModule;
-use crate::mocks::{alliance_rewards_mock, eris_hub_mock, incentive_mock};
+use crate::mocks::{alliance_rewards_mock, incentive_mock};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Decimal, Empty, Timestamp, Uint128, Validator};
@@ -55,12 +55,10 @@ pub struct Addresses {
   pub ve3_connector_alliance_1: Addr,
 
   pub ve3_asset_staking_2: Addr,
-  pub ve3_connector_alliance_2: Addr,
-
   pub ve3_connector_alliance_eris: Addr,
 
   pub eris_hub: Addr,
-  pub eris_hub_cw20: Addr,
+  pub eris_hub_cw20_ampluna: Addr,
   // pub eris_hub_mock: Addr,
   // pub eris_hub_cw20_mock: Addr,
   pub eris_hub_cw20_code: u64,
@@ -102,13 +100,13 @@ impl Addresses {
   // }
 
   pub(crate) fn ampluna_info(&self) -> AssetInfoUnchecked {
-    AssetInfoUnchecked::cw20(self.eris_hub_cw20.to_string())
+    AssetInfoUnchecked::cw20(self.eris_hub_cw20_ampluna.to_string())
   }
   pub(crate) fn ampluna_info_checked(&self) -> AssetInfo {
-    AssetInfo::cw20(self.eris_hub_cw20.clone())
+    AssetInfo::cw20(self.eris_hub_cw20_ampluna.clone())
   }
   pub(crate) fn ampluna(&self, a: u32) -> Asset {
-    cw20(self.eris_hub_cw20.clone(), Uint128::new(a.into()))
+    cw20(self.eris_hub_cw20_ampluna.clone(), Uint128::new(a.into()))
   }
 
   pub(crate) fn lp_cw20_info(&self) -> AssetInfoUnchecked {
@@ -295,11 +293,10 @@ impl TestingSuite {
         ve3_asset_staking_1: Addr::unchecked(""),
         ve3_connector_alliance_1: Addr::unchecked(""),
         ve3_asset_staking_2: Addr::unchecked(""),
-        ve3_connector_alliance_2: Addr::unchecked(""),
         ve3_connector_alliance_eris: Addr::unchecked(""),
 
         eris_hub: Addr::unchecked(""),
-        eris_hub_cw20: Addr::unchecked(""),
+        eris_hub_cw20_ampluna: Addr::unchecked(""),
         eris_hub_cw20_code: 0,
         // eris_hub_mock: Addr::unchecked(""),
         // eris_hub_cw20_mock: Addr::unchecked(""),
@@ -387,7 +384,7 @@ impl TestingSuite {
 
       zasset_denom: "zluna".to_string(),
       lst_hub_address: self.addresses.eris_hub.to_string(),
-      lst_asset_info: AssetInfoUnchecked::cw20(self.addresses.eris_hub_cw20.to_string()),
+      lst_asset_info: AssetInfoUnchecked::cw20(self.addresses.eris_hub_cw20_ampluna.to_string()),
     };
     let alliance_connector = self
       .app
@@ -448,21 +445,24 @@ impl TestingSuite {
 
     self.create_global_config();
     self.create_asset_gauge();
-    self.create_asset_staking_1();
-    self.create_asset_staking_2();
     self.create_bribe_manager();
     self.create_connector_alliance_1();
-    self.create_connector_alliance_2();
-    self.create_voting_escrow();
     self.create_connector_alliance_eris();
+    self.create_voting_escrow();
+
+    self.create_asset_staking_1();
+    self.create_asset_staking_2();
 
     self.use_connector_alliance_1();
-    self.use_asset_staking_1();
+    self.use_staking_1();
 
     self.create_incentive_mock();
 
     self.def_get_ampluna("creator", 100_000000);
     self.def_change_exchange_rate(Decimal::percent(120));
+
+    self.def_get_ampluna("user1", 10_000000);
+    self.def_get_ampluna("user2", 10_000000);
 
     // let state: eris::hub::StateResponse = self
     //   .app
@@ -574,11 +574,11 @@ impl TestingSuite {
     let msg = msgs_connector_alliance::InstantiateMsg {
       alliance_token_denom: "vt".to_string(),
       global_config_addr: self.addresses.ve3_global_config.to_string(),
-      gauge: self.addresses.gauge_1.clone(),
+      gauge: self.addresses.gauge_2.clone(),
       reward_denom: "uluna".to_string(),
       zasset_denom: "zluna".to_string(),
       lst_hub_address: self.addresses.eris_hub.to_string(),
-      lst_asset_info: AssetInfoUnchecked::cw20(self.addresses.eris_hub_cw20.to_string()),
+      lst_asset_info: AssetInfoUnchecked::cw20(self.addresses.eris_hub_cw20_ampluna.to_string()),
     };
 
     self.addresses.ve3_connector_alliance_eris =
@@ -607,16 +607,16 @@ impl TestingSuite {
       self.init_contract(code_id, msg, "alliance_rewards_mock_1");
   }
 
-  fn create_connector_alliance_2(&mut self) {
-    let code_id = self.app.store_code(alliance_rewards_mock());
+  // fn create_connector_alliance_2(&mut self) {
+  //   let code_id = self.app.store_code(alliance_rewards_mock());
 
-    let msg = alliance_rewards_mock::InstantiateMsg {
-      reward_denom: "uluna".to_string(),
-    };
+  //   let msg = alliance_rewards_mock::InstantiateMsg {
+  //     reward_denom: "uluna".to_string(),
+  //   };
 
-    self.addresses.ve3_connector_alliance_2 =
-      self.init_contract(code_id, msg, "alliance_rewards_mock_2");
-  }
+  //   self.addresses.ve3_connector_alliance_2 =
+  //     self.init_contract(code_id, msg, "alliance_rewards_mock_2");
+  // }
 
   fn create_voting_escrow(&mut self) {
     let code_id = self.app.store_code(ve3_voting_escrow());
@@ -676,7 +676,7 @@ impl TestingSuite {
       .query_wasm_smart(self.addresses.eris_hub.clone(), &eris::hub::QueryMsg::Config {})
       .unwrap();
 
-    self.addresses.eris_hub_cw20 = Addr::unchecked(config.stake_token);
+    self.addresses.eris_hub_cw20_ampluna = Addr::unchecked(config.stake_token);
   }
 
   fn create_hub_cw20(&mut self) {
@@ -824,7 +824,7 @@ impl TestingSuite {
         (AT_ASSET_GAUGE.to_string(), self.addresses.ve3_asset_gauge.to_string()),
         (AT_BRIBE_MANAGER.to_string(), self.addresses.ve3_bribe_manager.to_string()),
         (at_connector(&self.gauge1()), self.addresses.ve3_connector_alliance_1.to_string()),
-        (at_connector(&self.gauge2()), self.addresses.ve3_connector_alliance_2.to_string()),
+        (at_connector(&self.gauge2()), self.addresses.ve3_connector_alliance_eris.to_string()),
         (at_asset_staking(&self.gauge1()), self.addresses.ve3_asset_staking_1.to_string()),
         (at_asset_staking(&self.gauge2()), self.addresses.ve3_asset_staking_2.to_string()),
       ],

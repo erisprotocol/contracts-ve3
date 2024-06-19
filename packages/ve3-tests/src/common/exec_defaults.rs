@@ -1,8 +1,8 @@
 use crate::extensions::app_response_ext::Valid;
 
 use super::suite::TestingSuite;
-use cosmwasm_std::{Decimal, Uint128};
-use cw_asset::{AssetInfo, AssetInfoUnchecked};
+use cosmwasm_std::{Addr, Decimal, Uint128};
+use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
   extensions::{asset_ext::AssetExt, asset_info_ext::AssetInfoExt},
@@ -138,6 +138,23 @@ impl TestingSuite {
     res.assert_valid();
     self
   }
+  pub fn def_harvest(&mut self) -> &mut TestingSuite {
+    let sender = self.address("creator");
+    let res = self.app.execute_contract(
+      sender.clone(),
+      self.addresses.eris_hub.clone(),
+      &eris::hub::ExecuteMsg::Harvest {},
+      &[],
+    );
+    res.assert_valid();
+    self
+  }
+
+  pub fn def_send(&mut self, sender: &str, to: Addr, asset: Asset) -> &mut TestingSuite {
+    let sender = self.address(sender);
+    self.app.execute(sender, asset.transfer_msg(to).unwrap()).assert_valid();
+    self
+  }
 
   pub fn def_change_exchange_rate(&mut self, goal: Decimal) -> &mut TestingSuite {
     let addr = self.addresses.clone();
@@ -204,6 +221,34 @@ impl TestingSuite {
         .assert_valid();
     }
 
+    self
+  }
+
+  pub fn def_setup_staking(&mut self) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+
+    self
+      .use_connector_alliance_eris()
+      .use_staking_2()
+      .e_ve_create_lock_time_any(None, addr.uluna(1200), "user1", |res| res.assert_valid())
+      .e_ve_create_lock_time_any(None, addr.ampluna(2000), "user2", |res| res.assert_valid())
+      .def_staking_whitelist_recapture()
+      // 600 - 600
+      .def_gauge_2_vote(5000, 5000, "user1", |res| res.assert_valid())
+      // 1800 - 600
+      // = 2400 - 1200 = 2:1
+      .def_gauge_2_vote(7500, 2500, "user2", |res| res.assert_valid())
+      .add_one_period()
+      .e_gauge_set_distribution("user1", |res| res.assert_valid());
+    self
+  }
+
+  pub fn def_add_staking_rewards(&mut self, amount: u32) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+
+    self
+      .def_send("creator", addr.ve3_connector_alliance_eris.clone(), addr.uluna(amount))
+      .e_staking_update_rewards("user1", |res| res.assert_valid());
     self
   }
 }

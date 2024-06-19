@@ -1,243 +1,233 @@
 use crate::{
   common::{helpers::u, suite::TestingSuite},
-  extensions::app_response_ext::{EventChecker, Valid},
+  extensions::{
+    app_response_ext::{EventChecker, Valid},
+    helpers::assert_close,
+  },
 };
 use cosmwasm_std::{attr, Decimal};
-use ve3_asset_gauge::error::ContractError;
+use ve3_connector_alliance::error::ContractError;
 use ve3_shared::{
-  constants::WEEK,
-  error::SharedError,
-  helpers::time::Time,
-  msgs_asset_gauge::*,
-  msgs_voting_escrow::{End, LockInfoResponse},
+  constants::at_asset_staking, error::SharedError, msgs_asset_gauge::UserPendingRebaseResponse,
+  msgs_connector_alliance::*,
 };
 
 #[test]
-fn test_basic_rebase() {
+fn test_alliance_connector_rebase() {
   let mut suite = TestingSuite::def();
   suite.init();
 
   let addr = suite.addresses.clone();
+  let ampluna = addr.eris_hub_cw20_ampluna.to_string();
 
-  suite.use_connector_alliance_eris();
+  suite
+    .use_connector_alliance_eris()
+    .use_staking_2()
+    .e_ve_create_lock_time_any(None, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time_any(None, addr.uluna(2000), "user2", |res| res.assert_valid())
+    .def_staking_whitelist_recapture()
+    .def_gauge_2_vote(5000, 5000, "user1", |res| res.assert_valid())
+    .def_gauge_2_vote(7500, 2500, "user2", |res| res.assert_valid())
+    .add_one_period()
+    .e_gauge_set_distribution("user1", |res| res.assert_valid())
+    // claiming
+    .e_alliance_claim_rewards("user1", |res| {
+      res.assert_error(ContractError::SharedError(SharedError::UnauthorizedMissingRight(
+        at_asset_staking(&addr.gauge_2),
+        addr.user1.to_string(),
+      )))
+    })
+    .e_staking_update_rewards("user1", |res| {
+      res.assert_attribute(attr("action", "asset/update_rewards"));
+      res.assert_attribute(attr("action", "ca/claim_rewards"));
+      res.assert_attribute(attr("action", "ca/claim_rewards_callback"));
+      res.assert_attribute(attr("claimed", "native:uluna:0"));
+      res.assert_attribute(attr("action", "ca/bond_rewards_callback"));
+      res.assert_attribute(attr("share", "0"));
+      res.assert_attribute(attr("action", "asset/update_rewards_callback"));
+    })
+    .def_send("creator", addr.ve3_connector_alliance_eris.clone(), addr.uluna(10000))
+    .e_staking_update_rewards("user1", |res| {
+      res.assert_attribute(attr("action", "asset/update_rewards"));
+      res.assert_attribute(attr("action", "ca/claim_rewards"));
+      res.assert_attribute(attr("action", "ca/claim_rewards_callback"));
+      res.assert_attribute(attr("claimed", "native:uluna:10000"));
+      res.assert_attribute(attr("action", "erishub/bond"));
+      res.assert_attribute(attr("action", "ca/bond_rewards_callback"));
+      res.assert_attribute(attr("share", "8333"));
+      res.assert_attribute(attr("amount", "8333"));
+      res.assert_attribute(attr("action", "asset/update_rewards_callback"));
+    })
+    .q_alliance_state(|res| {
+      let res = res.unwrap();
+      assert_close(res.last_exchange_rate, Decimal::percent(120), Decimal::permille(1));
+      assert_eq!(
+        res.clone(),
+        State {
+          taken: u(0),
+          harvested: u(0),
+          ..res
+        }
+      )
+    })
+    .add_periods(52)
+    .def_harvest()
+    .q_alliance_state(|res| {
+      let res = res.unwrap();
+      assert_close(res.last_exchange_rate, Decimal::percent(120), Decimal::permille(1));
+      assert_eq!(
+        res.clone(),
+        State {
+          taken: u(0),
+          harvested: u(0),
+          ..res
+        }
+      )
+    })
+    .e_alliance_distribute_rebase(Some(true), "user1", |res| {
+      res.assert_attribute(attr("action", "ca/distribute_rebase"));
+      res.assert_attribute(attr("action", "gauge/add_rebase"));
+      res.assert_attribute(attr("rebase", format!("cw20:{ampluna}:666")));
+    })
+    .q_alliance_state(|res| {
+      let res = res.unwrap();
+      assert_close(res.last_exchange_rate, Decimal::permille(1304), Decimal::permille(1));
+      assert_eq!(
+        res.clone(),
+        State {
+          taken: u(666),
+          harvested: u(666),
+          ..res
+        }
+      )
+    })
+    .add_periods(5)
+    .def_harvest()
+    .def_send("creator", addr.ve3_connector_alliance_eris.clone(), addr.uluna(10000))
+    .e_staking_update_rewards("user1", |res| {
+      res.assert_attribute(attr("action", "asset/update_rewards"));
+      res.assert_attribute(attr("action", "ca/claim_rewards"));
+      res.assert_attribute(attr("action", "ca/claim_rewards_callback"));
+      res.assert_attribute(attr("claimed", "native:uluna:10000"));
+      res.assert_attribute(attr("action", "erishub/bond"));
+      res.assert_attribute(attr("action", "ca/bond_rewards_callback"));
+      res.assert_attribute(attr("share", "8331"));
+      res.assert_attribute(attr("amount", "7604"));
+      res.assert_attribute(attr("action", "asset/update_rewards_callback"));
+    })
+    .q_alliance_state(|res| {
+      let res = res.unwrap();
+      assert_close(res.last_exchange_rate, Decimal::permille(1314), Decimal::permille(1));
+      assert_eq!(
+        res.clone(),
+        State {
+          taken: u(728),
+          harvested: u(666),
+          ..res
+        }
+      )
+    })
+    .q_gauge_user_pending_rebase("user1", |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserPendingRebaseResponse {
+          rebase: u(222)
+        }
+      );
+    })
+    .q_gauge_user_pending_rebase("user2", |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserPendingRebaseResponse {
+          rebase: u(444)
+        }
+      );
+    })
+    .e_gauge_claim_rebase(None, "user2", |res| {
+      res.assert_attribute(attr("action", "gauge/claim_rebase"));
+      res.assert_attribute(attr("action", "ve/create_lock"));
+      res.assert_attribute(attr("action", "gauge/update_vote"));
+      res.assert_attribute(attr("rebase_amount", "444"));
+      res.assert_attribute(attr("fixed_power", "583"));
+      res.assert_attribute(attr("voting_power", "5247"));
+    })
+    .q_gauge_user_pending_rebase("user2", |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserPendingRebaseResponse {
+          rebase: u(0)
+        }
+      );
+    })
+    .e_alliance_distribute_rebase(Some(true), "user1", |res| {
+      res.assert_attribute(attr("action", "ca/distribute_rebase"));
+      res.assert_attribute(attr("action", "gauge/add_rebase"));
+      res.assert_attribute(attr("rebase", format!("cw20:{ampluna}:62")));
+    })
+    .add_one_period()
+    .def_harvest()
+    .e_alliance_distribute_rebase(Some(true), "user1", |res| {
+      res.assert_attribute(attr("action", "ca/distribute_rebase"));
+      res.assert_attribute(attr("action", "gauge/add_rebase"));
+      res.assert_attribute(attr("rebase", format!("cw20:{ampluna}:24")));
+    })
+    .add_one_period()
+    .def_harvest()
+    .e_alliance_distribute_rebase(Some(true), "user1", |res| {
+      res.assert_attribute(attr("action", "ca/distribute_rebase"));
+      res.assert_attribute(attr("action", "gauge/add_rebase"));
+      res.assert_attribute(attr("rebase", format!("cw20:{ampluna}:24")));
+    })
+    .add_one_period()
+    .def_harvest()
+    .e_alliance_distribute_rebase(None, "user1", |res| {
+      res.assert_error(ContractError::NothingToTake)
+    });
 }
 
-// #[test]
-// fn test_rebase_new_lock() {
-//   let mut suite = TestingSuite::def();
-//   suite.init();
+#[test]
+fn test_alliance_connector_staking_rewards() {
+  let mut suite = TestingSuite::def();
+  suite.init();
 
-//   let addr = suite.addresses.clone();
-
-//   suite
-//     .e_ve_create_lock_time_any(None, addr.uluna(1200), "user1", |res| res.assert_valid())
-//     .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
-//     .e_gauge_add_rebase("creator", addr.uluna(3000), |res| {
-//       res.assert_attribute(attr("action", "gauge/add_rebase"));
-//     })
-//     .e_gauge_claim_rebase(None, "user1", |res| {
-//       res.assert_attribute(attr("action", "gauge/claim_rebase"));
-//       res.assert_attribute(attr("action", "ve/create_lock"));
-//       res.assert_attribute(attr("action", "gauge/update_vote"));
-//       res.assert_attribute(attr("rebase_amount", "999"));
-//       res.assert_attribute(attr("fixed_power", "999"));
-//       res.assert_attribute(attr("voting_power", "8991"));
-//       res.assert_attribute(attr("token_id", "3"));
-//     })
-//     .q_ve_lock_info("1", None, |res| {
-//       let res = res.unwrap();
-//       assert_eq!(
-//         res,
-//         LockInfoResponse {
-//           owner: addr.user1.clone(),
-//           from_period: 74,
-//           asset: addr.uluna(1200),
-//           underlying_amount: u(1200),
-//           start: 74,
-//           end: End::Permanent,
-//           slope: u(0),
-//           fixed_amount: u(1200),
-//           voting_power: u(10800),
-//           coefficient: Decimal::percent(900)
-//         }
-//       );
-//     })
-//     .q_ve_lock_info("3", None, |res| {
-//       let res = res.unwrap();
-//       assert_eq!(
-//         res,
-//         LockInfoResponse {
-//           owner: addr.user1.clone(),
-//           from_period: 74,
-//           asset: addr.uluna(999),
-//           underlying_amount: u(999),
-//           start: 74,
-//           end: End::Permanent,
-//           slope: u(0),
-//           fixed_amount: u(999),
-//           voting_power: u(8991),
-//           coefficient: Decimal::percent(900)
-//         }
-//       );
-//     })
-//     .q_gauge_user_info("user1", Some(Time::Next), |res| {
-//       assert_eq!(
-//         res.unwrap(),
-//         UserInfoExtendedResponse {
-//           voting_power: u(19791),
-//           fixed_amount: u(2199),
-//           slope: u(0),
-//           gauge_votes: vec![]
-//         }
-//       )
-//     });
-// }
-
-// #[test]
-// fn test_rebase_new_lock_non_permanent() {
-//   let mut suite = TestingSuite::def();
-//   suite.init();
-
-//   let addr = suite.addresses.clone();
-
-//   suite
-//     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
-//     .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
-//     .e_gauge_add_rebase("creator", addr.uluna(3000), |res| {
-//       res.assert_attribute(attr("action", "gauge/add_rebase"));
-//     })
-//     .e_gauge_claim_rebase(None, "user1", |res| {
-//       res.assert_attribute(attr("action", "gauge/claim_rebase"));
-//       res.assert_attribute(attr("action", "ve/create_lock"));
-//       res.assert_attribute(attr("action", "gauge/update_vote"));
-//       res.assert_attribute(attr("rebase_amount", "999"));
-//       res.assert_attribute(attr("fixed_power", "999"));
-//       res.assert_attribute(attr("voting_power", "8991"));
-//       res.assert_attribute(attr("token_id", "3"));
-//     })
-//     .q_ve_lock_info("1", None, |res| {
-//       let res = res.unwrap();
-//       assert_eq!(
-//         res,
-//         LockInfoResponse {
-//           owner: addr.user1.clone(),
-//           from_period: 74,
-//           asset: addr.uluna(1200),
-//           underlying_amount: u(1200),
-//           start: 74,
-//           end: End::Period(76),
-//           slope: u(103),
-//           fixed_amount: u(1200),
-//           voting_power: u(206),
-//           ..res
-//         }
-//       );
-//     })
-//     .q_ve_lock_info("3", None, |res| {
-//       let res = res.unwrap();
-//       assert_eq!(
-//         res,
-//         LockInfoResponse {
-//           owner: addr.user1.clone(),
-//           from_period: 74,
-//           asset: addr.uluna(999),
-//           underlying_amount: u(999),
-//           start: 74,
-//           end: End::Permanent,
-//           slope: u(0),
-//           fixed_amount: u(999),
-//           voting_power: u(8991),
-//           coefficient: Decimal::percent(900)
-//         }
-//       );
-//     })
-//     .q_gauge_user_info("user1", Some(Time::Next), |res| {
-//       assert_eq!(
-//         res.unwrap(),
-//         UserInfoExtendedResponse {
-//           voting_power: u(9197),
-//           fixed_amount: u(2199),
-//           slope: u(103),
-//           gauge_votes: vec![]
-//         }
-//       )
-//     });
-// }
-
-// #[test]
-// fn test_rebase_double_claim() {
-//   let mut suite = TestingSuite::def();
-//   suite.init();
-
-//   let addr = suite.addresses.clone();
-
-//   suite
-//     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
-//     .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
-//     .e_gauge_add_rebase("creator", addr.uluna(3000), |res| {
-//       res.assert_attribute(attr("action", "gauge/add_rebase"));
-//     })
-//     .e_gauge_claim_rebase(None, "user1", |res| {
-//       res.assert_attribute(attr("action", "gauge/claim_rebase"));
-//       res.assert_attribute(attr("action", "ve/create_lock"));
-//       res.assert_attribute(attr("action", "gauge/update_vote"));
-//       res.assert_attribute(attr("rebase_amount", "999"));
-//       res.assert_attribute(attr("fixed_power", "999"));
-//       res.assert_attribute(attr("voting_power", "8991"));
-//       res.assert_attribute(attr("token_id", "3"));
-//     })
-//     .e_gauge_claim_rebase(None, "user1", |res| {
-//       res.assert_error(ContractError::SharedError(SharedError::InsufficientBalance(
-//         "no rebase amount".to_string(),
-//       )))
-//     })
-//     .q_gauge_user_pending_rebase("user2", |res| {
-//       assert_eq!(
-//         res.unwrap(),
-//         UserPendingRebaseResponse {
-//           rebase: u(1999)
-//         }
-//       );
-//     });
-// }
-
-// #[test]
-// fn test_rebase_claim_to_invalid_lock() {
-//   let mut suite = TestingSuite::def();
-//   suite.init();
-
-//   let addr = suite.addresses.clone();
-
-//   suite
-//     .e_ve_create_lock_time(WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
-//     .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
-//     .e_gauge_add_rebase("creator", addr.uluna(3000), |res| {
-//       res.assert_attribute(attr("action", "gauge/add_rebase"));
-//     })
-//     .e_gauge_claim_rebase(Some("2"), "user2", |res| {
-//       res.assert_error(ContractError::RebaseClaimingOnlyForPermanent)
-//     })
-//     .e_ve_lock_permanent("2", "user2", |res| res.assert_valid())
-//     .e_gauge_claim_rebase(Some("2"), "user2", |res| {
-//       res.assert_error(ContractError::RebaseWrongTargetLockAsset)
-//     })
-//     .e_gauge_claim_rebase(None, "user2", |res| {
-//       res.assert_attribute(attr("action", "gauge/claim_rebase"));
-//       res.assert_attribute(attr("action", "ve/create_lock"));
-//       res.assert_attribute(attr("action", "mint"));
-//       res.assert_attribute(attr("owner", addr.user2.to_string()));
-//       res.assert_attribute(attr("action", "gauge/update_vote"));
-//       res.assert_attribute(attr("rebase_amount", "1999"));
-//       res.assert_attribute(attr("fixed_power", "1999"));
-//       res.assert_attribute(attr("voting_power", "17991"));
-//       res.assert_attribute(attr("token_id", "3"));
-//     })
-//     .q_gauge_user_pending_rebase("user2", |res| {
-//       assert_eq!(
-//         res.unwrap(),
-//         UserPendingRebaseResponse {
-//           rebase: u(0)
-//         }
-//       );
-//     });
-// }
+  let addr = suite.addresses.clone();
+  suite
+    .def_setup_staking()
+    // stake some
+    .e_staking_stake(None, addr.lp_cw20(1000), "user1", |res| {
+      res.assert_attribute(attr("action", "asset/stake"));
+      res.assert_attribute(attr("share", "1000"));
+    })
+    .e_staking_stake(None, addr.lp_native(1000), "user2", |res| {
+      res.assert_attribute(attr("action", "asset/stake"));
+      res.assert_attribute(attr("share", "1000"));
+    })
+    // update rewards
+    .e_staking_claim_reward(addr.lp_cw20_info_checked(), "user2", |res| {
+      res.assert_attribute(attr("action", "asset/claim_rewards"));
+      res.assert_attribute(attr("assets", addr.lp_cw20_info_checked().to_string()));
+      res.assert_attribute(attr("reward_amount", "0"));
+    })
+    .e_staking_claim_rewards(None, "user2", |res| {
+      res.assert_attribute(attr("action", "asset/claim_rewards"));
+      res.assert_attribute(attr(
+        "assets",
+        format!("{0},{1}", addr.lp_cw20_info_checked(), addr.lp_native_info_checked()),
+      ));
+      res.assert_attribute(attr("reward_amount", "0"));
+    })
+    .def_add_staking_rewards(120000)
+    .e_staking_claim_rewards(None, "user1", |res| {
+      res.assert_attribute(attr("action", "asset/claim_rewards"));
+      res.assert_attribute(attr("assets", format!("{0}", addr.lp_cw20_info_checked())));
+      res.assert_attribute(attr("reward_amount", "33332"));
+    })
+    .e_staking_claim_rewards(None, "user2", |res| {
+      res.assert_attribute(attr("action", "asset/claim_rewards"));
+      res.assert_attribute(attr(
+        "assets",
+        format!("{0},{1}", addr.lp_cw20_info_checked(), addr.lp_native_info_checked()),
+      ));
+      res.assert_attribute(attr("reward_amount", "66666"));
+    });
+}

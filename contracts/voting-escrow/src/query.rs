@@ -45,10 +45,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       time,
     } => Ok(to_json_binary(&get_token_lock_info(deps, &env, &token_id, time)?)?),
 
-    QueryMsg::Config {} => {
-      let config = CONFIG.load(deps.storage)?;
-      Ok(to_json_binary(&config)?)
-    },
+    QueryMsg::Config {} => Ok(to_json_binary(&CONFIG.load(deps.storage)?)?),
 
     _ => Ok(nft.query(deps, env, msg.into())?),
   }

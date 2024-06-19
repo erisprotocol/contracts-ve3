@@ -167,7 +167,7 @@ impl StakeConfig<Addr> {
         reward_infos,
       } => {
         vec![
-          AssetStaking(contract.clone()).claim_rewards_msg(vec![asset.clone()])?,
+          AssetStaking(contract.clone()).claim_reward_msg(asset.clone())?,
           track_bribes_callback_msg(deps, env, asset, reward_infos)?,
         ]
       },
