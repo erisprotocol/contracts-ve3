@@ -538,7 +538,8 @@ fn test_asset_recipient() {
       assert_eq!(
         res.unwrap(),
         vec![StakedBalanceRes {
-          asset: addr.lp_native(10980822 + 19178),
+          // taken: 19178
+          asset: addr.lp_native(10980822),
           shares: u(11001921),
           config: AssetConfigRuntime {
             last_taken_s: 1712847600,
@@ -566,7 +567,8 @@ fn test_asset_recipient() {
       assert_eq!(
         res.unwrap(),
         vec![StakedBalanceRes {
-          asset: addr.lp_native(19178),
+          // taken: 19178
+          asset: addr.lp_native(0),
           shares: u(0),
           config: AssetConfigRuntime {
             last_taken_s: 1712847600,
@@ -611,7 +613,7 @@ fn test_asset_recipient() {
       assert_eq!(
         res.unwrap(),
         vec![StakedBalanceRes {
-          asset: addr.lp_native(1019178),
+          asset: addr.lp_native(1_000_000),
           shares: u(1000000),
           config: AssetConfigRuntime {
             last_taken_s: 1718895600,
