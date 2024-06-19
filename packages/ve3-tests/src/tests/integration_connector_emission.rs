@@ -3,16 +3,11 @@ use crate::{
     helpers::u,
     suite::{InitOptions, TestingSuite},
   },
-  extensions::{
-    app_response_ext::{EventChecker, Valid},
-    helpers::assert_close,
-  },
+  extensions::app_response_ext::{EventChecker, Valid},
 };
 use cosmwasm_std::{attr, Decimal, Uint128};
-use cw_utils::WEEK;
 use ve3_connector_emission::error::ContractError;
 use ve3_shared::{
-  adapters::asset_gauge,
   constants::{at_asset_staking, SECONDS_PER_YEAR},
   error::SharedError,
   extensions::asset_info_ext::AssetInfoExt,
