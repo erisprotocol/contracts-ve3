@@ -249,7 +249,6 @@ fn get_total_staked_balances(deps: Deps, env: Env) -> StdResult<Binary> {
       let (asset, (balance, shares)) = total_balance?;
 
       let mut config = ASSET_CONFIG.load(deps.storage, &asset)?;
-      let asset = asset.with_balance(balance);
 
       if config.last_taken_s != 0 {
         let take_diff_s = Uint128::new((env.block.time.seconds() - config.last_taken_s).into());
@@ -263,6 +262,8 @@ fn get_total_staked_balances(deps: Deps, env: Env) -> StdResult<Binary> {
         config.taken = config.taken.checked_add(take_amount)?
       };
 
+      let real_balance = balance.saturating_sub(config.taken);
+      let asset = asset.with_balance(real_balance);
       Ok(StakedBalanceRes {
         asset,
         shares,
