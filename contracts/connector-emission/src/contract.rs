@@ -9,7 +9,9 @@ use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint
 use cw2::set_contract_version;
 use ve3_shared::{
   adapters::{global_config_adapter::ConfigExt, mint_proxy::MintProxy},
-  constants::{at_asset_staking, AT_MINT_PROXY, AT_TEAM_WALLET, WEEK},
+  constants::{
+    at_asset_staking, AT_MINT_PROXY, AT_TEAM_WALLET, SECONDS_PER_WEEK, SECONDS_PER_YEAR,
+  },
   extensions::asset_info_ext::AssetInfoExt,
   msgs_connector_emission::{Config, ExecuteMsg, InstantiateMsg, RebaseConfg},
 };
@@ -84,7 +86,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       }
 
       CONFIG.save(deps.storage, &config)?;
-      Ok(Response::default().add_attribute("action", "emissions/update_config"))
+      Ok(Response::default().add_attribute("action", "ce/update_config"))
     },
   }
 }
@@ -99,13 +101,23 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
     let diff_claim_time_seconds =
       env.block.time.seconds().checked_sub(config.last_claim_s).unwrap_or_default();
 
-    let emission_amount =
-      Uint128::new(diff_claim_time_seconds.into()).multiply_ratio(config.emissions_per_week, WEEK);
+    let emission_amount = Uint128::new(diff_claim_time_seconds.into())
+      .multiply_ratio(config.emissions_per_week, SECONDS_PER_WEEK);
 
     if !emission_amount.is_zero() {
       let team_amount = emission_amount * config.team_share;
       let rebase_amount = match config.rebase_config {
         RebaseConfg::Fixed(percent) => emission_amount * percent,
+        RebaseConfg::TargetYearlyApy(apy) => {
+          let voting_escrow = config.voting_escrow(&deps.querier)?;
+          let total_fixed = voting_escrow.query_total_fixed(&deps.querier, None)?.fixed;
+
+          // println!("percent: {apy}");
+          // println!("total_fixed: {total_fixed}");
+          apy
+            * Uint128::new(diff_claim_time_seconds.into())
+              .multiply_ratio(total_fixed, SECONDS_PER_YEAR)
+        },
         RebaseConfg::Dynamic {} => {
           // weeklyEmissions × (1 - (VP.totalSupply / 10) / TOKEN.totalSupply)ˆ2 × 0.5
 
@@ -117,9 +129,16 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
           let reverse_quotient = Decimal::one() - quotient;
           let factor = reverse_quotient * reverse_quotient * Decimal::percent(50);
 
+          // println!("total_vp: {total_vp}");
+          // println!("token_supply: {token_supply}");
+          // println!("quotient: {quotient}");
+          // println!("reverse_quotient: {reverse_quotient}");
+          // println!("factor: {factor}");
+
           emission_amount * factor
         },
       };
+      // println!("rebase_amount: {rebase_amount}");
 
       config.last_claim_s = env.block.time.seconds();
 
@@ -172,9 +191,11 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
         msgs.push(msg);
       }
 
+      CONFIG.save(deps.storage, &config)?;
+
       return Ok(
         Response::default()
-          .add_attribute("action", "emissions/claim_rewards")
+          .add_attribute("action", "ce/claim_rewards")
           .add_attribute("emission_amount", emission_amount)
           .add_attribute("rebase_amount", rebase_amount)
           .add_attribute("team_amount", team_amount)
@@ -182,7 +203,7 @@ fn claim_rewards(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult {
       );
     }
   }
-  Ok(Response::default().add_attribute("action", "emissions/claim_rewards_noop"))
+  Ok(Response::default().add_attribute("action", "ce/claim_rewards_noop"))
 }
 
 fn assert_asset_staking_right_gauge(

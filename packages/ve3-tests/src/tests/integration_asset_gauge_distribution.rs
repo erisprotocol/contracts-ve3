@@ -4,7 +4,7 @@ use crate::{
 };
 use cosmwasm_std::Decimal;
 use ve3_shared::{
-  constants::WEEK, helpers::time::Time, msgs_asset_gauge::GaugeDistributionResponse,
+  constants::SECONDS_PER_WEEK, helpers::time::Time, msgs_asset_gauge::GaugeDistributionResponse,
   msgs_asset_staking::AssetDistribution,
 };
 
@@ -95,6 +95,12 @@ fn test_gauge_distributions() {
             period: 75,
             total_gauge_vp: u(0),
             assets: vec![]
+          },
+          GaugeDistributionResponse {
+            gauge: addr.gauge_3.to_string(),
+            period: 75,
+            total_gauge_vp: u(0),
+            assets: vec![]
           }
         ]
       );
@@ -129,6 +135,12 @@ fn test_gauge_distributions() {
           },
           GaugeDistributionResponse {
             gauge: addr.gauge_2.to_string(),
+            period: 75,
+            total_gauge_vp: u(0),
+            assets: vec![]
+          },
+          GaugeDistributionResponse {
+            gauge: addr.gauge_3.to_string(),
             period: 75,
             total_gauge_vp: u(0),
             assets: vec![]
@@ -176,6 +188,12 @@ fn test_gauge_distributions() {
                 total_vp: u(10000)
               },
             ]
+          },
+          GaugeDistributionResponse {
+            gauge: addr.gauge_3.to_string(),
+            period: 76,
+            total_gauge_vp: u(0),
+            assets: vec![]
           }
         ]
       );
@@ -189,7 +207,7 @@ fn test_gauge_distributions_decay() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time_any(Some(WEEK * 10), addr.ampluna(1000), "user1", |res| {
+    .e_ve_create_lock_time_any(Some(SECONDS_PER_WEEK * 10), addr.ampluna(1000), "user1", |res| {
       res.assert_valid()
     })
     .def_staking_whitelist_recapture()
@@ -233,6 +251,12 @@ fn test_gauge_distributions_decay() {
               distribution: Decimal::one(),
               total_vp: u(2230)
             }]
+          },
+          GaugeDistributionResponse {
+            gauge: addr.gauge_3.to_string(),
+            period: 75,
+            total_gauge_vp: u(0),
+            assets: vec![]
           }
         ]
       );
@@ -273,6 +297,12 @@ fn test_gauge_distributions_decay() {
               distribution: Decimal::one(),
               total_vp: u(1715)
             }]
+          },
+          GaugeDistributionResponse {
+            gauge: addr.gauge_3.to_string(),
+            period: 80,
+            total_gauge_vp: u(0),
+            assets: vec![]
           }
         ]
       );

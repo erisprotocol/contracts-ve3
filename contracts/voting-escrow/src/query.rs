@@ -9,7 +9,7 @@ use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT, MAX_LOCK_PERIODS};
 use ve3_shared::helpers::slope::calc_coefficient;
 use ve3_shared::helpers::time::{GetPeriod, Time};
 use ve3_shared::msgs_voting_escrow::{
-  End, LockInfoResponse, QueryMsg, VeNftCollection, VotingPowerResponse,
+  End, LockInfoResponse, QueryMsg, VeNftCollection, VotingPowerFixedResponse, VotingPowerResponse,
 };
 
 /// Expose available contract queries.
@@ -35,6 +35,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::TotalVamp {
       time,
     } => Ok(to_json_binary(&get_total_vamp_at_time(deps, env, time)?)?),
+    QueryMsg::TotalFixed {
+      time,
+    } => Ok(to_json_binary(&get_total_fixed_at_time(deps, env, time)?)?),
     QueryMsg::LockVamp {
       time,
       token_id,
@@ -160,6 +163,7 @@ fn get_total_vamp_at_time(
     },
     |(_, point)| point,
   );
+  let fixed = point.fixed;
 
   let voting_power = if point.start == period {
     point.power + point.fixed
@@ -180,6 +184,32 @@ fn get_total_vamp_at_time(
 
   Ok(VotingPowerResponse {
     vp: voting_power,
+    fixed,
+    voting_power: voting_power.saturating_sub(fixed),
+  })
+}
+
+fn get_total_fixed_at_time(
+  deps: Deps,
+  env: Env,
+  time: Option<Time>,
+) -> StdResult<VotingPowerFixedResponse> {
+  let period = time.get_period(&env)?;
+  let last_checkpoint = fetch_last_checkpoint(deps.storage, CONTRACT_TOTAL_VP_TOKEN_ID, period)?;
+
+  let point = last_checkpoint.map_or(
+    Point {
+      power: Uint128::zero(),
+      start: period,
+      end: End::Period(period),
+      slope: Default::default(),
+      fixed: Uint128::zero(),
+    },
+    |(_, point)| point,
+  );
+
+  Ok(VotingPowerFixedResponse {
+    fixed: point.fixed,
   })
 }
 
@@ -216,11 +246,15 @@ fn get_token_vamp_at_time(
 
     Ok(VotingPowerResponse {
       vp: voting_power,
+      fixed: point.fixed,
+      voting_power: voting_power.saturating_sub(point.fixed),
     })
   } else {
     // User not found
     Ok(VotingPowerResponse {
       vp: Uint128::zero(),
+      fixed: Uint128::zero(),
+      voting_power: Uint128::zero(),
     })
   }
 }

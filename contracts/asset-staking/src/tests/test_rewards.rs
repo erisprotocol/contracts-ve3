@@ -147,7 +147,10 @@ fn update_reward_callback() {
 
   assert_eq!(
     res,
-    Response::new().add_attributes(vec![("action", "asset/update_rewards_callback")])
+    Response::new().add_attributes(vec![
+      ("action", "asset/update_rewards_callback"),
+      ("rewards", "native:uluna:1000000")
+    ])
   );
 }
 

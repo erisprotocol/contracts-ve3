@@ -21,6 +21,11 @@ impl TestingSuite {
     self
   }
 
+  pub fn use_staking_3(&mut self) -> &mut TestingSuite {
+    self.addresses.active_asset_staking = self.addresses.ve3_asset_staking_3.clone();
+    self
+  }
+
   pub fn e_staking_receive(
     &mut self,
     cw20_receive_msg: Cw20ReceiveMsg,

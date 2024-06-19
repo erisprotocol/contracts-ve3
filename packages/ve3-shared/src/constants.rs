@@ -22,10 +22,6 @@ const AT_CONNECTOR: &str = "CONNECTOR";
 pub fn at_connector(gauge: &str) -> String {
   format!("{AT_CONNECTOR}__{gauge}")
 }
-// const AT_REWARD_DISTRIBUTION_CONTROLLER: &str = "REWARD_DISTRIBUTION_CONTROLLER";
-// pub fn at_reward_distribution_controller(gauge: &str) -> String {
-//   format!("{AT_REWARD_DISTRIBUTION_CONTROLLER}__{gauge}")
-// }
 
 pub const DEFAULT_LIMIT: u32 = 30;
 pub const DEFAULT_PERIODS_LIMIT: u64 = 20;
@@ -37,7 +33,7 @@ pub const SECONDS_PER_YEAR: u64 = 60 * 60 * 24 * 365;
 // Seconds in one week. It is intended for period number calculation.
 // mainnet: 7 * 86400
 // testnet: 60 * 60
-pub const WEEK: u64 = 7 * 86400;
+pub const SECONDS_PER_WEEK: u64 = 7 * 86400;
 /// Seconds in 2 years which is the maximum lock period.
 pub const MAX_LOCK_TIME: u64 = 2 * 365 * 86400;
 // 2 years (104 weeks)

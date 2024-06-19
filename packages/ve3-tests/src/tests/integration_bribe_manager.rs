@@ -5,7 +5,7 @@ use crate::{
 use cosmwasm_std::attr;
 use ve3_bribe_manager::error::ContractError;
 use ve3_shared::{
-  constants::WEEK,
+  constants::SECONDS_PER_WEEK,
   error::SharedError,
   helpers::{assets::Assets, time::Time},
   msgs_bribe_manager::{
@@ -20,8 +20,12 @@ fn test_lock_add_bribes() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(2000), "user2", |res| {
+      res.assert_valid()
+    })
     .def_staking_whitelist_recapture()
     .def_gauge_1_vote(5000, 5000, "user1", |res| res.assert_valid())
     .def_gauge_1_vote(7500, 2500, "user2", |res| res.assert_valid())
@@ -332,9 +336,13 @@ fn test_errors() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
     .add_one_period()
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(2000), "user2", |res| {
+      res.assert_valid()
+    })
     .def_staking_whitelist_recapture()
     .def_gauge_1_vote(5000, 5000, "user1", |res| res.assert_valid())
     .def_gauge_1_vote(7500, 2500, "user2", |res| res.assert_valid())
@@ -443,9 +451,13 @@ fn test_try_withdraw_late() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
     .add_one_period()
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(2000), "user2", |res| {
+      res.assert_valid()
+    })
     .def_staking_whitelist_recapture()
     .def_gauge_1_vote(5000, 5000, "user1", |res| res.assert_valid())
     .def_gauge_1_vote(7500, 2500, "user2", |res| res.assert_valid())
@@ -522,8 +534,12 @@ fn test_any_bribe() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user2", |res| {
+      res.assert_valid()
+    })
     .def_staking_whitelist_recapture()
     .e_bribe_update_config(None, Some(true), "creator", |res| {
       res.assert_attribute(attr("action", "bribe/update_config"));

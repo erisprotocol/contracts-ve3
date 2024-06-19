@@ -10,7 +10,7 @@ use cw721::{AllNftInfoResponse, NftInfoResponse, OwnerOfResponse, TokensResponse
 use cw_asset::{AssetInfo, AssetInfoBase};
 use ve3_asset_gauge::error::ContractError;
 use ve3_shared::{
-  constants::{MAX_LOCK_PERIODS, WEEK},
+  constants::{MAX_LOCK_PERIODS, SECONDS_PER_WEEK},
   error::SharedError,
   extensions::decimal_ext::DecimalExt,
   helpers::{
@@ -30,8 +30,8 @@ fn test_total_vp() {
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user2", |res| res.assert_valid())
     .q_ve_all_tokens(None, None, |res| {
       assert_eq!(
         res.unwrap(),
@@ -85,7 +85,9 @@ fn test_total_vp() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vp: total_vp * u(2)
+          vp: total_vp * u(2),
+          fixed: u(2000),
+          voting_power: u(344)
         }
       )
     });
@@ -99,11 +101,11 @@ fn test_locks_transfer() {
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock"));
       res.assert_attribute(attr("token_id", "1"));
     })
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user2", |res| {
       res.assert_attribute(attr("token_id", "2"));
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
@@ -131,7 +133,9 @@ fn test_locks_transfer() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vp: total_vp * u(2)
+          vp: total_vp * u(2),
+          fixed: u(2000),
+          voting_power: u(344)
         }
       )
     })
@@ -254,7 +258,7 @@ fn test_vote_asserts() {
   let allowed_cw20 = addr.lp_cw20.to_string();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.unwrap();
     })
     .init_def_staking_whitelist()
@@ -324,7 +328,7 @@ fn test_query_infos() {
   let allowed_cw20 = addr.lp_cw20.to_string();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.assert_valid()
     })
     .init_def_staking_whitelist()
@@ -465,10 +469,10 @@ fn test_query_infos() {
         }
       );
     })
-    .e_ve_create_lock_time(WEEK * 20, native("uluna", 4000u128), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 20, native("uluna", 4000u128), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_create_lock_time(WEEK * 20, native("uluna", 10000u128), "user2", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 20, native("uluna", 10000u128), "user2", |res| {
       res.unwrap();
     })
     .e_gauge_vote(
@@ -746,6 +750,10 @@ fn test_config() {
               name: addr.gauge_2.clone(),
               min_gauge_percentage: Decimal::percent(0)
             },
+            GaugeConfig {
+              name: addr.gauge_3.clone(),
+              min_gauge_percentage: Decimal::percent(0)
+            },
           ],
           rebase_asset: addr.ampluna_info_checked()
         }
@@ -793,6 +801,10 @@ fn test_config() {
               min_gauge_percentage: Decimal::percent(0)
             },
             GaugeConfig {
+              name: addr.gauge_3.to_string(),
+              min_gauge_percentage: Decimal::percent(0)
+            },
+            GaugeConfig {
               name: "any".to_string(),
               min_gauge_percentage: Decimal::percent(1)
             },
@@ -811,8 +823,8 @@ fn test_user_infos() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
     .q_gauge_user_infos(None, None, None, |res| {
       assert_eq!(
         res.unwrap(),

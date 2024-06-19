@@ -1,4 +1,4 @@
-use crate::constants::{EPOCH_START, WEEK};
+use crate::constants::{EPOCH_START, SECONDS_PER_WEEK};
 use cosmwasm_std::{StdError, StdResult, Uint128};
 
 /// Calculates the period number. Time should be formatted as a timestamp.
@@ -6,18 +6,18 @@ pub fn get_period(time: u64) -> StdResult<u64> {
   if time < EPOCH_START {
     Err(StdError::generic_err("Invalid time"))
   } else {
-    Ok((time - EPOCH_START) / WEEK)
+    Ok((time - EPOCH_START) / SECONDS_PER_WEEK)
   }
 }
 
 /// converts the period to the start time of the period (EPOCH_START + period * WEEK)
 pub fn get_s_from_period(period: u64) -> u64 {
-  EPOCH_START + period * WEEK
+  EPOCH_START + period * SECONDS_PER_WEEK
 }
 
 /// Calculates how many periods are in the specified time interval. The time should be in seconds.
 pub fn get_periods_count(interval: u64) -> u64 {
-  interval / WEEK
+  interval / SECONDS_PER_WEEK
 }
 
 /// Main function used to calculate a user's voting power at a specific period as: previous_power - slope*(x - previous_x).

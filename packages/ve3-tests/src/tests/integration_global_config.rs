@@ -3,7 +3,7 @@ use cw_ownable::Ownership;
 use ve3_global_config::error::ContractError;
 use ve3_shared::constants::AT_FREE_BRIBES;
 
-use crate::common::suite::TestingSuite;
+use crate::common::suite::{InitOptions, TestingSuite};
 
 #[test]
 fn test_config_default() {
@@ -17,6 +17,7 @@ fn test_config_default() {
         res.unwrap(),
         vec![
           ("ASSET_GAUGE".to_string(), addr.ve3_asset_gauge.clone()),
+          ("ASSET_STAKING__emission".to_string(), addr.ve3_asset_staking_3.clone()),
           ("ASSET_STAKING__project".to_string(), addr.ve3_asset_staking_2.clone()),
           ("ASSET_STAKING__stable".to_string(), addr.ve3_asset_staking_1.clone()),
           (
@@ -28,8 +29,9 @@ fn test_config_default() {
             "BRIBE_WHITELIST_CONTROLLER".to_string(),
             Addr::unchecked("terra12c28vjamz0tfwjf3h9669zx4fhkpjnfd75vjsw807h38w5qkv7es0v88dv")
           ),
+          ("CONNECTOR__emission".to_string(), addr.ve3_connector_emissions.clone()),
           ("CONNECTOR__project".to_string(), addr.ve3_connector_alliance_eris.clone()),
-          ("CONNECTOR__stable".to_string(), addr.ve3_connector_alliance_1.clone()),
+          ("CONNECTOR__stable".to_string(), addr.ve3_connector_alliance_mock.clone()),
           (
             "DELEGATION_CONTROLLER".to_string(),
             Addr::unchecked("terra15ja5gr6saap69dnszyf3zwh28306xw8sefl8yluvsvkcttxh4u5sv2xus6")
@@ -41,6 +43,10 @@ fn test_config_default() {
           (
             "TAKE_RECIPIENT".to_string(),
             Addr::unchecked("terra1lx7v09sx6mwazws6nd4n499ue7z28d7wyst3js6rtcu47fuwnmtqh5r9xl")
+          ),
+          (
+            "TEAM_WALLET".to_string(),
+            Addr::unchecked("terra1k5yhkz4lgvtq3gz4d6th0wpf8g9mtgjp4aaj8gzakz2qcl6r5hcqkw69f7")
           ),
           (
             "VE_GUARDIAN".to_string(),
@@ -60,6 +66,7 @@ fn test_config_default() {
         vec![
           addr.ve3_asset_staking_1.clone(),
           addr.ve3_asset_staking_2.clone(),
+          addr.ve3_asset_staking_3.clone(),
           addr.creator.clone()
         ]
       )
@@ -69,7 +76,7 @@ fn test_config_default() {
 #[test]
 fn test_config_update_ownership() {
   let mut suite = TestingSuite::def();
-  suite.init_no_config();
+  suite.init_no_config(InitOptions::default());
   let addr = suite.addresses.clone();
 
   suite
@@ -130,7 +137,7 @@ fn test_config_update_ownership() {
 #[test]
 fn test_config_update_addresses() {
   let mut suite = TestingSuite::def();
-  suite.init_no_config();
+  suite.init_no_config(InitOptions::default());
   let addr = suite.addresses.clone();
 
   suite

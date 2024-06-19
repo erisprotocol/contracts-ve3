@@ -5,7 +5,7 @@ use crate::{
 use cosmwasm_std::{attr, Decimal};
 use ve3_asset_gauge::error::ContractError;
 use ve3_shared::{
-  constants::WEEK,
+  constants::SECONDS_PER_WEEK,
   error::SharedError,
   helpers::time::Time,
   msgs_asset_gauge::*,
@@ -21,8 +21,8 @@ fn test_basic_rebase() {
 
   suite
     .def_get_ampluna("user1", 10000)
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(2400), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(2400), "user2", |res| res.assert_valid())
     .e_gauge_add_rebase_in_ampluna(3000, |res| {
       res.assert_attribute(attr("action", "gauge/add_rebase"));
     })
@@ -123,7 +123,7 @@ fn test_rebase_new_lock() {
   suite
     .def_get_ampluna("user2", 10000)
     .e_ve_create_lock_time_any(None, addr.uluna(1200), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
     .e_gauge_add_rebase_in_ampluna(3000, |res| {
       res.assert_attribute(attr("action", "gauge/add_rebase"));
     })
@@ -194,8 +194,8 @@ fn test_rebase_new_lock_non_permanent() {
 
   suite
     .def_get_ampluna("user2", 10000)
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
     .e_gauge_add_rebase_in_ampluna(3000, |res| {
       res.assert_attribute(attr("action", "gauge/add_rebase"));
     })
@@ -266,8 +266,8 @@ fn test_rebase_double_claim() {
 
   suite
     .def_get_ampluna("user2", 10000)
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
     .e_gauge_add_rebase_in_ampluna(3000, |res| {
       res.assert_attribute(attr("action", "gauge/add_rebase"));
     })
@@ -304,8 +304,8 @@ fn test_rebase_claim_to_invalid_lock() {
 
   suite
     .def_get_ampluna("user2", 10000)
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1200), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(2000), "user2", |res| res.assert_valid())
     .e_gauge_add_rebase_in_ampluna(3000, |res| {
       res.assert_attribute(attr("action", "gauge/add_rebase"));
     })

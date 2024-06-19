@@ -5,7 +5,7 @@ use cw_asset::{Asset, AssetInfo};
 use cw_storage_plus::Bound;
 use ve3_shared::msgs_voting_escrow::End;
 use ve3_shared::{
-  constants::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, WEEK},
+  constants::{MAX_LOCK_TIME, MIN_LOCK_PERIODS, SECONDS_PER_WEEK},
   extensions::asset_info_ext::AssetInfoExt,
   msgs_voting_escrow::{AssetInfoConfig, Config, DepositAsset},
 };
@@ -13,7 +13,7 @@ use ve3_shared::{
 /// Checks that a timestamp is within limits.
 pub(crate) fn assert_time_limits(time: Option<u64>) -> Result<(), ContractError> {
   if let Some(time) = time {
-    if !(WEEK..=MAX_LOCK_TIME).contains(&time) {
+    if !(SECONDS_PER_WEEK..=MAX_LOCK_TIME).contains(&time) {
       return Err(ContractError::LockTimeLimitsError {});
     }
   }

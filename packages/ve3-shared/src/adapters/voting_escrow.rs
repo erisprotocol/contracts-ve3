@@ -2,7 +2,7 @@ use crate::{
   error::SharedError,
   extensions::asset_ext::AssetExt,
   helpers::time::Time,
-  msgs_voting_escrow::{ExecuteMsg, QueryMsg, VotingPowerResponse},
+  msgs_voting_escrow::{ExecuteMsg, QueryMsg, VotingPowerFixedResponse, VotingPowerResponse},
 };
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, QuerierWrapper, StdResult};
 use cw_asset::Asset;
@@ -18,6 +18,19 @@ impl VotingEscrow {
     querier.query_wasm_smart(
       self.0.clone(),
       &QueryMsg::TotalVamp {
+        time,
+      },
+    )
+  }
+
+  pub fn query_total_fixed(
+    &self,
+    querier: &QuerierWrapper,
+    time: Option<Time>,
+  ) -> StdResult<VotingPowerFixedResponse> {
+    querier.query_wasm_smart(
+      self.0.clone(),
+      &QueryMsg::TotalFixed {
         time,
       },
     )

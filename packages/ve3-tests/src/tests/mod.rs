@@ -1,4 +1,4 @@
-pub mod integration_alliance_connector;
+pub mod integration_connector_alliance;
 pub mod integration_asset_gauge;
 pub mod integration_asset_gauge_distribution;
 pub mod integration_asset_gauge_rebase;
@@ -10,3 +10,4 @@ pub mod integration_global_config;
 pub mod integration_migrate;
 pub mod integration_voting_escrow;
 pub mod integration_voting_escrow_blacklist;
+pub mod integration_connector_emission;

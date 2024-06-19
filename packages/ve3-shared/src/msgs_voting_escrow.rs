@@ -247,6 +247,12 @@ pub enum QueryMsg {
     time: Option<Time>,
   },
 
+  /// Return the current total amount of vAMP
+  #[returns(VotingPowerFixedResponse)]
+  TotalFixed {
+    time: Option<Time>,
+  },
+
   /// Return the user's current voting power (vAMP balance)
   #[returns(VotingPowerResponse)]
   LockVamp {
@@ -455,8 +461,15 @@ impl From<QueryMsg> for CW721QueryMsg<Empty> {
 /// This structure is used to return a user's amount of vAMP.
 #[cw_serde]
 pub struct VotingPowerResponse {
-  /// The vp balance
+  pub fixed: Uint128,
+  pub voting_power: Uint128,
+  /// The total vp balance (fixed + voting_power)
   pub vp: Uint128,
+}
+
+#[cw_serde]
+pub struct VotingPowerFixedResponse {
+  pub fixed: Uint128,
 }
 
 /// This structure is used to return the lock information for a vAMP position.

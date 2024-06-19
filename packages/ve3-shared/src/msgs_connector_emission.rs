@@ -8,7 +8,7 @@ use crate::{
   adapters::{
     asset_gauge::AssetGauge, global_config_adapter::ConfigExt, voting_escrow::VotingEscrow,
   },
-  constants::AT_ASSET_GAUGE,
+  constants::{AT_ASSET_GAUGE, AT_VOTING_ESCROW},
   error::SharedError,
 };
 
@@ -30,6 +30,8 @@ pub enum RebaseConfg {
 
   // weeklyEmissions × (1 - (VP.totalSupply / 10) ÷ TOKEN.totalsupply)ˆ2 × 0.5
   Dynamic {},
+
+  TargetYearlyApy(Decimal),
 }
 
 #[cw_serde]
@@ -61,7 +63,7 @@ pub struct Config {
 
 impl Config {
   pub fn voting_escrow(&self, querier: &QuerierWrapper) -> Result<VotingEscrow, SharedError> {
-    self.global_config().get_address(querier, AT_ASSET_GAUGE).map(VotingEscrow)
+    self.global_config().get_address(querier, AT_VOTING_ESCROW).map(VotingEscrow)
   }
 
   pub fn asset_gauge(&self, querier: &QuerierWrapper) -> Result<AssetGauge, SharedError> {

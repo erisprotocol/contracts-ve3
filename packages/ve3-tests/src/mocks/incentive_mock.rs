@@ -9,7 +9,7 @@ use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo};
 use cw_storage_plus::{Item, Map};
 use ve3_shared::{
-  constants::WEEK, error::SharedError, extensions::asset_info_ext::AssetInfoExt,
+  constants::SECONDS_PER_WEEK, error::SharedError, extensions::asset_info_ext::AssetInfoExt,
   helpers::assets::Assets,
 };
 pub type ContractResult = Result<Response, SharedError>;
@@ -212,7 +212,7 @@ fn _claim(
   let seconds = env.block.time.seconds() - last;
 
   let emissions =
-    config.per_week.multiply_ratio(Uint128::new(seconds.into()), Uint128::new(WEEK.into()));
+    config.per_week.multiply_ratio(Uint128::new(seconds.into()), Uint128::new(SECONDS_PER_WEEK.into()));
 
   LAST_CLAIM.save(deps.storage, user.clone(), &env.block.time.seconds())?;
 

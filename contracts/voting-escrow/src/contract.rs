@@ -21,7 +21,7 @@ use cw_asset::Asset;
 use std::collections::HashSet;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{
-  AT_VE_GUARDIAN, EPOCH_START, MAX_LOCK_PERIODS, MIN_LOCK_PERIODS, WEEK,
+  AT_VE_GUARDIAN, EPOCH_START, MAX_LOCK_PERIODS, MIN_LOCK_PERIODS, SECONDS_PER_WEEK,
 };
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
@@ -831,7 +831,7 @@ fn extend_lock_time(
     lock.end = End::Period(end);
 
     // Should not exceed MAX_LOCK_TIME
-    assert_time_limits(Some(EPOCH_START + end * WEEK - env.block.time.seconds()))?;
+    assert_time_limits(Some(EPOCH_START + end * SECONDS_PER_WEEK - env.block.time.seconds()))?;
   } else {
     return Err(ContractError::LockIsPermanent("cannot extend".to_string()));
   }

@@ -706,6 +706,7 @@ fn update_reward_callback(
   let current_balance = initial_balance.info.query_balance(&deps.querier, env.contract.address)?;
 
   let rewards_collected = current_balance - previous_balance;
+  let rewards = initial_balance.info.with_balance(rewards_collected);
 
   let asset_reward_distribution = ASSET_REWARD_DISTRIBUTION.load(deps.storage)?;
   let total_distribution = asset_reward_distribution
@@ -733,7 +734,10 @@ fn update_reward_callback(
     }
   }
 
-  Ok(Response::new().add_attributes(vec![("action", "asset/update_rewards_callback")]))
+  Ok(Response::new().add_attributes(vec![
+    ("action", "asset/update_rewards_callback"),
+    ("rewards", &rewards.to_string()),
+  ]))
 }
 
 fn track_bribes_callback(

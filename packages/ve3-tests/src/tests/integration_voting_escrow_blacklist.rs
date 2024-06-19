@@ -1,21 +1,13 @@
-use std::str::FromStr;
-
 use crate::{
-  common::{
-    helpers::{cw20, native, u},
-    suite::TestingSuite,
-  },
+  common::{helpers::u, suite::TestingSuite},
   extensions::app_response_ext::{EventChecker, Valid},
 };
-use cosmwasm_std::{attr, Decimal};
-use cw721::{AllNftInfoResponse, Approval, NftInfoResponse, OwnerOfResponse, TokensResponse};
+use cosmwasm_std::attr;
 use ve3_shared::{
-  constants::{AT_VE_GUARDIAN, MAX_LOCK_PERIODS, WEEK},
+  constants::{AT_VE_GUARDIAN, SECONDS_PER_WEEK},
   error::SharedError,
-  extensions::decimal_ext::DecimalExt,
-  helpers::{slope::adjust_vp_and_slope, time::Time},
+  helpers::time::Time,
   msgs_asset_gauge::UserInfoExtendedResponse,
-  msgs_voting_escrow::*,
 };
 use ve3_voting_escrow::error::ContractError;
 
@@ -26,7 +18,7 @@ fn test_blacklist() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -47,10 +39,7 @@ fn test_blacklist() {
       "creator",
       |res| {
         res.assert_attribute(attr("action", "ve/update_blacklist"));
-        res.assert_attribute(attr(
-          "added_addresses",
-          format!("{0},{1}", addr.user1.to_string(), addr.user2.to_string()),
-        ));
+        res.assert_attribute(attr("added_addresses", format!("{0},{1}", addr.user1, addr.user2)));
         res.assert_attribute(attr("action", "gauge/update_vote"));
       },
     )
@@ -65,7 +54,7 @@ fn test_blacklist() {
         }
       );
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.assert_error(ContractError::AddressBlacklisted(addr.user1.to_string()))
     })
     .add_one_period()
@@ -105,7 +94,7 @@ fn test_blacklist_remove() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -143,7 +132,7 @@ fn test_blacklist_remove() {
         }
       );
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
     .add_one_period()
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(

@@ -10,7 +10,7 @@ use crate::{
 use cosmwasm_std::{attr, Decimal};
 use cw721::{AllNftInfoResponse, Approval, NftInfoResponse, OwnerOfResponse, TokensResponse};
 use ve3_shared::{
-  constants::{MAX_LOCK_PERIODS, WEEK},
+  constants::{MAX_LOCK_PERIODS, SECONDS_PER_WEEK},
   extensions::decimal_ext::DecimalExt,
   helpers::{slope::adjust_vp_and_slope, time::Time},
   msgs_asset_gauge::UserInfoExtendedResponse,
@@ -27,11 +27,11 @@ fn test_locks() {
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock"));
       res.assert_attribute(attr("token_id", "1"));
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user2", |res| {
       res.assert_attribute(attr("token_id", "2"));
     })
     .q_ve_all_tokens(None, None, |res| {
@@ -87,7 +87,9 @@ fn test_locks() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vp: total_vp * u(2)
+          vp: total_vp * u(2),
+          fixed: u(2000),
+          voting_power: u(344)
         }
       )
     });
@@ -102,11 +104,11 @@ fn test_locks_transfer() {
 
   suite
     .init()
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock"));
       res.assert_attribute(attr("token_id", "1"));
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user2", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user2", |res| {
       res.assert_attribute(attr("token_id", "2"));
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
@@ -134,7 +136,9 @@ fn test_locks_transfer() {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vp: total_vp * u(2)
+          vp: total_vp * u(2),
+          fixed: u(2000),
+          voting_power: u(344)
         }
       )
     })
@@ -256,13 +260,15 @@ fn test_locks_exchange_rate() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
     .q_ve_total_vamp(Some(Time::Period(300)), |res| {
       assert_eq!(
         res.unwrap(),
         VotingPowerResponse {
-          vp: u(2200)
+          vp: u(2200),
+          fixed: u(2200),
+          voting_power: u(0)
         }
       );
     })
@@ -323,10 +329,10 @@ fn test_locks_lock_extension() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_extend_lock_time(WEEK * 2, "1", "user1", |res| {
+    .e_ve_extend_lock_time(SECONDS_PER_WEEK * 2, "1", "user1", |res| {
       res.unwrap();
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
@@ -387,7 +393,7 @@ fn test_locks_lock_extension_ampluna() {
   let ampluna = addr.eris_hub_cw20_ampluna.to_string();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -405,11 +411,11 @@ fn test_locks_lock_extension_ampluna() {
     })
     // TODO UPDATE EXCHANGE RATE
     .def_change_exchange_rate(Decimal::percent(130))
-    .e_ve_extend_lock_time(WEEK * 2, "2", "user1", |res| {
+    .e_ve_extend_lock_time(SECONDS_PER_WEEK * 2, "2", "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::LockDoesNotExist("2".to_string()));
     })
-    .e_ve_extend_lock_time(WEEK * 2, "1", "user1", |res| {
+    .e_ve_extend_lock_time(SECONDS_PER_WEEK * 2, "1", "user1", |res| {
       res.unwrap();
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
@@ -471,26 +477,26 @@ fn test_locks_merge() {
   let fake = addr.fake_cw20.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 2, native("xxx", 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("xxx", 1000u128), "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset("xxx".into()));
     })
-    .e_ve_create_lock_time(WEEK * 2, cw20(fake.clone(), 1000u128), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, cw20(fake.clone(), 1000u128), "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
       assert_eq!(res, ContractError::WrongAsset(format!("cw20:{fake}")));
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
     // 2 = wrong asset
-    .e_ve_create_lock_time(WEEK * 2, addr.ampluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
       res.unwrap();
     })
     // 3 = wrong end
-    .e_ve_create_lock_time(WEEK * 3, addr.uluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 3, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
-    .e_ve_create_lock_time(WEEK * 2, addr.uluna(1000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -547,7 +553,9 @@ fn test_locks_merge() {
       assert_eq!(
         res,
         VotingPowerResponse {
-          vp: u(1086)
+          vp: u(1086),
+          fixed: u(1000),
+          voting_power: u(86)
         }
       );
     })
@@ -662,7 +670,7 @@ fn test_locks_merge() {
         }
       );
     })
-    .e_ve_extend_lock_time(WEEK, "1", "user1", |res| {
+    .e_ve_extend_lock_time(SECONDS_PER_WEEK, "1", "user1", |res| {
       res.unwrap();
     })
     // 3 can now be merged
@@ -753,7 +761,7 @@ fn test_locks_split() {
   let ampluna = suite.addresses.eris_hub_cw20_ampluna.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_one_period()
@@ -936,7 +944,7 @@ fn test_lock_withdraw_cw20() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(10)
@@ -963,7 +971,7 @@ fn test_lock_withdraw_native() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.uluna(2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(10)
@@ -990,7 +998,7 @@ fn test_lock_increase_cw20() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.ampluna(2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.ampluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1034,7 +1042,7 @@ fn test_lock_increase_native() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.uluna(2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1147,7 +1155,7 @@ fn test_lock_permanent() {
       )
     })
     // .print_block("creating lock 2")
-    .e_ve_create_lock_time_any(Some(WEEK * 10), addr.uluna(4000), "user1", |res| {
+    .e_ve_create_lock_time_any(Some(SECONDS_PER_WEEK * 10), addr.uluna(4000), "user1", |res| {
       res.unwrap();
     })
     .q_ve_lock_info("2", None, |res| {
@@ -1282,7 +1290,7 @@ fn test_lock_make_permanent() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.uluna(2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
@@ -1368,11 +1376,11 @@ fn test_lock_merge_permanent() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(WEEK * 10, addr.uluna(  2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(  2000), "user1", |res| {
       res.unwrap();
     })
     .add_periods(5)
-    .e_ve_create_lock_time(WEEK * 10, addr.uluna(  2000), "user1", |res| {
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(  2000), "user1", |res| {
       res.unwrap();
     })
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
