@@ -47,7 +47,7 @@ pub struct AssetConfigRuntime {
 
 #[cw_serde]
 pub struct AssetConfig<T: AddressLike> {
-  pub yearly_take_rate: Decimal,
+  pub yearly_take_rate: Option<Decimal>,
   pub stake_config: StakeConfig<T>,
 }
 

@@ -36,6 +36,7 @@ pub fn instantiate(
   fee.info.assert_native()?;
 
   let whitelist = msg.whitelist.check(deps.api)?;
+  let allow_any = whitelist.is_empty();
 
   CONFIG.save(
     deps.storage,
@@ -43,7 +44,7 @@ pub fn instantiate(
       global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
       whitelist,
       fee,
-      allow_any: false,
+      allow_any,
     },
   )?;
 

@@ -18,7 +18,7 @@ impl TestingSuite {
         AssetInfoWithConfig::new(
           AssetInfoUnchecked::native("lp"),
           Some(AssetConfig {
-            yearly_take_rate: Decimal::percent(20),
+            yearly_take_rate: Some(Decimal::percent(20)),
             stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
               contract: addr.incentive_mock.to_string(),
               reward_infos: vec![AssetInfoUnchecked::native("astro")],
@@ -110,7 +110,7 @@ impl TestingSuite {
       vec![AssetInfoWithConfig::new(
         AssetInfoUnchecked::native("lp"),
         Some(AssetConfig {
-          yearly_take_rate: Decimal::percent(10),
+          yearly_take_rate: Some(Decimal::percent(10)),
           stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
             contract: addr.incentive_mock.to_string(),
             reward_infos: vec![AssetInfoUnchecked::native("astro")],
@@ -130,7 +130,7 @@ impl TestingSuite {
         AssetInfoWithConfig::new(
           AssetInfoUnchecked::native("lp"),
           Some(AssetConfig {
-            yearly_take_rate: Decimal::percent(10),
+            yearly_take_rate: Some(Decimal::percent(10)),
             stake_config: ve3_shared::stake_config::StakeConfig::Default,
           }),
         ),

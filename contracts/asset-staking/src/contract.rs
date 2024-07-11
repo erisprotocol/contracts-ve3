@@ -206,13 +206,13 @@ fn _update_asset_config(
   let current = ASSET_CONFIG.may_load(deps.storage, &update.info)?.unwrap_or_default();
   let mut updated = current.clone();
   let new_config = update.config.clone().unwrap_or(AssetConfig {
-    yearly_take_rate: config.default_yearly_take_rate,
+    yearly_take_rate: Some(config.default_yearly_take_rate),
     stake_config: ve3_shared::stake_config::StakeConfig::Default,
   });
   updated.stake_config = new_config.stake_config;
-  updated.yearly_take_rate = new_config.yearly_take_rate;
+  updated.yearly_take_rate = new_config.yearly_take_rate.unwrap_or(config.default_yearly_take_rate);
 
-  if new_config.yearly_take_rate > Decimal::percent(50) {
+  if updated.yearly_take_rate > Decimal::percent(50) {
     return Err(ContractError::TakeRateLessOrEqual50);
   }
 

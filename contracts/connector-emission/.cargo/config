@@ -2,4 +2,5 @@
 wasm = "build --release --target wasm32-unknown-unknown"
 wasm-debug = "build --target wasm32-unknown-unknown"
 unit-test = "test --lib"
-schema = "run --example schema_connector_alliance"
+integration-test = "test --test integration"
+schema = "run --example schema_connector_emissions"

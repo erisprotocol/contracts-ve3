@@ -35,3 +35,4 @@ artifacts/
 scripts/data/
 scripts/keys/
 lcov.info
+**/schema/**/*.json

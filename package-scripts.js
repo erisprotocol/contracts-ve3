@@ -6,46 +6,28 @@ module.exports = {
       default: "bash build_release.sh",
     },
     schema: {
-      default: "nps schema.create schema.transform  schema.restakegauges",
+      default:
+        "nps schema.create   schema.asset-gauge schema.asset-staking schema.bribe-manager schema.connector-alliance schema.connector-emission schema.global-config schema.voting-escrow",
 
-      single: "nps schema.restakegauges_manual schema.restakegauges",
+      create: "bash scripts/build_schema.sh",
+      transform: "ts-node scripts/transform.ts",
 
-      transform: "ts-node transform.ts",
+      "asset-gauge":
+        "json2ts -i contracts/asset-gauge/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/asset-gauge",
+      "asset-staking":
+        "json2ts -i contracts/asset-staking/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/asset-staking",
+      "bribe-manager":
+        "json2ts -i contracts/bribe-manager/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/bribe-manager",
 
-      create: "bash build_schema.sh",
+      "connector-alliance":
+        "json2ts -i contracts/connector-alliance/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/connector-alliance",
 
-      hub: "cd .. && json2ts -i contracts/hub/**/*.json -o ../liquid-staking-scripts/types/tokenfactory/hub",
-      alliancelst:
-        "cd .. && json2ts -i contracts/alliance-lst/**/*.json -o ../liquid-staking-scripts/types/tokenfactory/alliance-lst",
-
-      // ampz: "cd .. && json2ts -i contracts/ampz/schema/*.json -o ../liquid-staking-scripts/types/ampz",
-      arb: "cd .. && json2ts -i contracts/arb-vault/schema/*.json -o ../liquid-staking-scripts/types/tokenfactory/arb-vault",
-
-      // token:
-      //   "cd .. && json2ts -i contracts/token/**/*.json -o ../liquid-staking-scripts/types/token",
-      // ampextractor:
-      //   "cd .. && json2ts -i contracts/amp-extractor/**/*.json -o ../liquid-staking-scripts/types/amp-extractor",
-
-      votingescrow:
-        "cd .. && json2ts -i contracts/amp-governance/voting_escrow/**/*.json -o ../liquid-staking-scripts/types/tokenfactory/voting_escrow",
-      // ampgauges:
-      //   "cd .. && json2ts -i contracts/amp-governance/amp_gauges/**/*.json -o ../liquid-staking-scripts/types/amp_gauges",
-      // empgauges:
-      //   "cd .. && json2ts -i contracts/amp-governance/emp_gauges/**/*.json -o ../liquid-staking-scripts/types/emp_gauges",
-      // propgauges:
-      //   "cd .. && json2ts -i contracts/amp-governance/prop_gauges/**/*.json -o ../liquid-staking-scripts/types/prop_gauges",
-      restakegauges:
-        "cd .. && json2ts -i contracts/amp-governance/restake_gauges/schema/raw/*.json -o ../liquid-staking-scripts/types/restake_gauges",
-
-      restakegauges_manual:
-        "cd .. && cd contracts/amp-governance/restake_gauges && cargo schema",
-
-      farm: "cd .. && json2ts -i contracts/amp-compounder/astroport_farm/**/*.json -o ../liquid-staking-scripts/types/tokenfactory/amp-compounder/astroport_farm",
-      compound:
-        "cd .. && json2ts -i contracts/amp-compounder/compound_proxy/**/*.json -o ../liquid-staking-scripts/types/tokenfactory/amp-compounder/compound_proxy",
-      // fees: "cd .. && json2ts -i contracts/amp-compounder/fees_collector/**/*.json -o ../liquid-staking-scripts/types/amp-compounder/fees_collector",
-      generator:
-        "cd .. && json2ts -i contracts/amp-compounder/generator_proxy/**/*.json -o ../liquid-staking-scripts/types/tokenfactory/amp-compounder/generator_proxy",
+      "connector-emission":
+        "json2ts -i contracts/connector-emission/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/connector-emission",
+      "global-config":
+        "json2ts -i contracts/global-config/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/global-config",
+      "voting-escrow":
+        "json2ts -i contracts/voting-escrow/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/voting-escrow",
     },
   },
 };
