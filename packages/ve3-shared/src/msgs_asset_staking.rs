@@ -231,6 +231,7 @@ pub struct MigrateMsg {}
 pub struct StakedBalanceRes {
   pub asset: Asset,
   pub shares: Uint128,
+  pub total_shares: Uint128,
   pub config: AssetConfigRuntime,
 }
 

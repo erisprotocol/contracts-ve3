@@ -68,6 +68,7 @@ fn test_stake_cw20() {
     vec![StakedBalanceRes {
       asset: Asset::cw20(Addr::unchecked("asset1"), Uint128::new(200)),
       shares: Uint128::new(200),
+      total_shares: Uint128::new(200),
       config: AssetConfigRuntime {
         last_taken_s: 1571797419,
         taken: Uint128::zero(),
@@ -220,6 +221,7 @@ fn test_stake() {
     vec![StakedBalanceRes {
       asset: Asset::native("asset1".to_string(), Uint128::new(200)),
       shares: Uint128::new(200),
+      total_shares: Uint128::new(200),
       config: AssetConfigRuntime {
         last_taken_s: 1571797419,
         taken: Uint128::zero(),

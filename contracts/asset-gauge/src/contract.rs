@@ -441,14 +441,8 @@ fn calc_rebase_share(
   }
 }
 
-/// The function checks that the last pools tuning happened >= 14 days ago.
-/// Then it calculates voting power for each pool at the current period, filters all pools which
-/// are not eligible to receive allocation points,
-/// takes top X pools by voting power, where X is 'config.pools_limit', calculates allocation points
-/// for these pools and applies allocation points in generator contract.
 fn set_distribution(mut deps: DepsMut, env: Env) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
-  // config.assert_gauge_controller(&deps, &info.sender)?;
   let block_period = get_period(env.block.time.seconds())?;
 
   let mut attrs = vec![];

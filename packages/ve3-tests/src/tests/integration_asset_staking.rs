@@ -294,6 +294,7 @@ fn test_asset_unstake() {
           vec![StakedBalanceRes {
             asset: addr.lp_native(10000000),
             shares: u(10000000),
+            total_shares: u(10000000),
             config: AssetConfigRuntime {
               last_taken_s: 1712242800,
               taken: u(0),
@@ -320,6 +321,7 @@ fn test_asset_unstake() {
           vec![StakedBalanceRes {
             asset: addr.lp_native(9980822),
             shares: u(10000000),
+            total_shares: u(10000000),
             config: AssetConfigRuntime {
               last_taken_s: 1712847600,
               taken: u(19178),
@@ -345,6 +347,7 @@ fn test_asset_unstake() {
           StakedBalanceRes {
             asset: addr.lp_native(9980822),
             shares: u(10000000),
+            total_shares: u(10000000),
             config: AssetConfigRuntime {
               last_taken_s: 1712847600,
               taken: u(19178),
@@ -430,6 +433,7 @@ fn test_asset_second_user() {
           vec![StakedBalanceRes {
             asset: addr.lp_native(999999),
             shares: u(1001921),
+            total_shares: u(11001921),
             config: AssetConfigRuntime {
               last_taken_s: 1712847600,
               taken: u(19178),
@@ -481,6 +485,7 @@ fn test_asset_recipient() {
           vec![StakedBalanceRes {
             asset: addr.lp_native(10980822),
             shares: u(11001921),
+            total_shares: u(11001921),
             config: AssetConfigRuntime {
               last_taken_s: 1712847600,
               taken: u(19178),
@@ -505,6 +510,7 @@ fn test_asset_recipient() {
           // taken: 19178
           asset: addr.lp_native(10980822),
           shares: u(11001921),
+          total_shares: u(11001921),
           config: AssetConfigRuntime {
             last_taken_s: 1712847600,
             taken: u(19178),
@@ -534,6 +540,7 @@ fn test_asset_recipient() {
           // taken: 19178
           asset: addr.lp_native(0),
           shares: u(0),
+          total_shares: u(0),
           config: AssetConfigRuntime {
             last_taken_s: 1712847600,
             taken: u(19178),
@@ -559,6 +566,7 @@ fn test_asset_recipient() {
           vec![StakedBalanceRes {
             asset: addr.lp_native(1_000_000),
             shares: u(1000000),
+            total_shares: u(1000000),
             config: AssetConfigRuntime {
               last_taken_s: 1718895600,
               taken: u(19178),
@@ -579,6 +587,7 @@ fn test_asset_recipient() {
         vec![StakedBalanceRes {
           asset: addr.lp_native(1_000_000),
           shares: u(1000000),
+          total_shares: u(1000000),
           config: AssetConfigRuntime {
             last_taken_s: 1718895600,
             taken: u(19178),

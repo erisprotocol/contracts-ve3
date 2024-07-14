@@ -98,6 +98,7 @@ fn get_staked_balance(deps: Deps, env: Env, asset_query: AssetQuery) -> StdResul
   to_json_binary(&StakedBalanceRes {
     asset,
     shares: user_shares,
+    total_shares: shares,
     config,
   })
 }
@@ -129,14 +130,15 @@ fn get_all_staked_balances(
       asset_config.taken = asset_config.taken.checked_add(take_amount)?
     };
 
-    let real_balance =
-      compute_balance_amount(shares, user_shares, balance.saturating_sub(asset_config.taken));
+    let available = balance.saturating_sub(asset_config.taken);
+    let real_balance = compute_balance_amount(shares, user_shares, available);
     let asset = asset_info.with_balance(real_balance);
 
     // Append the request
     res.push(StakedBalanceRes {
       asset,
       shares: user_shares,
+      total_shares: shares,
       config: asset_config,
     })
   }
@@ -265,6 +267,7 @@ fn get_total_staked_balances(deps: Deps, env: Env) -> StdResult<Binary> {
       Ok(StakedBalanceRes {
         asset,
         shares,
+        total_shares: shares,
         config,
       })
     })
