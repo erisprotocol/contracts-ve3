@@ -219,6 +219,7 @@ pub struct UserInfoExtendedResponse {
 #[cw_serde]
 #[derive(Default)]
 pub struct GaugeVote {
+  pub gauge: String,
   pub period: u64,
   pub votes: Vec<(String, u16)>,
 }

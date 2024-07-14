@@ -428,7 +428,12 @@ fn unstake(
     withdraw_amount = compute_balance_amount(shares, share_amount, asset_available)
   }
 
-  SHARES.save(deps.storage, (sender, &asset.info), &(current_user_share - share_amount))?;
+  let new_value = current_user_share - share_amount;
+  if new_value.is_zero() {
+    SHARES.remove(deps.storage, (sender, &asset.info));
+  } else {
+    SHARES.save(deps.storage, (sender, &asset.info), &(current_user_share - share_amount))?;
+  }
 
   TOTAL.save(
     deps.storage,

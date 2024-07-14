@@ -108,16 +108,14 @@ fn get_all_staked_balances(
   asset_query: AllStakedBalancesQuery,
 ) -> StdResult<Binary> {
   let addr = deps.api.addr_validate(&asset_query.address)?;
-  let whitelist = WHITELIST.range(deps.storage, None, None, Order::Ascending);
   let mut res: Vec<StakedBalanceRes> = Vec::new();
 
-  for asset_res in whitelist {
-    // Build the required key to recover the BALANCES
-    let (asset_info, _) = asset_res?;
-    let stake_key = (addr.clone(), &asset_info);
-    let user_shares = SHARES.load(deps.storage, stake_key).unwrap_or_default();
-    let (balance, shares) = TOTAL.load(deps.storage, &asset_info)?;
+  for shares in SHARES.prefix(addr.clone()).range(deps.storage, None, None, Order::Ascending) {
+    let (asset_info, user_shares) = shares?;
+
     let mut asset_config = ASSET_CONFIG.load(deps.storage, &asset_info)?;
+
+    let (balance, shares) = TOTAL.load(deps.storage, &asset_info).unwrap_or_default();
 
     if asset_config.last_taken_s != 0 {
       let take_diff_s = Uint128::new((env.block.time.seconds() - asset_config.last_taken_s).into());

@@ -58,9 +58,8 @@ fn test_stake_cw20() {
     .unwrap();
   assert_eq!(balance, Uint128::new(200));
 
-  let total_balance = TOTAL
-    .load(deps.as_ref().storage, &AssetInfo::Cw20(Addr::unchecked("asset1")))
-    .unwrap();
+  let total_balance =
+    TOTAL.load(deps.as_ref().storage, &AssetInfo::Cw20(Addr::unchecked("asset1"))).unwrap();
   assert_eq!(total_balance, (Uint128::new(200), Uint128::new(200)));
 
   let total_balances_res = query_all_staked_balances(deps.as_ref());
@@ -156,7 +155,7 @@ fn test_unstake_cw20() {
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Cw20(Addr::unchecked("asset1".to_string()))),
     )
-    .unwrap();
+    .unwrap_or_default();
   assert_eq!(balance, Uint128::new(0));
 
   let total_balance = TOTAL
@@ -325,7 +324,7 @@ fn test_unstake() {
       deps.as_ref().storage,
       (Addr::unchecked("user1"), &AssetInfo::Native("asset1".to_string())),
     )
-    .unwrap();
+    .unwrap_or_default();
   assert_eq!(balance, Uint128::new(0));
 
   let total_balance =

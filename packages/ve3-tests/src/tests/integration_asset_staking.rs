@@ -388,25 +388,7 @@ fn test_asset_unstake() {
       AllStakedBalancesQuery {
         address: addr.user1.to_string(),
       },
-      |res| {
-        assert_eq!(
-          res.unwrap(),
-          vec![StakedBalanceRes {
-            asset: addr.lp_native(0),
-            shares: u(0),
-            config: AssetConfigRuntime {
-              last_taken_s: 1712847600,
-              taken: u(19178),
-              harvested: u(0),
-              yearly_take_rate: Decimal::percent(10),
-              stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
-                contract: addr.incentive_mock.clone(),
-                reward_infos: vec![native_info("astro")]
-              }
-            }
-          }]
-        )
-      },
+      |res| assert_eq!(res.unwrap(), vec![]),
     )
     .add_one_period()
     .e_staking_distribute_take_rate(None, None, "user1", |res| res.assert_valid())
@@ -414,25 +396,7 @@ fn test_asset_unstake() {
       AllStakedBalancesQuery {
         address: addr.user1.to_string(),
       },
-      |res| {
-        assert_eq!(
-          res.unwrap(),
-          vec![StakedBalanceRes {
-            asset: addr.lp_native(0),
-            shares: u(0),
-            config: AssetConfigRuntime {
-              last_taken_s: 1713452400,
-              taken: u(19178),
-              harvested: u(19178),
-              yearly_take_rate: Decimal::percent(10),
-              stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
-                contract: addr.incentive_mock.clone(),
-                reward_infos: vec![native_info("astro")]
-              }
-            }
-          }]
-        )
-      },
+      |res| assert_eq!(res.unwrap(), vec![]),
     );
 }
 

@@ -27,6 +27,7 @@ pub struct Rebase {
 }
 
 #[cw_serde]
+#[derive(Default)]
 pub struct GaugeDistributionPeriod {
   pub total_gauge_vp: Uint128,
   pub assets: Vec<AssetDistribution>,
