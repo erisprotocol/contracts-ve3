@@ -208,6 +208,7 @@ fn user_info(
     if let Some((period, votes)) = fetch_last_gauge_vote(deps.storage, &gauge.name, &user, period)?
     {
       gauge_votes.push(GaugeVote {
+        gauge: gauge.name,
         period,
         votes: votes.votes.into_iter().map(|(a, b)| (a, b.u16())).collect(),
       })
@@ -276,7 +277,8 @@ fn get_gauge_distribution(
   gauge: String,
   period: u64,
 ) -> StdResult<GaugeDistributionResponse> {
-  GAUGE_DISTRIBUTION.load(deps.storage, (&gauge, period)).map(|distribution| {
+  GAUGE_DISTRIBUTION.may_load(deps.storage, (&gauge, period)).map(|distribution| {
+    let distribution = distribution.unwrap_or_default();
     GaugeDistributionResponse {
       gauge,
       period,
