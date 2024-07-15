@@ -76,21 +76,27 @@ pub(crate) fn _claim_periods(
   deps: &Deps,
   user: &Addr,
   periods: Option<Vec<u64>>,
-  block_period: u64,
+  last_distribution_period: Option<u64>,
   asset_gauge: &AssetGauge,
 ) -> Result<Vec<u64>, ContractError> {
-  let periods = match periods {
-    Some(periods) => periods,
-    None => {
-      let start = _next_claim_period(deps, user, block_period, asset_gauge)?;
-      let end = min(start + 101, block_period);
-      let numbs = (start)..=end;
+  match last_distribution_period {
+    Some(last_period) => {
+      let periods = match periods {
+        Some(periods) => periods,
+        None => {
+          let start = _next_claim_period(deps, user, last_period, asset_gauge)?;
+          let end = min(start + 101, last_period);
+          let numbs = (start)..=end;
 
-      numbs.collect()
+          numbs.collect()
+        },
+      };
+      let periods: Vec<_> =
+        periods.into_iter().sorted().take_while(|a| *a <= last_period).collect();
+      Ok(periods)
     },
-  };
-  let periods: Vec<_> = periods.into_iter().sorted().take_while(|a| *a <= block_period).collect();
-  Ok(periods)
+    None => Ok(vec![]),
+  }
 }
 
 fn bribes(deps: Deps, env: Env, time: Option<Time>) -> StdResult<BribesResponse> {
@@ -106,14 +112,14 @@ fn bribes(deps: Deps, env: Env, time: Option<Time>) -> StdResult<BribesResponse>
 
 fn user_claimable(
   deps: Deps,
-  env: Env,
+  _env: Env,
   user: String,
   periods: Option<Vec<u64>>,
 ) -> Result<UserClaimableResponse, ContractError> {
   let user_addr = deps.api.addr_validate(&user)?;
-  let block_period = Time::Current.get_period(&env)?;
   let asset_gauge = CONFIG.load(deps.storage)?.asset_gauge(&deps.querier)?;
-  let periods = _claim_periods(&deps, &user_addr, periods, block_period, &asset_gauge)?;
+  let last_distribution_period = asset_gauge.query_last_distribution_period(&deps.querier)?.period;
+  let periods = _claim_periods(&deps, &user_addr, periods, last_distribution_period, &asset_gauge)?;
 
   if periods.is_empty() {
     return Ok(UserClaimableResponse {
@@ -157,7 +163,10 @@ fn user_claimable(
 
       let bribe_totals = match BRIBE_TOTAL.may_load(deps.storage, share.period)? {
         Some(buckets) => buckets,
-        None => bribe_available,
+        None => {
+          // usually this is being saved into BRIBE_TOTAL
+          bribe_available
+        },
       };
 
       context = ClaimContext {

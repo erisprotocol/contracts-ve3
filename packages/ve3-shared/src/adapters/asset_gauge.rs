@@ -2,7 +2,10 @@ use crate::{
   error::SharedError,
   extensions::asset_ext::AssetExt,
   helpers::time::Times,
-  msgs_asset_gauge::{ExecuteMsg, QueryMsg, UserFirstParticipationResponse, UserSharesResponse},
+  msgs_asset_gauge::{
+    ExecuteMsg, LastDistributionPeriodResponse, QueryMsg, UserFirstParticipationResponse,
+    UserSharesResponse,
+  },
 };
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, QuerierWrapper, StdResult};
 use cw_asset::Asset;
@@ -36,6 +39,13 @@ impl AssetGauge {
         user,
       },
     )
+  }
+
+  pub fn query_last_distribution_period(
+    &self,
+    querier: &QuerierWrapper,
+  ) -> StdResult<LastDistributionPeriodResponse> {
+    querier.query_wasm_smart(self.0.clone(), &QueryMsg::LastDistributionPeriod {})
   }
 
   pub fn add_rebase_msg(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {

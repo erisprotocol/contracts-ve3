@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use crate::state::{
-  fetch_first_gauge_vote, fetch_last_gauge_vote, user_idx, AssetIndex, CONFIG, GAUGE_DISTRIBUTION,
-  REBASE, UNCLAIMED_REBASE, USER_ASSET_REWARD_INDEX,
+  fetch_first_gauge_vote, fetch_last_gauge_vote, user_idx, AssetIndex, GaugeDistributionPeriod,
+  CONFIG, GAUGE_DISTRIBUTION, REBASE, UNCLAIMED_REBASE, USER_ASSET_REWARD_INDEX,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -13,8 +13,8 @@ use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::helpers::time::{GetPeriod, GetPeriods, Time, Times};
 use ve3_shared::msgs_asset_gauge::{
-  GaugeDistributionResponse, GaugeInfosResponse, GaugeVote, QueryMsg,
-  UserFirstParticipationResponse, UserInfoExtendedResponse, UserInfosResponse,
+  GaugeDistributionResponse, GaugeInfosResponse, GaugeVote, LastDistributionPeriodResponse,
+  QueryMsg, UserFirstParticipationResponse, UserInfoExtendedResponse, UserInfosResponse,
   UserPendingRebaseResponse, UserShare, UserSharesResponse, VotedInfoResponse,
 };
 
@@ -67,6 +67,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::Distributions {
       time,
     } => Ok(to_json_binary(&distributions(deps, env, time)?)?),
+
+    QueryMsg::LastDistributions {} => Ok(to_json_binary(&last_distributions(deps, env)?)?),
+
+    QueryMsg::LastDistributionPeriod {} => {
+      Ok(to_json_binary(&last_distribution_period(deps, env)?)?)
+    },
   }
 }
 
@@ -288,6 +294,24 @@ fn get_gauge_distribution(
   })
 }
 
+fn get_last_gauge_distribution(deps: Deps, gauge: String) -> StdResult<GaugeDistributionResponse> {
+  let elements = GAUGE_DISTRIBUTION
+    .prefix(&gauge)
+    .range(deps.storage, None, None, cosmwasm_std::Order::Descending)
+    .take(1)
+    .collect::<StdResult<Vec<_>>>()?;
+
+  let (period, distribution) =
+    elements.first().unwrap_or(&(0, GaugeDistributionPeriod::default())).clone();
+
+  Ok(GaugeDistributionResponse {
+    gauge,
+    period,
+    total_gauge_vp: distribution.total_gauge_vp,
+    assets: distribution.assets,
+  })
+}
+
 fn distributions(
   deps: Deps,
   env: Env,
@@ -301,6 +325,38 @@ fn distributions(
     .into_iter()
     .map(|a| get_gauge_distribution(deps, a.name, period))
     .collect::<StdResult<Vec<_>>>()
+}
+
+fn last_distributions(deps: Deps, _env: Env) -> StdResult<Vec<GaugeDistributionResponse>> {
+  let config = CONFIG.load(deps.storage)?;
+
+  config
+    .gauges
+    .into_iter()
+    .map(|a| get_last_gauge_distribution(deps, a.name))
+    .collect::<StdResult<Vec<_>>>()
+}
+
+fn last_distribution_period(deps: Deps, _env: Env) -> StdResult<LastDistributionPeriodResponse> {
+  let config = CONFIG.load(deps.storage)?;
+
+  for gauge in config.gauges {
+    let elements = GAUGE_DISTRIBUTION
+      .prefix(&gauge.name)
+      .keys(deps.storage, None, None, cosmwasm_std::Order::Descending)
+      .take(1)
+      .collect::<StdResult<Vec<_>>>()?;
+
+    if !elements.is_empty() {
+      return Ok(LastDistributionPeriodResponse {
+        period: elements.first().cloned(),
+      });
+    }
+  }
+
+  Ok(LastDistributionPeriodResponse {
+    period: None,
+  })
 }
 
 fn gauge_info(

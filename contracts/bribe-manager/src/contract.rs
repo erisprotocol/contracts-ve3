@@ -244,16 +244,15 @@ fn withdraw_bribes(
 
 fn claim_bribes(
   deps: DepsMut,
-  env: Env,
+  _env: Env,
   info: MessageInfo,
   periods: Option<Vec<u64>>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let user = &info.sender;
-  let block_period = get_period(env.block.time.seconds())?;
   let asset_gauge = config.asset_gauge(&deps.querier)?;
-
-  let periods = _claim_periods(&deps.as_ref(), user, periods, block_period, &asset_gauge)?;
+  let last_period = asset_gauge.query_last_distribution_period(&deps.querier)?;
+  let periods = _claim_periods(&deps.as_ref(), user, periods, last_period.period, &asset_gauge)?;
 
   if periods.is_empty() {
     return Err(ContractError::NoPeriodsValid);
@@ -277,6 +276,7 @@ fn claim_bribes(
     // starts with 0
     if share.period != context.period {
       context.maybe_save(deps.storage, user)?;
+
       periods.push(share.period);
 
       let bribe_available = match BRIBE_AVAILABLE.may_load(deps.storage, share.period)? {
@@ -286,6 +286,7 @@ fn claim_bribes(
           context = ClaimContext::default();
           context.period = share.period;
           context.skip = true;
+          context.should_save = true;
           continue;
         },
       };

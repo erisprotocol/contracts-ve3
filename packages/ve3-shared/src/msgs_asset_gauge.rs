@@ -125,6 +125,12 @@ pub enum QueryMsg {
     time: Option<Time>,
   },
 
+  #[returns(Vec<GaugeDistributionResponse>)]
+  LastDistributions {},
+
+  #[returns(LastDistributionPeriodResponse)]
+  LastDistributionPeriod {},
+
   #[returns(UserPendingRebaseResponse)]
   UserPendingRebase {
     user: Addr,
@@ -134,6 +140,11 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct UserPendingRebaseResponse {
   pub rebase: Uint128,
+}
+
+#[cw_serde]
+pub struct LastDistributionPeriodResponse {
+  pub period: Option<u64>,
 }
 
 #[cw_serde]

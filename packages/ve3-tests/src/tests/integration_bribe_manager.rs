@@ -2,7 +2,7 @@ use crate::{
   common::{helpers::u, suite::TestingSuite},
   extensions::app_response_ext::{EventChecker, Valid},
 };
-use cosmwasm_std::attr;
+use cosmwasm_std::{attr, StdError};
 use ve3_bribe_manager::error::ContractError;
 use ve3_shared::{
   constants::SECONDS_PER_WEEK,
@@ -200,6 +200,9 @@ fn test_lock_add_bribes() {
       )
     })
     .e_bribe_claim_bribes(Some(vec![75, 76]), "user1", |res| {
+      res.assert_error(ContractError::BribeAlreadyClaimed(75))
+    })
+    .e_bribe_claim_bribes(Some(vec![76]), "user1", |res| {
       res.assert_error(ContractError::BribeAlreadyClaimed(76))
     })
     .q_bribe_next_claim_period("user1", |res| {
@@ -586,5 +589,130 @@ fn test_any_bribe() {
           }]
         }
       )
+    });
+}
+
+#[test]
+fn test_query_claimable_without_distribution() {
+  let mut suite = TestingSuite::def();
+  let suite = suite.init();
+  let addr = suite.addresses.clone();
+
+  suite
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
+    .add_one_period()
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(2000), "user2", |res| {
+      res.assert_valid()
+    })
+    .def_staking_whitelist_recapture()
+    .def_gauge_1_vote(5000, 5000, "user1", |res| res.assert_valid())
+    .def_gauge_1_vote(7500, 2500, "user2", |res| res.assert_valid())
+    .q_bribe_user_claimable("user1", None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserClaimableResponse {
+          start: 0,
+          end: 0,
+          buckets: vec![]
+        }
+      )
+    })
+    .add_one_period()
+    .e_gauge_set_distribution("user1", |res| res.assert_valid())
+    .q_bribe_user_claimable("user1", None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserClaimableResponse {
+          start: 76,
+          end: 76,
+          buckets: vec![]
+        }
+      )
+    })
+    .e_bribe_add_bribe_native(
+      addr.uluna(1000),
+      &addr.gauge_1,
+      addr.lp_cw20_info(),
+      ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
+      None,
+      // creator part of AT_FREE_BRIBES
+      "creator",
+      |res| {
+        res.assert_attribute(attr("start", "77"));
+        res.assert_attribute(attr("end", "77"));
+      },
+    )
+    .q_bribe_user_claimable("user1", None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserClaimableResponse {
+          start: 76,
+          end: 76,
+          buckets: vec![]
+        }
+      )
+    })
+    .add_one_period()
+    .q_bribe_user_claimable("user1", None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserClaimableResponse {
+          start: 76,
+          end: 76,
+          buckets: vec![]
+        }
+      )
+    })
+    .add_one_period()
+    .q_bribe_user_claimable("user1", None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserClaimableResponse {
+          start: 76,
+          end: 76,
+          buckets: vec![]
+        }
+      )
+    })
+    .e_gauge_set_distribution("user1", |res| {
+      res.assert_attribute(attr("action", "gauge/set_distribution"));
+      res.assert_attribute(attr("periods", "76,77,78"));
+    })
+    .q_bribe_user_claimable("user1", None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        UserClaimableResponse {
+          start: 76,
+          end: 78,
+          buckets: vec![BribeBucket {
+            gauge: "stable".to_string(),
+            asset: Some(addr.lp_cw20_info_checked()),
+            // on native lp it is 75% for user2, 25% for user1
+            assets: Assets(vec![addr.uluna(479)])
+          }]
+        }
+      )
+    })
+    .e_bribe_claim_bribes(Some(vec![76u64]), "user1", |res| {
+      res.assert_attribute(attr("action", "bribe/claim_bribes"));
+      res.assert_attribute(attr("periods", "76"));
+    })
+    .e_bribe_claim_bribes(None, "user1", |res| {
+      res.assert_attribute(attr("action", "bribe/claim_bribes"));
+      res.assert_attribute(attr("periods", "77,78"));
+      res.assert_attribute_ty("transfer", attr("amount", "479uluna"));
+    })
+    .e_bribe_claim_bribes(None, "user2", |res| {
+      res.assert_attribute(attr("action", "bribe/claim_bribes"));
+      res.assert_attribute(attr("periods", "76,77,78"));
+      res.assert_attribute_ty("transfer", attr("amount", "520uluna"));
+    })
+    .e_bribe_claim_bribes(None, "user2", |res| {
+      res.assert_error(ContractError::NoPeriodsValid);
+    })
+    .e_bribe_claim_bribes(Some(vec![75u64]), "user2", |res| {
+      res.assert_error(ContractError::Std(StdError::generic_err("Querier contract error: User 'terra1vqjarrly327529599rcc4qhzvhwe34pp5uyy4gylvxe5zupeqx3sl7x356' has no voting power in period 75".to_string())));
     });
 }
