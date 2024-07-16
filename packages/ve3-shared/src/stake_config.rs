@@ -99,7 +99,7 @@ impl StakeConfig<Addr> {
         reward_infos,
       } => {
         vec![
-          AssetStaking(contract.clone()).deposit_msg(asset.clone())?,
+          AssetStaking(contract.clone()).deposit_msg(asset.clone(), None)?,
           track_bribes_callback_msg(deps, env, asset.info, reward_infos)?,
         ]
       },

@@ -11,3 +11,4 @@ pub mod msgs_connector_emission;
 pub mod msgs_global_config;
 pub mod msgs_voting_escrow;
 pub mod stake_config;
+pub mod msgs_zapper;

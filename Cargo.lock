@@ -1524,6 +1524,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ve3-zapper"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-asset",
+ "cw-ownable",
+ "cw-ownable-derive",
+ "cw-storage-plus 1.2.0",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
+ "thiserror",
+ "ve3-shared",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

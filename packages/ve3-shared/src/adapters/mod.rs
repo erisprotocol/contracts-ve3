@@ -5,5 +5,6 @@ pub mod bribe_manager;
 pub mod connector;
 pub mod eris;
 pub mod global_config_adapter;
-pub mod voting_escrow;
 pub mod mint_proxy;
+pub mod pair;
+pub mod voting_escrow;

@@ -34,6 +34,9 @@ pub enum SharedError {
   #[error("Not supported: {0}")]
   NotSupported(String),
 
+  #[error("Not supported: Asset Info")]
+  NotSupportedAssetInfo(),
+
   #[error("Insufficient balance: {0}")]
   InsufficientBalance(String),
 

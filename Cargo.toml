@@ -7,6 +7,7 @@ members = [
     "contracts/asset-staking",
     "contracts/asset-gauge",
     "contracts/bribe-manager",
+    "contracts/zapper",
     "packages/*",
 ]
 resolver = "2"

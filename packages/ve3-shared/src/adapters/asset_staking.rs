@@ -31,12 +31,16 @@ impl AssetStaking {
     }))
   }
 
-  pub fn deposit_msg(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
+  pub fn deposit_msg(
+    &self,
+    asset: Asset,
+    recipient: Option<String>,
+  ) -> Result<CosmosMsg, SharedError> {
     match asset.info {
       cw_asset::AssetInfoBase::Native(native) => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: self.0.to_string(),
         msg: to_json_binary(&ExecuteMsg::Stake {
-          recipient: None,
+          recipient,
         })?,
         funds: coins(asset.amount.u128(), native),
       })),
@@ -47,7 +51,7 @@ impl AssetStaking {
           contract: self.0.to_string(),
           amount: asset.amount,
           msg: to_json_binary(&Cw20HookMsg::Stake {
-            recipient: None,
+            recipient,
           })?,
         })?,
       })),

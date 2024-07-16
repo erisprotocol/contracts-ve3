@@ -48,10 +48,9 @@ pub enum ExecuteMsg {
 
   AddRebase {},
 
-  /// Implements the Cw20 receiver interface
   Receive(Cw20ReceiveMsg),
 
-  /// TunePools transforms the latest vote distribution into alloc_points which are then applied to ASTRO generators
+  /// Will snapshot the voting power for each asset and store it for bribe allocation, and sends the newest distribution to the asset staking to decide staking rewards.
   SetDistribution {},
 
   UpdateConfig {
