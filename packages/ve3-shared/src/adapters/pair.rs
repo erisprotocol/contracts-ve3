@@ -1,4 +1,7 @@
-use crate::{error::SharedError, extensions::asset_info_ext::AssetInfoExt};
+use crate::{
+  error::SharedError,
+  extensions::{asset_ext::AssetExt, asset_info_ext::AssetInfoExt},
+};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
   to_json_binary, Addr, Coin, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128, WasmMsg,
@@ -267,5 +270,8 @@ impl Pair {
       })?,
       funds,
     }))
+  }
+  pub fn withdraw_liquidity_msg(&self, lp: Asset) -> Result<CosmosMsg, SharedError> {
+    lp.send_or_execute_msg(self.0.to_string(), &PairExecuteMsg::WithdrawLiquidity {})
   }
 }

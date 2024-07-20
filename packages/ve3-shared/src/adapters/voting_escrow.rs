@@ -4,7 +4,7 @@ use crate::{
   helpers::time::Time,
   msgs_voting_escrow::{ExecuteMsg, QueryMsg, VotingPowerFixedResponse, VotingPowerResponse},
 };
-use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, QuerierWrapper, StdResult};
+use cosmwasm_std::{Addr, CosmosMsg, QuerierWrapper, StdResult};
 use cw_asset::Asset;
 
 pub struct VotingEscrow(pub Addr);
@@ -43,10 +43,10 @@ impl VotingEscrow {
   ) -> Result<CosmosMsg, SharedError> {
     asset.send_or_execute_msg(
       self.0.to_string(),
-      to_json_binary(&ExecuteMsg::CreateLock {
+      &ExecuteMsg::CreateLock {
         time: None,
         recipient,
-      })?,
+      },
     )
   }
 
@@ -57,9 +57,9 @@ impl VotingEscrow {
   ) -> Result<CosmosMsg, SharedError> {
     asset.send_or_execute_msg(
       self.0.to_string(),
-      to_json_binary(&ExecuteMsg::ExtendLockAmount {
+      &ExecuteMsg::ExtendLockAmount {
         token_id,
-      })?,
+      },
     )
   }
 }

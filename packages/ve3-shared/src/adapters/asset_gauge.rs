@@ -7,7 +7,7 @@ use crate::{
     UserSharesResponse,
   },
 };
-use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, QuerierWrapper, StdResult};
+use cosmwasm_std::{ Addr, CosmosMsg, QuerierWrapper, StdResult};
 use cw_asset::Asset;
 
 pub struct AssetGauge(pub Addr);
@@ -49,6 +49,6 @@ impl AssetGauge {
   }
 
   pub fn add_rebase_msg(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
-    asset.send_or_execute_msg(self.0.to_string(), to_json_binary(&ExecuteMsg::AddRebase {})?)
+    asset.send_or_execute_msg(self.0.to_string(), &ExecuteMsg::AddRebase {})
   }
 }
