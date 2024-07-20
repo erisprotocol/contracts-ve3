@@ -404,6 +404,55 @@ fn test_asset_unstake() {
 }
 
 #[test]
+fn test_asset_unstake_recipient() {
+  let mut suite = TestingSuite::def();
+  suite.init();
+
+  let addr = suite.addresses.clone();
+
+  suite
+    .def_asset_config_astro(|res| {
+      res.assert_attribute(attr("action", "asset/whitelist_assets"));
+    })
+    .e_staking_stake(None, addr.lp_native(10_000_000), "user1", |res| {
+      res.assert_attribute(attr("action", "asset/stake"));
+      res.assert_attribute(attr("share", "10000000"));
+      res.assert_attribute(attr("action", "mock/deposit"));
+      res.assert_attribute(attr("mock/amount", "native:lp:10000000"));
+      res.assert_attribute(attr("action", "asset/track_bribes_callback"));
+    })
+    .e_staking_unstake_recipient(addr.lp_native(1000000), "user1", "user2", |res| {
+      res.assert_attribute(attr("action", "asset/unstake"));
+      res.assert_attribute(attr("amount", "1000000"));
+      res.assert_attribute(attr("share", "1000000"));
+      res.assert_attribute(attr("action", "mock/withdraw"));
+      res.assert_attribute(attr("mock/amount", "native:lp:1000000"));
+      res.assert_attribute(attr("action", "asset/track_bribes_callback"));
+      res.assert_attribute_ty("transfer", attr("recipient", addr.user2.to_string()));
+      res.assert_attribute_ty("transfer", attr("amount", "1000000lp"));
+    })
+    .e_staking_unstake(addr.lp_native(9000000), "user1", |res| {
+      res.assert_attribute(attr("action", "asset/unstake"));
+      res.assert_attribute(attr("amount", "9000000"));
+      res.assert_attribute(attr("share", "9000000"));
+      res.assert_attribute(attr("action", "mock/withdraw"));
+      res.assert_attribute(attr("mock/amount", "native:lp:9000000"));
+      res.assert_attribute(attr("action", "asset/track_bribes_callback"));
+      res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
+      res.assert_attribute_ty("transfer", attr("amount", "9000000lp"));
+    })
+    .q_staking_all_staked_balances(
+      AllStakedBalancesQuery {
+        address: addr.user1.to_string(),
+      },
+      |res| assert_eq!(res.unwrap(), vec![]),
+    )
+    .e_staking_unstake(addr.lp_native(100), "user1", |res| {
+      res.assert_error(ContractError::AmountCannotBeZero {})
+    });
+}
+
+#[test]
 fn test_asset_second_user() {
   let mut suite = TestingSuite::def();
   suite.init();

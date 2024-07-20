@@ -78,14 +78,20 @@ pub fn stake_cw20(deps: DepsMut, user: &str, amount: u128, denom: &str) -> Respo
 pub fn unstake(deps: DepsMut, user: &str, amount: u128, denom: &str) -> Response {
   let info = mock_info(user, &[]);
   let env = mock_env();
-  let msg = ExecuteMsg::Unstake(Asset::native(denom, amount));
+  let msg = ExecuteMsg::Unstake {
+    asset: Asset::native(denom, amount),
+    recipient: None,
+  };
   execute(deps, env, info, msg).unwrap()
 }
 
 pub fn unstake_cw20(deps: DepsMut, user: &str, amount: u128, denom: &str) -> Response {
   let info = mock_info(user, &[]);
   let env = mock_env();
-  let msg = ExecuteMsg::Unstake(Asset::cw20(deps.api.addr_validate(denom).unwrap(), amount));
+  let msg = ExecuteMsg::Unstake {
+    asset: Asset::cw20(deps.api.addr_validate(denom).unwrap(), amount),
+    recipient: None,
+  };
   execute(deps, env, info, msg).unwrap()
 }
 

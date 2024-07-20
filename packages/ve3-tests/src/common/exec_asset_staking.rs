@@ -77,7 +77,27 @@ impl TestingSuite {
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
-    let msg = ExecuteMsg::Unstake(asset);
+    let msg = ExecuteMsg::Unstake {
+      asset,
+      recipient: None,
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
+    self
+  }
+
+  pub fn e_staking_unstake_recipient(
+    &mut self,
+    asset: Asset,
+    sender: &str,
+    recipient: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut TestingSuite {
+    let recipient = self.address(recipient);
+    let msg = ExecuteMsg::Unstake {
+      asset,
+      recipient: Some(recipient.to_string()),
+    };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self

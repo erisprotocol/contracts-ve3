@@ -72,7 +72,13 @@ pub fn execute(
       let asset = AssetInfo::native(&info.funds[0].denom);
       stake(deps, env, asset, info.funds[0].amount, recipient)
     },
-    ExecuteMsg::Unstake(asset) => unstake(deps, env, info, asset),
+    ExecuteMsg::Unstake {
+      asset,
+      recipient,
+    } => {
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
+      unstake(deps, env, info, asset, recipient)
+    },
     ExecuteMsg::ClaimReward(asset) => claim_rewards(deps, info, Some(vec![asset])),
     ExecuteMsg::ClaimRewards {
       assets,
@@ -395,6 +401,7 @@ fn unstake(
   env: Env,
   info: MessageInfo,
   asset: Asset,
+  recipient: Addr,
 ) -> Result<Response, ContractError> {
   let sender = info.sender.clone();
   if asset.amount.is_zero() {
@@ -448,13 +455,14 @@ fn unstake(
     ),
   )?;
 
-  let msg = asset.info.with_balance(withdraw_amount).transfer_msg(&info.sender)?;
+  let msg = asset.info.with_balance(withdraw_amount).transfer_msg(&recipient)?;
 
   Ok(
     Response::new()
       .add_attributes(vec![
         ("action", "asset/unstake"),
         ("user", info.sender.as_ref()),
+        ("recipient", recipient.as_ref()),
         ("asset", &asset.info.to_string()),
         ("amount", &withdraw_amount.to_string()),
         ("share", &share_amount.to_string()),

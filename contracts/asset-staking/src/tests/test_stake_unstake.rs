@@ -105,6 +105,7 @@ fn test_unstake_cw20() {
       .add_attributes(vec![
         ("action", "asset/unstake"),
         ("user", "user1"),
+        ("recipient", "user1"),
         ("asset", "cw20:asset1"),
         ("amount", "50"),
         ("share", "50"),
@@ -136,6 +137,7 @@ fn test_unstake_cw20() {
       .add_attributes(vec![
         ("action", "asset/unstake"),
         ("user", "user1"),
+        ("recipient", "user1"),
         ("asset", "cw20:asset1"),
         ("amount", "50"),
         ("share", "50"),
@@ -286,6 +288,7 @@ fn test_unstake() {
       .add_attributes(vec![
         ("action", "asset/unstake"),
         ("user", "user1"),
+        ("recipient", "user1"),
         ("asset", "native:asset1"),
         ("amount", "50"),
         ("share", "50"),
@@ -311,6 +314,7 @@ fn test_unstake() {
       .add_attributes(vec![
         ("action", "asset/unstake"),
         ("user", "user1"),
+        ("recipient", "user1"),
         ("asset", "native:asset1"),
         ("amount", "50"),
         ("share", "50"),
@@ -344,13 +348,19 @@ fn test_unstake_invalid() {
 
   // User does not have any staked asset
   let info = mock_info("user2", &[]);
-  let msg = ExecuteMsg::Unstake(Asset::native("asset1", 100u128));
+  let msg = ExecuteMsg::Unstake {
+    asset: Asset::native("asset1", 100u128),
+    recipient: None,
+  };
   let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
   assert_eq!(err, ContractError::AmountCannotBeZero {});
 
   // User unstakes more than they have
   let info = mock_info("user1", &[]);
-  let msg = ExecuteMsg::Unstake(Asset::native("asset1", 101u128));
+  let msg = ExecuteMsg::Unstake {
+    asset: Asset::native("asset1", 101u128),
+    recipient: None,
+  };
   let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
   assert_eq!(
     res,
@@ -358,6 +368,7 @@ fn test_unstake_invalid() {
       .add_attributes(vec![
         ("action", "asset/unstake"),
         ("user", "user1"),
+        ("recipient", "user1"),
         ("asset", "native:asset1"),
         // even though user tries to withdraw 101, he will receive his max (100)
         ("amount", "100"),
@@ -371,7 +382,10 @@ fn test_unstake_invalid() {
 
   // User unstakes zero amount
   let info = mock_info("user1", &[]);
-  let msg = ExecuteMsg::Unstake(Asset::native("asset1", 0u128));
+  let msg = ExecuteMsg::Unstake {
+    asset: Asset::native("asset1", 0u128),
+    recipient: None,
+  };
   let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
   assert_eq!(err, ContractError::AmountCannotBeZero {});
 }

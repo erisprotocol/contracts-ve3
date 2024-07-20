@@ -145,7 +145,10 @@ pub enum ExecuteMsg {
   Stake {
     recipient: Option<String>,
   },
-  Unstake(Asset),
+  Unstake {
+    asset: Asset,
+    recipient: Option<String>,
+  },
   ClaimReward(AssetInfo),
   ClaimRewards {
     assets: Option<Vec<AssetInfo>>,
