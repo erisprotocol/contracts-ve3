@@ -20,9 +20,9 @@ pub enum ContractError {
   #[error("{0}")]
   AssetError(#[from] AssetError),
 
-  #[error("AssertionFailed: balance {balance} smaller than expected {expected}")]
+  #[error("AssertionFailed: balance {actual} smaller than expected {expected}")]
   AssertionFailed {
-    balance: Uint128,
+    actual: Uint128,
     expected: Uint128,
   },
 
@@ -31,4 +31,7 @@ pub enum ContractError {
     from: AssetInfo,
     to: String,
   },
+
+  #[error("Expecting assets that are unknown")]
+  ExpectingUnknownAssets(),
 }

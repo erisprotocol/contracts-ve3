@@ -130,6 +130,7 @@ pub enum PairExecuteMsg {
     slippage_tolerance: Option<Decimal>,
     receiver: Option<String>,
   },
+  WithdrawLiquidity {},
 }
 
 #[cw_serde]

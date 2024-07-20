@@ -16,7 +16,12 @@ pub enum ExecuteMsg {
     stage: StageType,
     assets: Vec<AssetInfo>,
     min_received: Option<Uint128>,
-    post_action: Option<PostAction>,
+    post_action: Option<PostActionCreate>,
+  },
+  WithdrawLp {
+    stage: StageType,
+    min_received: Option<Vec<Asset>>,
+    post_action: Option<PostActionWithdraw>,
   },
 
   /// Swaps a number of assets to a single result
@@ -76,6 +81,11 @@ pub enum CallbackMsg {
     token: AssetInfo,
     receiver: String,
   },
+  SendResults {
+    tokens: Vec<AssetInfo>,
+    receiver: String,
+    min_received: Option<Vec<Asset>>,
+  },
 }
 
 impl CallbackMsg {
@@ -89,12 +99,21 @@ impl CallbackMsg {
 }
 
 #[cw_serde]
-pub enum PostAction {
+pub enum PostActionCreate {
   Stake {
     asset_staking: Addr,
     receiver: Option<String>,
   },
   SendResult {
+    receiver: Option<String>,
+  },
+}
+
+#[cw_serde]
+pub enum PostActionWithdraw {
+  SwapTo {
+    asset: AssetInfo,
+    min_received: Option<Uint128>,
     receiver: Option<String>,
   },
 }
