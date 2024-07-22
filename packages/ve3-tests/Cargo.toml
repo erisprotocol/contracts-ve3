@@ -41,6 +41,7 @@ ve3-connector-alliance = {path = "../../contracts/connector-alliance"}
 ve3-connector-emission = {path = "../../contracts/connector-emission"}
 ve3-global-config = {path = "../../contracts/global-config"}
 ve3-voting-escrow = {path = "../../contracts/voting-escrow"}
+ve3-zapper = {path = "../../contracts/zapper"}
 
 # astroport = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "bc68bb65cc2f7d5916c1f0ea41de3b19b5b63b62" }
 # stader = { git = "https://github.com/stader-labs/lunax.git", package="staking", default-features = false, rev = "20143548e2dea807b343fe6ad60375086af35ea9"}

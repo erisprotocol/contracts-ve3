@@ -13,7 +13,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Expiration;
-use cw_asset::{Asset, AssetInfo};
+use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase};
 use ve3_shared::{
   adapters::{
     asset_staking::AssetStaking,
@@ -37,10 +37,17 @@ pub fn instantiate(
 ) -> ContractResult {
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+  let center_asset_infos = msg
+    .center_asset_infos
+    .into_iter()
+    .map(|a| a.check(deps.api, None))
+    .collect::<Result<Vec<_>, AssetError>>()?;
+
   CONFIG.save(
     deps.storage,
     &Config {
       global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
+      center_asset_infos,
     },
   )?;
 
@@ -208,8 +215,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
     ExecuteMsg::UpdateConfig {
       insert_routes,
       delete_routes,
+      update_centers,
     } => {
-      let config = CONFIG.load(deps.storage)?;
+      let mut config = CONFIG.load(deps.storage)?;
       config.global_config().assert_owner(&deps.querier, &info.sender)?;
 
       if let Some(insert_routes) = insert_routes {
@@ -260,18 +268,30 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
         }
       }
 
+      if let Some(update_centers) = update_centers {
+        let centers = update_centers
+          .into_iter()
+          .map(|a| a.check(deps.api, None))
+          .collect::<Result<Vec<_>, AssetError>>()?;
+
+        config.center_asset_infos = centers;
+
+        CONFIG.save(deps.storage, &config)?;
+      }
+
       Ok(Response::default().add_attribute("action", "zapper/update_config"))
     },
     ExecuteMsg::Callback(callback) => handle_callback(deps, env, info, callback),
   }
 }
 
+/// finding the shortest path, from each of the from assets to a SINGLE to asset.
 fn get_swap_stages(
   storage: &dyn Storage,
   from_assets: &Vec<AssetInfo>,
   to_assets: &Vec<AssetInfo>,
 ) -> Result<Vec<CallbackMsg>, ContractError> {
-  let mut callbacks: Vec<CallbackMsg> = vec![];
+  let mut stages: Vec<Stage> = vec![];
   for from in from_assets {
     if to_assets.contains(from) {
       // can skip assets that are right already
@@ -295,12 +315,52 @@ fn get_swap_stages(
       }
     }
 
+    if shortest_route.is_none() {
+      let config = CONFIG.load(storage)?;
+
+      for center in config.center_asset_infos {
+        // if from_assets.contains(&center) || to_assets.contains(&center) {
+        //   continue;
+        // }
+
+        match (
+          get_swap_stages(storage, from_assets, &vec![center.clone()]),
+          get_swap_stages(storage, &vec![center], to_assets),
+        ) {
+          (Ok(segment1), Ok(segment2)) => {
+            let stages = [segment1, segment2]
+              .concat()
+              .into_iter()
+              .filter_map(|a| match a {
+                CallbackMsg::SwapStage {
+                  stage,
+                } => Some(stage),
+                _ => None,
+              })
+              .collect::<Vec<_>>();
+
+            let route = RouteConfig {
+              stages,
+            };
+
+            match &shortest_route {
+              Some(current) => {
+                if route.stages.len() < current.stages.len() {
+                  shortest_route = Some(route);
+                }
+              },
+              None => shortest_route = Some(route),
+            }
+
+            break;
+          },
+          _ => continue,
+        }
+      }
+    }
+
     match shortest_route {
-      Some(route) => {
-        callbacks.extend(route.stages.into_iter().map(|stage| CallbackMsg::SwapStage {
-          stage,
-        }))
-      },
+      Some(route) => stages.extend(route.stages),
 
       None => {
         let to = to_assets.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(",");
@@ -312,6 +372,53 @@ fn get_swap_stages(
       },
     };
   }
+
+  // OPTIMIZING STAGES
+  let stages = if from_assets.len() > 1 {
+    let mut result = vec![];
+
+    stages.reverse();
+
+    let mut ignored_denoms: HashSet<AssetInfoBase<Addr>> = HashSet::new();
+    let mut searched_to: HashSet<AssetInfoBase<Addr>> = HashSet::from_iter(to_assets.clone());
+
+    while !stages.is_empty() {
+      for stage in stages.clone().into_iter() {
+        let mut remove = false;
+
+        if ignored_denoms.contains(&stage.from)
+          || (searched_to.contains(&stage.from) && searched_to.contains(&stage.to))
+        {
+          remove = true;
+        }
+
+        if searched_to.contains(&stage.to) && !remove {
+          remove = true;
+
+          ignored_denoms.insert(stage.from.clone());
+          ignored_denoms.insert(stage.to.clone());
+          searched_to.insert(stage.from.clone());
+          result.push(stage.clone());
+        }
+
+        if remove {
+          stages.retain(|a| a != &stage);
+        }
+      }
+    }
+
+    result.reverse();
+    result
+  } else {
+    stages
+  };
+
+  let callbacks = stages
+    .into_iter()
+    .map(|stage| CallbackMsg::SwapStage {
+      stage,
+    })
+    .collect::<Vec<_>>();
 
   Ok(callbacks)
 }
@@ -376,7 +483,8 @@ fn callback_send_result(
   Ok(
     Response::new()
       .add_message(return_amount.transfer_msg(receiver)?)
-      .add_attribute("action", "ampc/callback_send_result"),
+      .add_attribute("action", "zapper/callback_send_result")
+      .add_attribute("amount", return_amount.to_string()),
   )
 }
 fn callback_send_results(

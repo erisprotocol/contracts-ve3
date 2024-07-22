@@ -1503,6 +1503,7 @@ dependencies = [
  "ve3-global-config",
  "ve3-shared",
  "ve3-voting-escrow",
+ "ve3-zapper",
 ]
 
 [[package]]

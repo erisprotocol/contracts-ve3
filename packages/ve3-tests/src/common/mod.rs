@@ -12,3 +12,4 @@ pub mod suite;
 pub mod suite_contracts;
 pub mod suite_create;
 pub mod suite_migrate;
+pub mod exec_zapper;

@@ -211,6 +211,17 @@ impl TestingSuite {
     self.addresses.ve3_voting_escrow = self.init_contract(code_id, msg, "ve3_voting_escrow");
   }
 
+  pub(super) fn create_zapper(&mut self) {
+    let code_id = self.app.store_code(ve3_zapper());
+
+    let msg = ve3_shared::msgs_zapper::InstantiateMsg {
+      global_config_addr: self.addresses.ve3_global_config.to_string(),
+      center_asset_infos: vec![self.addresses.uluna_info()],
+    };
+
+    self.addresses.ve3_zapper = self.init_contract(code_id, msg, "ve3_zapper");
+  }
+
   pub(super) fn create_hub_cw20(&mut self) {
     let code_id = self.app.store_code(eris_hub_cw20_mock());
     self.addresses.eris_hub_cw20_code = code_id;

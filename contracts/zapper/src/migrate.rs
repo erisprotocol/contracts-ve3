@@ -21,6 +21,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     );
   }
 
+  // clear only for development environment
   ROUTES.clear(deps.storage);
 
   Ok(

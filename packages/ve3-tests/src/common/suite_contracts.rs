@@ -79,6 +79,17 @@ pub fn ve3_voting_escrow() -> Box<dyn Contract<Empty>> {
   Box::new(contract)
 }
 
+pub fn ve3_zapper() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    ve3_zapper::contract::execute,
+    ve3_zapper::contract::instantiate,
+    ve3_zapper::query::query,
+  )
+  .with_migrate(ve3_zapper::migrate::migrate);
+
+  Box::new(contract)
+}
+
 pub fn alliance_rewards_mock() -> Box<dyn Contract<Empty>> {
   let contract = ContractWrapper::new(
     alliance_rewards_mock::execute,

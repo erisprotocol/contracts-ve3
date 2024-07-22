@@ -8,6 +8,7 @@ use cw_ownable::{cw_ownable_execute, Ownership};
 #[cw_serde]
 pub struct InstantiateMsg {
   pub global_config_addr: String,
+  pub center_asset_infos: Vec<AssetInfoUnchecked>,
 }
 
 #[cw_serde]
@@ -38,6 +39,7 @@ pub enum ExecuteMsg {
   UpdateConfig {
     insert_routes: Option<Vec<RouteInit>>,
     delete_routes: Option<Vec<RouteDelete>>,
+    update_centers: Option<Vec<AssetInfoUnchecked>>,
   },
 
   Callback(CallbackMsg),
@@ -148,6 +150,8 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct Config {
   pub global_config_addr: Addr,
+  #[serde(default)]
+  pub center_asset_infos: Vec<AssetInfo>,
 }
 
 #[cw_serde]

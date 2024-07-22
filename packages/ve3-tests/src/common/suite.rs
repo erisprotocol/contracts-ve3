@@ -48,6 +48,7 @@ pub struct Addresses {
   pub ve3_bribe_manager: Addr,
   pub ve3_global_config: Addr,
   pub ve3_voting_escrow: Addr,
+  pub ve3_zapper: Addr,
 
   pub ve3_asset_staking_1: Addr,
   pub ve3_connector_alliance_mock: Addr,
@@ -302,6 +303,7 @@ impl TestingSuite {
         eris_hub: Addr(""),
         eris_hub_cw20_ampluna: Addr(""),
         eris_hub_cw20_code: 0,
+        ve3_zapper: Addr(""),
         // eris_hub_mock: Addr(""),
         // eris_hub_cw20_mock: Addr(""),
         fake_cw20: Addr(""),
@@ -395,6 +397,7 @@ impl TestingSuite {
     self.create_connector_alliance_eris();
     self.create_connector_emissions();
     self.create_voting_escrow();
+    self.create_zapper();
 
     self.create_asset_staking_1();
     self.create_asset_staking_2();
