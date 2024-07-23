@@ -107,7 +107,9 @@ pub enum ExecuteMsg {
     update: Option<bool>,
   },
 
-  Withdraw {},
+  Withdraw {
+    recipient: Option<String>,
+  },
 
   // Privileged functions
   ClaimRewards {},
@@ -129,9 +131,22 @@ pub enum QueryMsg {
   #[returns(Config)]
   Config {},
 
-  #[returns(State)]
+  #[returns(StateResponse)]
   State {},
 
   #[returns(HashSet<Addr>)]
   Validators {},
+}
+
+#[cw_serde]
+pub struct StateResponse {
+  pub last_exchange_rate: Decimal,
+  pub taken: Uint128,
+  pub harvested: Uint128,
+
+  pub total_shares: Uint128,
+  pub stake_available: Uint128,
+  pub stake_in_contract: Uint128,
+
+  pub share_exchange_rate: Decimal,
 }

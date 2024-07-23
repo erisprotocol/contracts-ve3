@@ -46,7 +46,9 @@ impl TestingSuite {
     amount: u32,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
-    let msg = ExecuteMsg::Withdraw {};
+    let msg = ExecuteMsg::Withdraw {
+      recipient: None,
+    };
     let sender = self.address(sender);
     result(self.app.execute_contract(
       sender,

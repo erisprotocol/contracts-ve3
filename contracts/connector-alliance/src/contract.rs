@@ -4,7 +4,7 @@ use crate::state::{CONFIG, STATE, VALIDATORS};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  Binary, CosmosMsg, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128,
+  Addr, Binary, CosmosMsg, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
 use cw_asset::AssetInfo;
@@ -21,6 +21,7 @@ use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::denom::MsgCreateDenom;
+use ve3_shared::helpers::general::addr_opt_fallback;
 use ve3_shared::helpers::take::{compute_balance_amount, compute_share_amount};
 use ve3_shared::msgs_connector_alliance::{
   AllianceDelegateMsg, AllianceRedelegateMsg, AllianceUndelegateMsg, CallbackMsg, Config,
@@ -107,7 +108,12 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
   match msg {
     ExecuteMsg::ClaimRewards {} => claim_rewards(deps, env, info),
-    ExecuteMsg::Withdraw {} => withdraw(deps, env, info),
+    ExecuteMsg::Withdraw {
+      recipient,
+    } => {
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
+      withdraw(deps, env, info, recipient)
+    },
     ExecuteMsg::DistributeRebase {
       update,
     } => distribute_rebase(deps, env, info, update),
@@ -268,7 +274,12 @@ fn distribute_rebase(
   )
 }
 
-fn withdraw(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn withdraw(
+  mut deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  recipient: Addr,
+) -> Result<Response, ContractError> {
   let contract_addr = env.contract.address.clone();
   let config = CONFIG.load(deps.storage)?;
   let zasset = AssetInfo::native(config.zasset_denom.clone());
@@ -282,7 +293,7 @@ fn withdraw(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
   let withdraw_amount = compute_balance_amount(shares, share_amount, asset_available);
 
   let transfer_msg =
-    config.lst_asset_info.with_balance(withdraw_amount).transfer_msg(&info.sender)?;
+    config.lst_asset_info.with_balance(withdraw_amount).transfer_msg(recipient)?;
 
   let burn_msg: CosmosMsg = ve3_shared::helpers::denom::MsgBurn {
     sender: contract_addr.to_string(),
