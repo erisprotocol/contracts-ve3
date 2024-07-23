@@ -183,25 +183,18 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       receiver,
     } => {
       assert_uniq_assets(&assets)?;
-      let to = into.check(deps.api, None)?;
+      let into = into.check(deps.api, None)?;
 
-      let mut callbacks: Vec<CallbackMsg> = vec![];
-      for from in assets {
-        let route = ROUTES.load(deps.storage, (from.to_string(), to.to_string()))?;
-
-        callbacks.extend(route.stages.into_iter().map(|stage| CallbackMsg::SwapStage {
-          stage,
-        }));
-      }
+      let mut callbacks = get_swap_stages(deps.storage, &assets, &vec![into.clone()])?;
 
       if let Some(min_received) = min_received {
         callbacks.push(CallbackMsg::AssertReceived {
-          asset: to.with_balance(min_received),
+          asset: into.with_balance(min_received),
         })
       }
 
       callbacks.push(CallbackMsg::SendResult {
-        token: to,
+        token: into,
         receiver: receiver.unwrap_or(info.sender.to_string()),
       });
 
