@@ -72,15 +72,6 @@ impl AssetInfoExt for AssetInfo {
       },
       _ => todo!(),
     }
-
-    // pub(crate) fn query_cw20_total_supply(
-    //     querier: &QuerierWrapper,
-    //     token_addr: &Addr,
-    // ) -> StdResult<Uint128> {
-    //     let token_info: TokenInfoResponse =
-    //         querier.query_wasm_smart(token_addr, &Cw20QueryMsg::TokenInfo {})?;
-    //     Ok(token_info.total_supply)
-    // }
   }
 
   fn assert_received(&self, info: &MessageInfo) -> Result<Asset, SharedError> {
