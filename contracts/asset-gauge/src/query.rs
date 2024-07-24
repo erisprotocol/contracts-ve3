@@ -107,9 +107,9 @@ fn user_pending_rebase(
 ) -> Result<UserPendingRebaseResponse, ContractError> {
   let rebase = REBASE.load(deps.storage)?;
   let block_period = get_period(env.block.time.seconds())?;
-  let user_data = user_idx().get_latest_data(deps.storage, block_period + 1, user.as_str())?;
+  let fixed_amount = user_idx().get_latest_fixed(deps.storage, block_period + 1, user.as_str())?;
 
-  let balance = user_data.fixed_amount;
+  let balance = fixed_amount;
   let user_reward_index = USER_ASSET_REWARD_INDEX.load(deps.storage, user.clone());
   let global_reward_index = rebase.global_reward_index;
 

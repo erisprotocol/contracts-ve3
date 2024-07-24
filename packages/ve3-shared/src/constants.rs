@@ -14,13 +14,11 @@ pub const AT_FEE_COLLECTOR: &str = "FEE_COLLECTOR";
 pub const AT_TEAM_WALLET: &str = "TEAM_WALLET";
 pub const AT_MINT_PROXY: &str = "MINT_PROXY";
 
-const AT_ASSET_STAKING: &str = "ASSET_STAKING";
 pub fn at_asset_staking(gauge: &str) -> String {
-  format!("{AT_ASSET_STAKING}__{gauge}")
+  format!("ASSET_STAKING__{gauge}")
 }
-const AT_CONNECTOR: &str = "CONNECTOR";
 pub fn at_connector(gauge: &str) -> String {
-  format!("{AT_CONNECTOR}__{gauge}")
+  format!("CONNECTOR__{gauge}")
 }
 
 pub const DEFAULT_LIMIT: u32 = 30;

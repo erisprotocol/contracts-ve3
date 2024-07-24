@@ -227,8 +227,8 @@ fn _update_asset_config(
   if current.stake_config != updated.stake_config {
     // if stake config changed, withdraw from one (or do nothing), deposit on the other.
     let (balance, _) = TOTAL.may_load(deps.storage, &update.info)?.unwrap_or_default();
-    let available = balance - current.taken;
-    let asset = update.info.with_balance(available);
+    let in_contract = balance - current.harvested;
+    let asset = update.info.with_balance(in_contract);
 
     let mut unstake_msgs =
       current.stake_config.unstake_check_received_msg(deps, env, asset.clone())?;
