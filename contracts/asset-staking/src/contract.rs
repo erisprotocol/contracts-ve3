@@ -433,6 +433,9 @@ fn unstake(
   if current_user_share < share_amount {
     share_amount = current_user_share;
     withdraw_amount = compute_balance_amount(shares, share_amount, asset_available)
+  } else {
+    // even if the share is available, rerun the calculation for withdraw_amount so that the withdrawn_amount is floored in case of rounding issues
+    withdraw_amount = compute_balance_amount(shares, share_amount, asset_available);
   }
 
   let new_value = current_user_share - share_amount;
