@@ -23,7 +23,7 @@ use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::assets::Assets;
-use ve3_shared::helpers::general::{addr_opt_fallback, validate_addresses};
+use ve3_shared::helpers::general::addr_opt_fallback;
 use ve3_shared::helpers::take::{compute_balance_amount, compute_share_amount};
 use ve3_shared::msgs_asset_staking::{
   AssetConfig, AssetConfigRuntime, AssetDistribution, AssetInfoWithConfig, CallbackMsg, Config,

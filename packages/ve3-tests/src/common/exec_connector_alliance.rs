@@ -144,7 +144,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn q_alliance_state(&mut self, result: impl Fn(StdResult<State>)) -> &mut Self {
+  pub fn q_alliance_state(&mut self, result: impl Fn(StdResult<StateResponse>)) -> &mut Self {
     let response = self.app.wrap().query_wasm_smart(self.contract_5(), &QueryMsg::State {});
     result(response);
     self

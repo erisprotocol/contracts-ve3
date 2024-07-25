@@ -63,7 +63,7 @@ fn test_alliance_connector_rebase() {
       assert_close(res.last_exchange_rate, Decimal::percent(120), Decimal::permille(1));
       assert_eq!(
         res.clone(),
-        State {
+        StateResponse {
           taken: u(0),
           harvested: u(0),
           ..res
@@ -77,7 +77,7 @@ fn test_alliance_connector_rebase() {
       assert_close(res.last_exchange_rate, Decimal::percent(120), Decimal::permille(1));
       assert_eq!(
         res.clone(),
-        State {
+        StateResponse {
           taken: u(0),
           harvested: u(0),
           ..res
@@ -94,7 +94,7 @@ fn test_alliance_connector_rebase() {
       assert_close(res.last_exchange_rate, Decimal::permille(1304), Decimal::permille(1));
       assert_eq!(
         res.clone(),
-        State {
+        StateResponse {
           taken: u(666),
           harvested: u(666),
           ..res
@@ -120,7 +120,7 @@ fn test_alliance_connector_rebase() {
       assert_close(res.last_exchange_rate, Decimal::permille(1314), Decimal::permille(1));
       assert_eq!(
         res.clone(),
-        State {
+        StateResponse {
           taken: u(728),
           harvested: u(666),
           ..res

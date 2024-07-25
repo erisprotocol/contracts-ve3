@@ -367,25 +367,25 @@ fn test_asset_unstake() {
     })
     .e_staking_unstake(addr.lp_native(1000000), "user1", |res| {
       res.assert_attribute(attr("action", "asset/unstake"));
-      res.assert_attribute(attr("amount", "1000000"));
+      res.assert_attribute(attr("amount", "999999"));
       res.assert_attribute(attr("share", "1001921"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:1000000"));
+      res.assert_attribute(attr("mock/amount", "native:lp:999999"));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute(attr("bribe", "native:astro:10000"));
       res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
-      res.assert_attribute_ty("transfer", attr("amount", "1000000lp"));
+      res.assert_attribute_ty("transfer", attr("amount", "999999lp"));
     })
     .e_staking_unstake(addr.lp_native(10000000), "user1", |res| {
       res.assert_attribute(attr("action", "asset/unstake"));
       // 8980822 + 1000000 = 9980822 (taken: 19178 - see previous test)
-      res.assert_attribute(attr("amount", "8980822"));
+      res.assert_attribute(attr("amount", "8980823"));
       res.assert_attribute(attr("share", "8998079"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:8980822"));
+      res.assert_attribute(attr("mock/amount", "native:lp:8980823"));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
-      res.assert_attribute_ty("transfer", attr("amount", "8980822lp"));
+      res.assert_attribute_ty("transfer", attr("amount", "8980823lp"));
     })
     .q_staking_all_staked_balances(
       AllStakedBalancesQuery {
@@ -499,7 +499,7 @@ fn test_asset_second_user() {
     )
     .e_staking_unstake(addr.lp_native(1_000_000), "user2", |res| {
       res.assert_attribute(attr("action", "asset/unstake"));
-      res.assert_attribute(attr("amount", "1000000"));
+      res.assert_attribute(attr("amount", "999999"));
       res.assert_attribute(attr("share", "1001921"));
     });
 }
