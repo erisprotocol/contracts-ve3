@@ -23,7 +23,7 @@ use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::extensions::env_ext::EnvExt;
 use ve3_shared::helpers::assets::Assets;
-use ve3_shared::helpers::general::addr_opt_fallback;
+use ve3_shared::helpers::general::{addr_opt_fallback, validate_addresses};
 use ve3_shared::helpers::take::{compute_balance_amount, compute_share_amount};
 use ve3_shared::msgs_asset_staking::{
   AssetConfig, AssetConfigRuntime, AssetDistribution, AssetInfoWithConfig, CallbackMsg, Config,
@@ -221,6 +221,8 @@ fn _update_asset_config(
   if updated.yearly_take_rate > Decimal::percent(50) {
     return Err(ContractError::TakeRateLessOrEqual50);
   }
+
+  assert_reward_not_stake_denom(update)?;
 
   ASSET_CONFIG.save(deps.storage, &update.info, &updated)?;
   let mut msgs = vec![];
@@ -817,4 +819,33 @@ fn assert_distribution_controller(
 ) -> Result<(), ContractError> {
   config.global_config().assert_has_access(&deps.querier, AT_ASSET_GAUGE, &info.sender)?;
   Ok(())
+}
+
+fn assert_reward_not_stake_denom(update: &AssetInfoWithConfig<Addr>) -> Result<(), ContractError> {
+  match &update.config {
+    Some(config) => match &config.stake_config {
+      ve3_shared::stake_config::StakeConfig::Default => Ok(()),
+      ve3_shared::stake_config::StakeConfig::Astroport {
+        reward_infos,
+        ..
+      } => {
+        if reward_infos.contains(&update.info) {
+          Err(ContractError::AssetInfoCannotEqualStakingReward {})
+        } else {
+          Ok(())
+        }
+      },
+      ve3_shared::stake_config::StakeConfig::Ve3 {
+        reward_infos,
+        ..
+      } => {
+        if reward_infos.contains(&update.info) {
+          Err(ContractError::AssetInfoCannotEqualStakingReward {})
+        } else {
+          Ok(())
+        }
+      },
+    },
+    None => Ok(()),
+  }
 }

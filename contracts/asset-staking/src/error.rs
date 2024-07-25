@@ -26,6 +26,9 @@ pub enum ContractError {
   #[error("Asset can't be the same as reward")]
   AssetInfoCannotEqualReward {},
 
+  #[error("Asset can't be the same as staking reward")]
+  AssetInfoCannotEqualStakingReward {},
+
   #[error("Asset already whitelisted")]
   AssetAlreadyWhitelisted,
 
