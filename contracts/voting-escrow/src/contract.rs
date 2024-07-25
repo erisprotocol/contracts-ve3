@@ -90,6 +90,15 @@ fn validate_deposit_assets(
   assets
     .into_iter()
     .map(|asset| -> Result<_, ContractError> {
+      match &asset.config {
+        AssetInfoConfig::Default => (),
+        AssetInfoConfig::ExchangeRate {
+          contract,
+        } => {
+          deps.api.addr_validate(contract.as_str())?;
+        },
+      }
+
       Ok(DepositAsset {
         config: asset.config,
         info: asset.info.check(deps.api, None)?,
