@@ -539,6 +539,7 @@ fn _calc_reward_share(
     let rewards = ((asset_reward_rate - user_reward_rate) * Decimal::from_atomics(user_staked, 0)?)
       .to_uint_floor();
     if rewards.is_zero() {
+      USER_ASSET_REWARD_RATE.save(storage, (user, &asset), &asset_reward_rate)?;
       Ok(Uint128::zero())
     } else {
       USER_ASSET_REWARD_RATE.save(storage, (user, &asset), &asset_reward_rate)?;
