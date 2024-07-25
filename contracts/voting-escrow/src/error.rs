@@ -80,4 +80,7 @@ pub enum ContractError {
 
   #[error("Locks need to have the same end, tokens: {0}, {1}")]
   LocksNeedSameEnd(String, String),
+
+  #[error("Cannot merge the same lock id: {0}")]
+  CannotMergeSameLock(String),
 }

@@ -562,6 +562,11 @@ fn merge_lock(
   token_id_1: String,
   token_id_2: String,
 ) -> Result<Response, ContractError> {
+
+  if token_id_1 == token_id_2 {
+    return Err(ContractError::CannotMergeSameLock(token_id_1.to_string()));
+  }
+
   let (config, mut lock1, mut token1, asset_config) =
     _get_lock_context(&deps, &sender, &token_id_1, &nft, &env, None, true)?;
 
