@@ -562,7 +562,6 @@ fn merge_lock(
   token_id_1: String,
   token_id_2: String,
 ) -> Result<Response, ContractError> {
-
   if token_id_1 == token_id_2 {
     return Err(ContractError::CannotMergeSameLock(token_id_1.to_string()));
   }
@@ -629,6 +628,8 @@ fn split_lock(
 ) -> Result<Response, ContractError> {
   let (config, mut lock, mut token, asset_config) =
     _get_lock_context(&deps, &sender, &token_id, &nft, &env, None, true)?;
+
+  assert_not_blacklisted(deps.storage, &recipient)?;
 
   let block_period = get_period(env.block.time.seconds())?;
   let start = block_period;
