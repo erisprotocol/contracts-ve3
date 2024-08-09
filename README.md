@@ -18,11 +18,11 @@ This repository contains the contracts for the Terra Liquidity Alliance. They im
 
 This repository contains software developed by:
 
-- Enterprise Protocol V1.1.0 (Apache 2.0): <https://github.com/terra-money/enterprise-contracts/tree/version/1.1.0?tab=License-1-ov-file>
+- Enterprise Protocol V1.1.0 (Apache 2.0) <https://github.com/terra-money/enterprise-contracts/tree/version/1.1.0?tab=License-1-ov-file>
 
-- Alliance Protocol: <https://github.com/terra-money/alliance-protocol/>
+- Alliance Protocol (Apache 2.0) <https://github.com/terra-money/alliance-protocol/>
 
-- White Whale Modifications on Alliance Protocol: <https://github.com/White-Whale-Defi-Platform/cw-alliance-hub>
+- White Whale Modifications on Alliance Protocol (Apache 2.0) <https://github.com/White-Whale-Defi-Platform/cw-alliance-hub>
 
 - Mars Address Provider (GPL 3) <https://github.com/mars-protocol/contracts/blob/master/contracts/address-provider/src/contract.rs>
 
