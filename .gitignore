@@ -23,7 +23,7 @@
 node_modules/
 
 # Artifacts
-artifacts/
+# artifacts/
 
 # Temporary files
 **/tmp.*

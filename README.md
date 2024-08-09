@@ -1,39 +1,31 @@
 # ve(3,3)
 
-## Strucuture
+This repository contains the contracts for the Terra Liquidity Alliance. They implement a ve3 model to decide on chain rewards going to staked LPs. It has the following features:
 
-connector-alliance
+- Allow locking of multiple tokens for voting power (voting-escrow)
+- Locks have the properties of NFTs and can also be merged or split apart for better management (voting-escrow)
+- Rebase rewards can be distributed to lockers (asset-gauge)
+- Allow voting based on a users VP on multiple group of assets (asset-gauge)
+- Bribe Market to incentivize voting behavior (bribe-market)
+- Global configuration of addresses and rights (global-config)
+- Allow creation of a virtual token and staking it in Alliance Module (connector-alliance)
+- Allow staking of whitelisted assets, claiming rewards, with a take rate (asset-staking)
+- Allow conversion of any list of assets to a different asset or LP (zapper)
 
-- part 1 of Alliance Protocol Hub contracts
-- contains logic for creating the VT coin to be staked and alliance delegation + claim mechanism
+![alt text](image.png)
 
-asset-staking
+## Notice
 
-- part 2 of Alliance Protocol Hub contracts
-- contains logic for staking and distributing rewards to "Asset (Token)" stakers.
-- changes:
-  - removed temp balance
-  - disallow receiving funds
-  - implement take rate from amp extractor
-  - withdraw will round down to available user funds
+This repository contains software developed by:
 
-global-config
-
-- Central place to store address information and access rights
-- Structure based on Mars Address Provider, but simplified for usage of &str consts instead of enum.
-
-## Mentions
-
-This repository is based on multiple open source contracts available in Cosmos:
-
-- Enterprise Protocol V1.1.0: <https://github.com/terra-money/enterprise-contracts/tree/version/1.1.0?tab=License-1-ov-file>
+- Enterprise Protocol V1.1.0 (Apache 2.0): <https://github.com/terra-money/enterprise-contracts/tree/version/1.1.0?tab=License-1-ov-file>
 
 - Alliance Protocol: <https://github.com/terra-money/alliance-protocol/>
 
 - White Whale Modifications on Alliance Protocol: <https://github.com/White-Whale-Defi-Platform/cw-alliance-hub>
 
-- Mars Address Provider: <https://github.com/mars-protocol/contracts/blob/master/contracts/address-provider/src/contract.rs>
+- Mars Address Provider (GPL 3) <https://github.com/mars-protocol/contracts/blob/master/contracts/address-provider/src/contract.rs>
 
-- ERIS Amp Extractor
+- Astroport Voting Escrow (GPL 3) <https://github.com/astroport-fi/astroport-governance>
 
-- Astroport Voting Escrow
+- ERIS Protocol (GPL 3) <https://github.com/erisprotocol/contracts-terra>

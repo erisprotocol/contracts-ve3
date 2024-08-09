@@ -10,7 +10,6 @@ module.exports = {
         "nps schema.create   schema.asset-gauge schema.asset-staking schema.bribe-manager schema.connector-alliance schema.connector-emission schema.global-config schema.voting-escrow schema.zapper",
 
       create: "bash scripts/build_schema.sh",
-      transform: "ts-node scripts/transform.ts",
 
       "asset-gauge":
         "json2ts -i contracts/asset-gauge/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/asset-gauge",
