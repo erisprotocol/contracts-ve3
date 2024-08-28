@@ -29,6 +29,7 @@ use ve3_shared::msgs_asset_staking::{
   AssetConfig, AssetConfigRuntime, AssetDistribution, AssetInfoWithConfig, CallbackMsg, Config,
   Cw20HookMsg, ExecuteMsg, InstantiateMsg,
 };
+use ve3_shared::stake_config::StakeConfig;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -213,7 +214,7 @@ fn _update_asset_config(
   let mut updated = current.clone();
   let new_config = update.config.clone().unwrap_or(AssetConfig {
     yearly_take_rate: Some(config.default_yearly_take_rate),
-    stake_config: ve3_shared::stake_config::StakeConfig::Default,
+    stake_config: StakeConfig::Default,
   });
   updated.stake_config = new_config.stake_config;
   updated.yearly_take_rate = new_config.yearly_take_rate.unwrap_or(config.default_yearly_take_rate);
@@ -226,7 +227,33 @@ fn _update_asset_config(
 
   ASSET_CONFIG.save(deps.storage, &update.info, &updated)?;
   let mut msgs = vec![];
-  if current.stake_config != updated.stake_config {
+
+  let changed_provider = match (&current.stake_config, &updated.stake_config) {
+    (StakeConfig::Default, StakeConfig::Default) => false,
+    (
+      StakeConfig::Astroport {
+        contract,
+        ..
+      },
+      StakeConfig::Astroport {
+        contract: contract_new,
+        ..
+      },
+    ) => contract != contract_new,
+    (
+      StakeConfig::Ve3 {
+        contract,
+        ..
+      },
+      StakeConfig::Ve3 {
+        contract: contract_new,
+        ..
+      },
+    ) => contract != contract_new,
+    _ => true,
+  };
+
+  if changed_provider {
     // if stake config changed, withdraw from one (or do nothing), deposit on the other.
     let (balance, _) = TOTAL.may_load(deps.storage, &update.info)?.unwrap_or_default();
     let in_contract = balance - current.harvested;
@@ -824,8 +851,8 @@ fn assert_distribution_controller(
 fn assert_reward_not_stake_denom(update: &AssetInfoWithConfig<Addr>) -> Result<(), ContractError> {
   match &update.config {
     Some(config) => match &config.stake_config {
-      ve3_shared::stake_config::StakeConfig::Default => Ok(()),
-      ve3_shared::stake_config::StakeConfig::Astroport {
+      StakeConfig::Default => Ok(()),
+      StakeConfig::Astroport {
         reward_infos,
         ..
       } => {
@@ -835,7 +862,7 @@ fn assert_reward_not_stake_denom(update: &AssetInfoWithConfig<Addr>) -> Result<(
           Ok(())
         }
       },
-      ve3_shared::stake_config::StakeConfig::Ve3 {
+      StakeConfig::Ve3 {
         reward_infos,
         ..
       } => {
