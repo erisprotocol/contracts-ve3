@@ -69,7 +69,7 @@ impl CustomQuerier {
 
   #[allow(dead_code)]
   pub fn get_cw20_total_supply(&mut self, token: &str) -> u128 {
-    *self.cw20_querier.total_supplies.get(&token.to_string()).unwrap_or(&0u128)
+    *self.cw20_querier.total_supplies.get(token).unwrap_or(&0u128)
   }
 
   pub fn handle_query(&self, request: &QueryRequest<Empty>) -> QuerierResult {

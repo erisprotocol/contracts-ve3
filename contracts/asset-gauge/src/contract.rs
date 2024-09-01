@@ -261,7 +261,7 @@ fn handle_vote(
 
   GAUGE_VOTE.save(
     deps.storage,
-    (&gauge, sender.as_str(), block_period + 1),
+    (gauge, sender.as_str(), block_period + 1),
     &UserVotes {
       votes,
     },
@@ -554,7 +554,7 @@ fn _set_distribution(
 
   GAUGE_DISTRIBUTION.save(
     deps.storage,
-    (&gauge, period),
+    (gauge, period),
     &GaugeDistributionPeriod {
       total_gauge_vp,
       assets: save_distribution.clone(),

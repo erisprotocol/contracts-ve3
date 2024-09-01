@@ -42,6 +42,7 @@ pub fn Uint128(a: u32) -> Uint128 {
   Uint128::new(a.into())
 }
 
+#[allow(dead_code)]
 trait U {
   fn u(self) -> Uint128;
 }

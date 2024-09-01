@@ -57,7 +57,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
 /// Returns a list of blacklisted voters.
 ///
 /// * **start_after** is an optional field that specifies whether the function should return
-/// a list of voters starting from a specific address onward.
+///   a list of voters starting from a specific address onward.
 ///
 /// * **limit** max amount of voters addresses to return.
 pub fn get_blacklisted_voters(

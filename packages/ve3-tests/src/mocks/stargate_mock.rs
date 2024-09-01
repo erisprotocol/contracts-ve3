@@ -23,7 +23,7 @@ impl Module for StargateMockModule {
   type QueryT = StargateQuery;
   type SudoT = Empty;
 
-  fn execute<ExecC: cosmwasm_std::CustomMsg, QueryC>(
+  fn execute<ExecC, QueryC>(
     &self,
     api: &dyn Api,
     storage: &mut dyn Storage,
@@ -33,7 +33,8 @@ impl Module for StargateMockModule {
     msg: Self::ExecT,
   ) -> AnyResult<AppResponse>
   where
-    ExecC: Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    ExecC:
+      cosmwasm_std::CustomMsg + Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
     QueryC: CustomQuery + DeserializeOwned + 'static,
   {
     let type_url = msg.type_url;
