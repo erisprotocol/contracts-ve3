@@ -1,19 +1,20 @@
 [workspace]
 members = [
-    "contracts/voting-escrow",
-    "contracts/connector-alliance",
-    "contracts/connector-emission",
-    "contracts/global-config",
-    "contracts/asset-staking",
-    "contracts/asset-gauge",
-    "contracts/bribe-manager",
-    "contracts/zapper",
+    # "contracts/voting-escrow",
+    # "contracts/connector-alliance",
+    "contracts/phoenix-alliance-treasury",
+    # "contracts/connector-emission",
+    # "contracts/global-config",
+    # "contracts/asset-staking",
+    # "contracts/asset-gauge",
+    # "contracts/bribe-manager",
+    # "contracts/zapper",
     "packages/*",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "1.0.1"
+version = "1.1.0"
 authors = ["devs <devs@erisprotocol.com>"]
 edition = "2021"
 license       = "GPL-3.0-or-later"
@@ -21,6 +22,7 @@ repository = "https://github.com/erisprotocol/contracts-ve3"
 homepage      = "https://www.erisprotocol.com"
 documentation = "https://docs.erisprotocol.com/"
 keywords      = ["eris", "cosmos", "cosmwasm"]
+
 
 [profile.release.package.ve3-shared]
 opt-level = 3

@@ -9,6 +9,7 @@ pub mod msgs_bribe_manager;
 pub mod msgs_connector_alliance;
 pub mod msgs_connector_emission;
 pub mod msgs_global_config;
+pub mod msgs_phoenix_alliance_treasury;
 pub mod msgs_voting_escrow;
-pub mod stake_config;
 pub mod msgs_zapper;
+pub mod stake_config;

@@ -37,6 +37,18 @@ impl OldAssetInfo {
       } => cw_asset::AssetInfoBase::Native(denom.clone()),
     }
   }
+
+  pub fn from_new(info: AssetInfo) -> Result<OldAssetInfo, SharedError> {
+    Ok(match info {
+      AssetInfoBase::Native(denom) => OldAssetInfo::NativeToken {
+        denom,
+      },
+      AssetInfoBase::Cw20(contract_addr) => OldAssetInfo::Token {
+        contract_addr,
+      },
+      _ => Err(SharedError::NotSupportedAssetInfo())?,
+    })
+  }
 }
 
 #[cw_serde]
@@ -50,15 +62,7 @@ pub struct OldAsset {
 impl OldAsset {
   pub fn from_new(asset: Asset) -> Result<OldAsset, SharedError> {
     Ok(OldAsset {
-      info: match asset.info {
-        AssetInfoBase::Native(denom) => OldAssetInfo::NativeToken {
-          denom,
-        },
-        AssetInfoBase::Cw20(contract_addr) => OldAssetInfo::Token {
-          contract_addr,
-        },
-        _ => Err(SharedError::NotSupportedAssetInfo())?,
-      },
+      info: OldAssetInfo::from_new(asset.info)?,
       amount: asset.amount,
     })
   }
@@ -170,6 +174,18 @@ pub enum PairQueryMsg {
   //   Pool {},
   //   /// Returns contract configuration settings in a custom [`ConfigResponse`] structure.
   //   Config {},
+  Simulation {
+    offer_asset: OldAsset,
+    ask_asset_info: Option<OldAssetInfo>,
+  },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct SimulationResponse {
+  pub return_amount: Uint128,
+  pub spread_amount: Uint128,
+  pub commission_amount: Uint128,
 }
 
 impl Pair {
@@ -187,6 +203,27 @@ impl Pair {
         AssetInfo::cw20(Addr::unchecked(pair.liquidity_token))
       },
     })
+  }
+
+  pub fn query_simulate(
+    &self,
+    querier: &QuerierWrapper,
+    offer_asset: Asset,
+    ask_asset_info: Option<AssetInfo>,
+  ) -> Result<SimulationResponse, SharedError> {
+    let response: SimulationResponse = querier.query_wasm_smart(
+      self.0.to_string(),
+      &PairQueryMsg::Simulation {
+        ask_asset_info: if let Some(ask_asset_info) = ask_asset_info {
+          Some(OldAssetInfo::from_new(ask_asset_info)?)
+        } else {
+          None
+        },
+        offer_asset: OldAsset::from_new(offer_asset)?,
+      },
+    )?;
+
+    Ok(response)
   }
 
   pub fn query_ww_pair_info(&self, querier: &QuerierWrapper) -> StdResult<PairInfo> {

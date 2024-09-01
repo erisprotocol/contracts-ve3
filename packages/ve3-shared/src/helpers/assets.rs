@@ -25,6 +25,12 @@ impl From<Vec<Asset>> for Assets {
   }
 }
 
+impl From<Asset> for Assets {
+  fn from(value: Asset) -> Self {
+    Assets(vec![value])
+  }
+}
+
 impl Assets {
   pub fn is_empty(&self) -> bool {
     self.0.len() == 0
