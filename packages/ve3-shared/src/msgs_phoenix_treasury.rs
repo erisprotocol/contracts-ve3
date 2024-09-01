@@ -74,7 +74,12 @@ pub enum ExecuteMsg {
   Claim {
     id: u64,
   },
-  Execute {
+  UpdateMilestone {
+    id: u64,
+    index: u64,
+    enabled: bool,
+  },
+  ExecuteDca {
     id: u64,
     min_received: Option<Uint128>,
   },

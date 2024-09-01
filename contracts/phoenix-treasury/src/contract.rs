@@ -15,6 +15,7 @@ use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::adapters::pair::Pair;
 use ve3_shared::adapters::router::Router;
 use ve3_shared::constants::{PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_VETO_CONFIG_OWNER};
+use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::assets::Assets;
 use ve3_shared::helpers::denom::MsgCreateDenom;
@@ -139,10 +140,16 @@ pub fn execute(
       id,
     } => execute_claim(deps, env, info, id),
 
-    ExecuteMsg::Execute {
+    ExecuteMsg::ExecuteDca {
       id,
       min_received,
     } => execute_dca(deps, env, info, id, min_received),
+
+    ExecuteMsg::UpdateMilestone {
+      id,
+      index,
+      enabled,
+    } => execute_update_milestone(deps, env, info, id, index, enabled),
 
     ExecuteMsg::Cancel {
       id,
@@ -182,6 +189,56 @@ pub fn execute(
 
       Ok(Response::new().add_attributes(vec![("action", "pdt/veto"), ("id", &id.to_string())]))
     },
+  }
+}
+
+fn execute_update_milestone(
+  deps: DepsMut,
+  _env: Env,
+  info: MessageInfo,
+  id: u64,
+  index: u64,
+  enabled: bool,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  let mut action = ACTIONS.load(deps.storage, id)?;
+  assert_not_cancelled_or_done(&action)?;
+  assert_controller(&deps, &info, &config)?;
+
+  match (&action.setup, &action.runtime) {
+    (
+      TreasuryActionSetup::Milestone {
+        ..
+      },
+      TreasuryActionRuntime::Milestone {
+        milestones,
+      },
+    ) => {
+      let mut new_milestones = milestones.clone();
+      let relevant = new_milestones.get_mut(index as usize);
+
+      match relevant {
+        Some(relevant) => {
+          if relevant.claimed {
+            Err(SharedError::NotSupported("already claimed".to_string()))?;
+          } else {
+            relevant.enabled = enabled;
+          }
+        },
+        None => Err(SharedError::NotFound("milestone".to_string()))?,
+      }
+
+      action.runtime = TreasuryActionRuntime::Milestone {
+        milestones: new_milestones,
+      };
+      ACTIONS.save(deps.storage, id, &action)?;
+
+      Ok(
+        Response::new()
+          .add_attributes(vec![("action", "pdt/update_milestone"), ("id", &id.to_string())]),
+      )
+    },
+    _ => Err(ContractError::CannotExecute("only available for DCA".to_string())),
   }
 }
 
