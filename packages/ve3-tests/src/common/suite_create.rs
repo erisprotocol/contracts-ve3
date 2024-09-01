@@ -235,6 +235,7 @@ impl TestingSuite {
       config: incentive_mock::Config {
         emission: astro.clone(),
         per_week: u(10000),
+        per_week_xxx: u(5000),
       },
     };
 

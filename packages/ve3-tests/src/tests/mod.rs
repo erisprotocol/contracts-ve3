@@ -4,6 +4,7 @@ pub mod integration_asset_gauge_rebase;
 pub mod integration_asset_gauge_vote;
 pub mod integration_asset_staking;
 pub mod integration_asset_staking_claim;
+pub mod integration_asset_staking_take;
 pub mod integration_bribe_manager;
 pub mod integration_connector_alliance;
 pub mod integration_connector_emission;
