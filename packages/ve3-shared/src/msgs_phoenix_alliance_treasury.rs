@@ -209,11 +209,8 @@ pub struct AllianceRedelegateMsg {
 #[cw_serde]
 pub struct Config {
   pub global_config_addr: Addr,
-
   pub reward_denom: String,
   pub alliance_token_denom: String,
-  pub alliance_token_supply: Uint128,
-
   pub vetos: Vec<VetoRight<Addr>>,
 }
 

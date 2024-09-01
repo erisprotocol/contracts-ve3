@@ -12,7 +12,6 @@ use std::collections::HashSet;
 use terra_proto_rs::alliance::alliance::{
   MsgClaimDelegationRewards, MsgDelegate, MsgRedelegate, MsgUndelegate,
 };
-use terra_proto_rs::cosmos::bank::v1beta1::Balance;
 use terra_proto_rs::cosmos::base::v1beta1::Coin;
 use terra_proto_rs::traits::Message;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
@@ -58,7 +57,6 @@ pub fn instantiate(
 
   let config = Config {
     alliance_token_denom: vt_full_denom.clone(),
-    alliance_token_supply: vt_total_supply,
     reward_denom: msg.reward_denom,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
     vetos: msg.vetos.check(deps.api)?,
@@ -275,6 +273,7 @@ pub fn execute(
 
       Ok(Response::new().add_attributes(vec![("action", "pdt/veto"), ("id", &id.to_string())]))
     },
+
     ExecuteMsg::Claim {
       id,
     } => {
@@ -285,6 +284,7 @@ pub fn execute(
 
       Ok(Response::new().add_attributes(vec![("action", "pdt/claim"), ("id", &id.to_string())]))
     },
+
     ExecuteMsg::Execute {
       id,
     } => {
