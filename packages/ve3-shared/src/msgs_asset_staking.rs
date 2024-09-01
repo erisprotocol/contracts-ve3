@@ -122,6 +122,11 @@ pub enum CallbackMsg {
   DistributeBribes {
     assets: Option<Vec<AssetInfo>>,
   },
+  DistributeTake {
+    stake_config: StakeConfig<Addr>,
+    take_asset: Asset,
+    recipient: Addr,
+  },
 }
 
 impl From<CallbackMsg> for ExecuteMsg {

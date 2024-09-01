@@ -131,6 +131,11 @@ fn callback(
     CallbackMsg::DistributeBribes {
       assets,
     } => distribute_bribes_callback(deps, env, info, assets),
+    CallbackMsg::DistributeTake {
+      take_asset,
+      stake_config,
+      recipient,
+    } => distribute_take_callback(deps, env, info, stake_config, take_asset, recipient),
   }
 }
 
@@ -601,6 +606,9 @@ fn distribute_take_rate(
 
   let mut response = Response::new().add_attributes(vec![("action", "asset/distribute_take_rate")]);
   let recipient = config.get_address(&deps.querier, AT_TAKE_RECIPIENT)?;
+  let mut msgs = vec![];
+  let mut attrs = vec![];
+
   for asset in assets {
     let mut config = if update == Some(true) {
       // if it should also update extraction, take the asset config from the result.
@@ -615,7 +623,7 @@ fn distribute_take_rate(
 
     let take_amount = config.taken.checked_sub(config.harvested)?;
     if take_amount.is_zero() {
-      response = response.add_attribute(asset.to_string(), "skip");
+      response = response.add_attribute("skip", asset.to_string());
       continue;
     }
 
@@ -624,21 +632,18 @@ fn distribute_take_rate(
     config.harvested = config.taken;
     ASSET_CONFIG.save(deps.storage, &asset, &config)?;
 
-    // unstake assets if necessary
-    let unstake_msgs =
-      config.stake_config.unstake_check_received_msg(&deps, &env, take_asset.clone())?;
-    // transfer to recipient
-    let take_msg = take_asset.transfer_msg(recipient.clone())?;
-
     // println!("unstake_msgs {unstake_msgs:?}");
     // println!("take {take_msg:?}");
 
-    response = response
-      .add_messages(unstake_msgs)
-      .add_message(take_msg)
-      .add_attribute("take", take_asset.to_string());
+    msgs.push(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::DistributeTake {
+      stake_config: config.stake_config,
+      take_asset: take_asset.clone(),
+      recipient: recipient.clone(),
+    }))?);
+
+    attrs.push(attr("take", take_asset.to_string()));
   }
-  Ok(response)
+  Ok(response.add_messages(msgs).add_attributes(attrs))
 }
 
 fn distribute_bribes(
@@ -663,9 +668,9 @@ fn distribute_bribes(
       msgs.extend(claim_msgs)
     }
 
-    msgs.push(env.callback_msg(CallbackMsg::DistributeBribes {
+    msgs.push(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::DistributeBribes {
       assets: Some(assets),
-    })?);
+    }))?);
     Ok(
       Response::new()
         .add_attributes(vec![("action", "asset/distribute_bribes")])
@@ -714,6 +719,28 @@ fn distribute_bribes_callback(
     Response::new()
       .add_attributes(vec![("action", "asset/distribute_bribes_callback")])
       .add_messages(msgs),
+  )
+}
+
+fn distribute_take_callback(
+  deps: DepsMut,
+  env: Env,
+  _info: MessageInfo,
+  stake_config: StakeConfig<Addr>,
+  take_asset: Asset,
+  recipient: Addr,
+) -> Result<Response, ContractError> {
+  // unstake assets if necessary
+  let unstake_msgs = stake_config.unstake_check_received_msg(&deps, &env, take_asset.clone())?;
+  // transfer to recipient
+  let take_msg = take_asset.transfer_msg(recipient.clone())?;
+
+  Ok(
+    Response::new()
+      .add_messages(unstake_msgs)
+      .add_message(take_msg)
+      .add_attributes(vec![("action", "asset/distribute_take_callback")])
+      .add_attribute("take", take_asset.to_string()),
   )
 }
 
@@ -807,6 +834,7 @@ fn track_bribes_callback(
       let added_amount = new_balance - old_balance.amount;
       let added = bribe_info.with_balance(added_amount);
       bribes.add(&added);
+      attrs.push(attr("asset", asset.to_string()));
       attrs.push(attr("bribe", added.to_string()));
     }
   }

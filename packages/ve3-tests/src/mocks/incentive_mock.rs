@@ -68,6 +68,7 @@ pub enum QueryMsg {}
 pub struct Config {
   pub emission: AssetInfo,
   pub per_week: Uint128,
+  pub per_week_xxx: Uint128,
 }
 
 #[entry_point]
@@ -83,7 +84,7 @@ pub fn instantiate(
 
 const DEPOSITS: Map<Addr, Assets> = Map::new("deposits");
 const TOTAL: Item<Assets> = Item::new("totals");
-const LAST_CLAIM: Map<Addr, u64> = Map::new("last_claim");
+const LAST_CLAIM: Map<(Addr, &AssetInfo), u64> = Map::new("last_claim");
 const CONFIG: Item<Config> = Item::new("config");
 
 #[entry_point]
@@ -198,10 +199,11 @@ fn _claim(
   user: Addr,
   asset_info: &AssetInfo,
 ) -> StdResult<()> {
-  let last = LAST_CLAIM.load(deps.storage, user.clone()).unwrap_or_default();
+  let key = (user.clone(), asset_info);
+  let last = LAST_CLAIM.load(deps.storage, key.clone()).unwrap_or_default();
 
   if last == 0 {
-    LAST_CLAIM.save(deps.storage, user, &env.block.time.seconds())?;
+    LAST_CLAIM.save(deps.storage, key, &env.block.time.seconds())?;
     return Ok(());
   }
 
@@ -211,10 +213,16 @@ fn _claim(
 
   let seconds = env.block.time.seconds() - last;
 
-  let emissions =
-    config.per_week.multiply_ratio(Uint128::new(seconds.into()), Uint128::new(SECONDS_PER_WEEK.into()));
+  let per_week = if *asset_info == AssetInfo::native("xxx") {
+    config.per_week_xxx
+  } else {
+    config.per_week
+  };
 
-  LAST_CLAIM.save(deps.storage, user.clone(), &env.block.time.seconds())?;
+  let emissions =
+    per_week.multiply_ratio(Uint128::new(seconds.into()), Uint128::new(SECONDS_PER_WEEK.into()));
+
+  LAST_CLAIM.save(deps.storage, key, &env.block.time.seconds())?;
 
   match (owned, total) {
     (Some(owned), Some(total)) => {
