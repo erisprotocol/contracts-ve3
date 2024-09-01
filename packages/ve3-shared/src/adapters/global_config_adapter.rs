@@ -171,7 +171,7 @@ impl ConfigExt for crate::msgs_zapper::Config {
   }
 }
 
-impl ConfigExt for crate::msgs_phoenix_alliance_treasury::Config {
+impl ConfigExt for crate::msgs_phoenix_treasury::Config {
   fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
     GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
   }

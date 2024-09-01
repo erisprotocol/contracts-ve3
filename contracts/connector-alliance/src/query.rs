@@ -30,7 +30,6 @@ fn get_state(deps: Deps, env: Env) -> Result<Binary, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let state = STATE.load(deps.storage)?;
 
-  
   let stake = config.lst_asset_info;
   let stake_in_contract = stake.query_balance(&deps.querier, env.contract.address)?;
   let stake_available = stake_in_contract.checked_add(state.harvested)?.checked_sub(state.taken)?;

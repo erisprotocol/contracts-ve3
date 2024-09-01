@@ -9,3 +9,4 @@ pub mod mint_proxy;
 pub mod pair;
 pub mod voting_escrow;
 pub mod router;
+pub mod zapper;

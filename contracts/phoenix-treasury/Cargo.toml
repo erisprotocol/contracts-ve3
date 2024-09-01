@@ -1,5 +1,5 @@
 [package]
-name = "phoenix-alliance-treasury"
+name = "phoenix-treasury"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

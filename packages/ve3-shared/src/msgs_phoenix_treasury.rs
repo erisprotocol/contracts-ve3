@@ -1,6 +1,11 @@
-use crate::{error::SharedError, helpers::assets::Assets};
+use crate::{
+  adapters::{global_config_adapter::ConfigExt, zapper::Zapper},
+  constants::AT_ZAPPER,
+  error::SharedError,
+  helpers::assets::Assets,
+};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Api, Uint128};
+use cosmwasm_std::{Addr, Api, QuerierWrapper, Uint128};
 use cw_address_like::AddressLike;
 use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase};
 #[allow(unused_imports)]
@@ -71,6 +76,7 @@ pub enum ExecuteMsg {
   },
   Execute {
     id: u64,
+    min_received: Option<Uint128>,
   },
 
   // Privileged functions
@@ -128,15 +134,15 @@ impl Oracle<String> {
 
 #[cw_serde]
 pub enum TreasuryActionSetup {
-  Payments {
+  Payment {
     payments: Vec<(String, Asset)>,
   },
   Dca {
     amount: Asset,
-    to: AssetInfo,
-    max: Option<Uint128>,
-    start: u64,
-    end: u64,
+    into: AssetInfo,
+    max_per_swap: Option<Uint128>,
+    start_unix_s: u64,
+    end_unix_s: u64,
   },
   Milestone {
     recipient: String,
@@ -157,25 +163,41 @@ pub struct TreasuryAction {
   pub name: String,
   pub reserved: Assets,
   pub cancelled: bool,
+  pub done: bool,
   pub setup: TreasuryActionSetup,
-  pub active_from: u64,
+  pub claim_active_from: u64,
   pub value_usd: Uint128,
   pub runtime: TreasuryActionRuntime,
 }
 
 #[cw_serde]
 pub enum TreasuryActionRuntime {
-  Payment {},
-  Dca {},
-  Milestone {},
-  Vesting {},
+  Payment {
+    open: Vec<(String, Asset)>,
+  },
+  Milestone {
+    milestones: Vec<MilestoneRuntime>,
+  },
+  Vesting {
+    last_claim_unix_s: u64,
+  },
+  Dca {
+    last_execution_unix_s: u64,
+  },
   Empty {},
 }
 
 #[cw_serde]
 pub struct Milestone {
+  pub text: String,
+  pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct MilestoneRuntime {
   pub amount: Uint128,
   pub enabled: bool,
+  pub claimed: bool,
 }
 
 #[cw_serde]
@@ -214,11 +236,11 @@ pub struct Config {
   pub vetos: Vec<VetoRight<Addr>>,
 }
 
-// impl Config {
-//   pub fn asset_gauge(&self, querier: &QuerierWrapper) -> Result<AssetGauge, SharedError> {
-//     self.global_config().get_address(querier, AT_ASSET_GAUGE).map(AssetGauge)
-//   }
-// }
+impl Config {
+  pub fn zapper(&self, querier: &QuerierWrapper) -> Result<Zapper, SharedError> {
+    Ok(Zapper(self.get_address(querier, AT_ZAPPER)?))
+  }
+}
 
 #[cw_serde]
 pub struct State {
@@ -237,4 +259,16 @@ pub enum QueryMsg {
 
   #[returns(HashSet<Addr>)]
   Validators {},
+
+  #[returns(Vec<TreasuryAction>)]
+  Actions {
+    start_after: Option<u64>,
+    limit: Option<u32>,
+  },
+  #[returns(Vec<TreasuryAction>)]
+  UserActions {
+    user: String,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+  },
 }

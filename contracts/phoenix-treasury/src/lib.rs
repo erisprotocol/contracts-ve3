@@ -4,3 +4,4 @@ pub mod error;
 pub mod migrate;
 pub mod query;
 pub mod state;
+pub mod domains;

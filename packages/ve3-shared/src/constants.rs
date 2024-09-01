@@ -13,6 +13,7 @@ pub const AT_TAKE_RECIPIENT: &str = "TAKE_RECIPIENT";
 pub const AT_FEE_COLLECTOR: &str = "FEE_COLLECTOR";
 pub const AT_TEAM_WALLET: &str = "TEAM_WALLET";
 pub const AT_MINT_PROXY: &str = "MINT_PROXY";
+pub const AT_ZAPPER: &str = "ZAPPER";
 
 pub fn at_asset_staking(gauge: &str) -> String {
   format!("ASSET_STAKING__{gauge}")

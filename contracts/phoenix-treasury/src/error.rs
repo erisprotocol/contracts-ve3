@@ -26,6 +26,9 @@ pub enum ContractError {
   #[error("Action cancelled: {0}")]
   ActionCancelled(u64),
 
+  #[error("Action done: {0}")]
+  ActionDone(u64),
+
   #[error("Sender is not allowed to veto {0}")]
   NotVetoer(String),
 
@@ -40,4 +43,8 @@ pub enum ContractError {
 
   #[error("Not enough balance: balance: {0}, required: {1}")]
   NotEnoughBalance(Uint128, Asset),
+  #[error("Cannot claim: {0}")]
+  CannotClaim(String),
+  #[error("Cannot execute: {0}")]
+  CannotExecute(String),
 }
