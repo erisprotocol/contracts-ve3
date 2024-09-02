@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, StdError, Uint128};
+use cosmwasm_std::{Decimal, OverflowError, StdError, Uint128};
 use cw_asset::{Asset, AssetError, AssetInfo};
 use thiserror::Error;
 use ve3_shared::error::SharedError;
@@ -41,10 +41,57 @@ pub enum ContractError {
   #[error("Expected reservation for asset info: {0}")]
   ExpectedAssetReservation(AssetInfo),
 
-  #[error("Not enough balance: balance: {0}, required: {1}")]
-  NotEnoughBalance(Uint128, Asset),
-  #[error("Cannot claim: {0}")]
-  CannotClaim(String),
-  #[error("Cannot execute: {0}")]
-  CannotExecute(String),
+  #[error("Not enough funds: balance: {0}, required: {1}")]
+  NotEnoughFunds(Uint128, Asset),
+
+  #[error("Cannot claim: no open payment for sender")]
+  CannotClaimNoOpenPayment,
+
+  #[error("Cannot claim: vesting not yet active")]
+  CannotClaimVestingNotActive,
+
+  #[error("Cannot claim: not allowed")]
+  CannotClaimNotAllowed,
+
+  #[error("Cannot claim: nothing to claim")]
+  CannotClaimNothingToClaim,
+
+  #[error("Cannot execute: not active")]
+  CannotExecuteNotActive,
+
+  #[error("Cannot execute: Only OTC")]
+  CannotExecuteOnlyOtc,
+
+  #[error("Cannot execute: Only OTC")]
+  CannotExecuteOnlyDca,
+
+  #[error("Cannot execute: Missing funds")]
+  CannotExecuteMissingFunds,
+
+  #[error("Cannot execute: DCA not active")]
+  CannotExecuteDcaNotActive,
+
+  #[error("Action not reserving any funds")]
+  ActionNotReservingAnyFunds,
+
+  #[error("Milestone already claimed")]
+  MilestoneClaimed,
+
+  #[error("No active, unclaimed milestone not found")]
+  MilestoneNotFound,
+
+  #[error("Missing oracle: {0}")]
+  MissingOracle(cw_asset::AssetInfoBase<cosmwasm_std::Addr>),
+
+  #[error("Otc amount bigger than available: returning: {0}, max: {1}")]
+  OtcAmountBiggerThanAvailable(Uint128, Uint128),
+
+  #[error("Otc discount too high: max {0}")]
+  OtcDiscountTooHigh(Decimal),
+
+  #[error("Dca wait for cooldown to end: {0}")]
+  DcaWaitForCooldown(u64),
+
+  #[error("Swap assets cannot be the same")]
+  SwapAssetsSame,
 }

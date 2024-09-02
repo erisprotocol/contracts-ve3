@@ -1,4 +1,6 @@
-use crate::mocks::{alliance_rewards_mock, eris_hub_mock, incentive_mock};
+use crate::mocks::{
+  alliance_rewards_mock, astroport_pair_mock, eris_hub_mock, incentive_mock, zapper_mock,
+};
 use cosmwasm_std::Empty;
 use cw_multi_test::{Contract, ContractWrapper};
 
@@ -89,6 +91,23 @@ pub fn ve3_zapper() -> Box<dyn Contract<Empty>> {
 
   Box::new(contract)
 }
+pub fn ve3_zapper_mock() -> Box<dyn Contract<Empty>> {
+  let contract =
+    ContractWrapper::new(zapper_mock::execute, zapper_mock::instantiate, zapper_mock::query);
+
+  Box::new(contract)
+}
+
+pub fn pdt() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    phoenix_treasury::contract::execute,
+    phoenix_treasury::contract::instantiate,
+    phoenix_treasury::query::query,
+  )
+  .with_migrate(phoenix_treasury::migrate::migrate);
+
+  Box::new(contract)
+}
 
 pub fn alliance_rewards_mock() -> Box<dyn Contract<Empty>> {
   let contract = ContractWrapper::new(
@@ -103,6 +122,16 @@ pub fn alliance_rewards_mock() -> Box<dyn Contract<Empty>> {
 pub fn eris_hub_mock() -> Box<dyn Contract<Empty>> {
   let contract =
     ContractWrapper::new(eris_hub_mock::execute, eris_hub_mock::instantiate, eris_hub_mock::query);
+
+  Box::new(contract)
+}
+
+pub fn astroport_pair_mock() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    astroport_pair_mock::execute,
+    astroport_pair_mock::instantiate,
+    astroport_pair_mock::query,
+  );
 
   Box::new(contract)
 }

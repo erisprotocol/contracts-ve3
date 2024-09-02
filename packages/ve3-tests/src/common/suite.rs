@@ -49,6 +49,7 @@ pub struct Addresses {
   pub ve3_global_config: Addr,
   pub ve3_voting_escrow: Addr,
   pub ve3_zapper: Addr,
+  pub pdt: Addr,
 
   pub ve3_asset_staking_1: Addr,
   pub ve3_connector_alliance_mock: Addr,
@@ -70,6 +71,7 @@ pub struct Addresses {
   pub fee_recipient: Addr,
 
   pub incentive_mock: Addr,
+  pub astroport_pair_mock: Addr,
 
   pub active_asset_staking: Addr,
   pub active_connector_alliance: Addr,
@@ -131,6 +133,16 @@ impl Addresses {
   }
   pub(crate) fn uluna(&self, a: u32) -> Asset {
     native("uluna", Uint128::new(a.into()))
+  }
+
+  pub(crate) fn usdc_info(&self) -> AssetInfoUnchecked {
+    AssetInfoUnchecked::native("ibc/usdc".to_string())
+  }
+  pub(crate) fn usdc_info_checked(&self) -> AssetInfo {
+    AssetInfo::native("ibc/usdc".to_string())
+  }
+  pub(crate) fn usdc(&self, a: u32) -> Asset {
+    native("ibc/usdc", Uint128::new(a.into()))
   }
 
   pub(crate) fn fake_cw20(&self, a: u32) -> Asset {
@@ -209,6 +221,7 @@ impl TestingSuite {
       coin(1_000_000_000_000u128, "usdc".to_string()),
       coin(1_000_000_000_000u128, "lp".to_string()),
       coin(1_000_000_000_000u128, "astro".to_string()),
+      coin(1_000_000_000_000u128, "ibc/usdc".to_string()),
     ])
   }
 
@@ -300,6 +313,8 @@ impl TestingSuite {
         ve3_connector_alliance_eris: Addr(""),
         ve3_asset_staking_3: Addr(""),
         ve3_connector_emissions: Addr(""),
+        pdt: Addr(""),
+
         eris_hub: Addr(""),
         eris_hub_cw20_ampluna: Addr(""),
         eris_hub_cw20_code: 0,
@@ -317,6 +332,7 @@ impl TestingSuite {
         active_connector_alliance: Addr(""),
 
         incentive_mock: Addr(""),
+        astroport_pair_mock: Addr(""),
 
         zasset_denom: "".to_string(),
         gauge_1: "stable".to_string(),
@@ -344,7 +360,7 @@ impl TestingSuite {
 
   #[track_caller]
 
-  pub(crate) fn init(&mut self) -> &mut Self {
+  pub(crate) fn init(&mut self) -> Addresses {
     self.init_no_config(InitOptions::default());
 
     self.init_global_config();
@@ -358,7 +374,7 @@ impl TestingSuite {
       },
     );
 
-    self
+    self.addresses.clone()
   }
 
   pub(crate) fn init_options(&mut self, init: InitOptions) -> &mut Self {
@@ -397,7 +413,8 @@ impl TestingSuite {
     self.create_connector_alliance_eris();
     self.create_connector_emissions();
     self.create_voting_escrow();
-    self.create_zapper();
+    self.create_zapper_mock();
+    self.create_pdt();
 
     self.create_asset_staking_1();
     self.create_asset_staking_2();
@@ -407,6 +424,7 @@ impl TestingSuite {
     self.use_staking_1();
 
     self.create_incentive_mock();
+    self.create_astroport_pair_mock();
 
     self.def_get_ampluna("creator", 100_000000);
     self.def_change_exchange_rate(Decimal::percent(120));
@@ -439,10 +457,15 @@ impl TestingSuite {
         (AT_TAKE_RECIPIENT.to_string(), self.address("AT_TAKE_RECIPIENT").to_string()),
         (AT_FEE_COLLECTOR.to_string(), self.address("AT_FEE_COLLECTOR").to_string()),
         (AT_TEAM_WALLET.to_string(), self.address("AT_TEAM_WALLET").to_string()),
+        // pdt
+        (PDT_CONFIG_OWNER.to_string(), self.address("PDT_CONFIG_OWNER").to_string()),
+        (PDT_CONTROLLER.to_string(), self.address("PDT_CONTROLLER").to_string()),
+        (PDT_VETO_CONFIG_OWNER.to_string(), self.address("PDT_VETO_CONFIG_OWNER").to_string()),
         // contracts
         (AT_VOTING_ESCROW.to_string(), self.addresses.ve3_voting_escrow.to_string()),
         (AT_ASSET_GAUGE.to_string(), self.addresses.ve3_asset_gauge.to_string()),
         (AT_BRIBE_MANAGER.to_string(), self.addresses.ve3_bribe_manager.to_string()),
+        (AT_ZAPPER.to_string(), self.addresses.ve3_zapper.to_string()),
         (at_connector(&self.gauge1()), self.addresses.ve3_connector_alliance_mock.to_string()),
         (at_connector(&self.gauge2()), self.addresses.ve3_connector_alliance_eris.to_string()),
         (at_connector(&self.gauge3()), self.addresses.ve3_connector_emissions.to_string()),

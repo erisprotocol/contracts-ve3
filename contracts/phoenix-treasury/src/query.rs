@@ -22,6 +22,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       limit,
       start_after,
     } => get_actions(deps, start_after, limit),
+    QueryMsg::Action {
+      id,
+    } => get_action(deps, id),
     QueryMsg::UserActions {
       user,
       limit,
@@ -63,6 +66,10 @@ fn get_actions(
 
   Ok(to_json_binary(&actions)?)
 }
+fn get_action(deps: Deps, id: u64) -> Result<Binary, ContractError> {
+  let action: TreasuryAction = ACTIONS.load(deps.storage, id)?;
+  Ok(to_json_binary(&action)?)
+}
 
 fn get_user_actions(
   deps: Deps,
@@ -77,7 +84,7 @@ fn get_user_actions(
 
   let actions: Vec<TreasuryAction> = USER_ACTIONS
     .prefix(&addr)
-    .range(deps.storage, start_after, None, Order::Descending)
+    .range(deps.storage, None, start_after, Order::Descending)
     .map(|a| {
       let action = ACTIONS.load(deps.storage, a?.0)?;
       Ok(action)

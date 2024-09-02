@@ -1524,6 +1524,7 @@ dependencies = [
  "eris",
  "eris-staking-hub",
  "eris-staking-token",
+ "phoenix-treasury",
  "protobuf",
  "schemars",
  "semver",

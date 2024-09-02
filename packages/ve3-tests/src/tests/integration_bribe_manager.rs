@@ -16,8 +16,7 @@ use ve3_shared::{
 #[test]
 fn test_lock_add_bribes() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
@@ -335,8 +334,7 @@ fn test_lock_add_bribes() {
 #[test]
 fn test_errors() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
@@ -450,8 +448,7 @@ fn test_errors() {
 #[test]
 fn test_try_withdraw_late() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
@@ -491,8 +488,7 @@ fn test_try_withdraw_late() {
 #[test]
 fn test_update_config() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_bribe_update_config(None, None, "user1", |res| {
@@ -533,8 +529,7 @@ fn test_update_config() {
 #[test]
 fn test_any_bribe() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
@@ -595,8 +590,7 @@ fn test_any_bribe() {
 #[test]
 fn test_query_claimable_without_distribution() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {

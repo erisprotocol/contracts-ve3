@@ -21,13 +21,21 @@ impl IntoIterator for Assets {
 
 impl From<Vec<Asset>> for Assets {
   fn from(value: Vec<Asset>) -> Self {
-    Assets(value)
+    let mut assets = Assets::default();
+
+    for asset in value {
+      assets.add(&asset);
+    }
+
+    assets
   }
 }
 
 impl From<Asset> for Assets {
   fn from(value: Asset) -> Self {
-    Assets(vec![value])
+    let mut assets = Assets::default();
+    assets.add(&value);
+    assets
   }
 }
 

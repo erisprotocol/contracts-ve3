@@ -41,6 +41,18 @@ fn test_config_default() {
             Addr::unchecked("terra1q7440dq4ydqh3x63rdfljq38xmyutjjzzrzhk9r9d8xmeeaxynxqkyqche")
           ),
           (
+            "PDT_CONFIG_OWNER".to_string(),
+            Addr::unchecked("terra183hc2qrxu2qm6rfar2sdfpdqzjnrtugpsxm23pw8rqksw0suhgsqddn2gx")
+          ),
+          (
+            "PDT_CONTROLLER".to_string(),
+            Addr::unchecked("terra1caaz4kfsu5w86mdc7c85a3zelyew2mlctdct7d64ygcc3myu7axqn9fugn")
+          ),
+          (
+            "PDT_VETO_CONFIG_OWNER".to_string(),
+            Addr::unchecked("terra1pm88ac7093qmynm2u7lw9tsca7786frym623e3289dvh8yktnzss0h5x2c")
+          ),
+          (
             "TAKE_RECIPIENT".to_string(),
             Addr::unchecked("terra1lx7v09sx6mwazws6nd4n499ue7z28d7wyst3js6rtcu47fuwnmtqh5r9xl")
           ),
@@ -53,10 +65,13 @@ fn test_config_default() {
             Addr::unchecked("terra17jpszh4mc0cxvv6enwvm646dtztcs0anwd234n867qf27umcj8cs55507e")
           ),
           ("VOTING_ESCROW".to_string(), addr.ve3_voting_escrow.clone()),
-          // (
-          //   "GAUGE_CONTROLLER".to_string(),
-          //   Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
-          // )
+          (
+            "ZAPPER".to_string(),
+            Addr::unchecked("terra18yn206ypuxay79gjqv6msvd9t2y49w4fz8q7fyenx5aggj0ua37qw43exn")
+          ) // (
+            //   "GAUGE_CONTROLLER".to_string(),
+            //   Addr::unchecked("terra1upd8urhe9wz4mpf42gmc4yv0hgrypjqm3a4qh4s6dxm5w90pae7qxwgf8t")
+            // )
         ]
       );
     })

@@ -1,4 +1,6 @@
-use crate::constants::{CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION};
+use crate::constants::{
+  CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION, MAX_OTC_DISCOUNT,
+};
 use crate::domains::alliance::{
   alliance_delegate, alliance_redelegate, alliance_undelegate, claim_rewards, remove_validator,
 };
@@ -8,14 +10,14 @@ use crate::state::{ACTIONS, CONFIG, ORACLES, STATE, USER_ACTIONS, VALIDATORS};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Reply, Response, Uint128};
 use cw2::set_contract_version;
-use cw_asset::Asset;
+use cw_asset::{Asset, AssetInfoBase};
 use std::cmp;
 use std::collections::HashSet;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::adapters::pair::Pair;
 use ve3_shared::adapters::router::Router;
 use ve3_shared::constants::{PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_VETO_CONFIG_OWNER};
-use ve3_shared::error::SharedError;
+use ve3_shared::extensions::asset_ext::AssetExt;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::assets::Assets;
 use ve3_shared::helpers::denom::MsgCreateDenom;
@@ -145,6 +147,11 @@ pub fn execute(
       min_received,
     } => execute_dca(deps, env, info, id, min_received),
 
+    ExecuteMsg::ExecuteOtc {
+      id,
+      offer_amount,
+    } => execute_otc(deps, env, info, id, offer_amount),
+
     ExecuteMsg::UpdateMilestone {
       id,
       index,
@@ -166,30 +173,37 @@ pub fn execute(
 
     ExecuteMsg::Veto {
       id,
-    } => {
-      let config = CONFIG.load(deps.storage)?;
-      let veto_config = config
-        .vetos
-        .into_iter()
-        .find(|a| a.vetoer == info.sender)
-        .ok_or(ContractError::NotVetoer(info.sender.to_string()))?;
-
-      let state = STATE.load(deps.storage)?;
-      let action = ACTIONS.load(deps.storage, id)?;
-      assert_not_cancelled_or_done(&action)?;
-
-      if veto_config.min_amount_usd > action.value_usd {
-        return Err(ContractError::ActionValueNotEnough(
-          veto_config.min_amount_usd,
-          action.value_usd,
-        ));
-      }
-
-      cancel_action(&mut deps, state, action)?;
-
-      Ok(Response::new().add_attributes(vec![("action", "pdt/veto"), ("id", &id.to_string())]))
-    },
+    } => execute_veto(deps, env, info, id),
   }
+}
+
+fn execute_veto(
+  mut deps: DepsMut,
+  _env: Env,
+  info: MessageInfo,
+  id: u64,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  let veto_config = config
+    .vetos
+    .into_iter()
+    .find(|a| a.vetoer == info.sender)
+    .ok_or(ContractError::NotVetoer(info.sender.to_string()))?;
+
+  let state = STATE.load(deps.storage)?;
+  let action = ACTIONS.load(deps.storage, id)?;
+  assert_not_cancelled_or_done(&action)?;
+
+  if veto_config.min_amount_usd > action.total_value_usd {
+    return Err(ContractError::ActionValueNotEnough(
+      veto_config.min_amount_usd,
+      action.total_value_usd,
+    ));
+  }
+
+  cancel_action(&mut deps, state, action)?;
+
+  Ok(Response::new().add_attributes(vec![("action", "pdt/veto"), ("id", &id.to_string())]))
 }
 
 fn execute_update_milestone(
@@ -220,12 +234,12 @@ fn execute_update_milestone(
       match relevant {
         Some(relevant) => {
           if relevant.claimed {
-            Err(SharedError::NotSupported("already claimed".to_string()))?;
+            return Err(ContractError::MilestoneClaimed);
           } else {
             relevant.enabled = enabled;
           }
         },
-        None => Err(SharedError::NotFound("milestone".to_string()))?,
+        None => Err(ContractError::MilestoneNotFound)?,
       }
 
       action.runtime = TreasuryActionRuntime::Milestone {
@@ -238,7 +252,7 @@ fn execute_update_milestone(
           .add_attributes(vec![("action", "pdt/update_milestone"), ("id", &id.to_string())]),
       )
     },
-    _ => Err(ContractError::CannotExecute("only available for DCA".to_string())),
+    _ => Err(ContractError::CannotExecuteOnlyDca),
   }
 }
 
@@ -252,6 +266,7 @@ fn execute_dca(
   let config = CONFIG.load(deps.storage)?;
   let mut action = ACTIONS.load(deps.storage, id)?;
   assert_not_cancelled_or_done(&action)?;
+  assert_action_active(&env, &action)?;
 
   match (&action.setup, &action.runtime) {
     (
@@ -259,26 +274,31 @@ fn execute_dca(
         amount,
         into,
         max_per_swap,
-        start_unix_s,
-        end_unix_s,
+        start_s: start_unix_s,
+        end_s: end_unix_s,
+        cooldown_s,
       },
       TreasuryActionRuntime::Dca {
-        last_execution_unix_s,
+        last_execution_s: last_execution_unix_s,
       },
     ) => {
       let from = *cmp::max(start_unix_s, last_execution_unix_s);
       let to = cmp::min(env.block.time.seconds(), *end_unix_s);
 
-      if to <= from {
-        return Err(ContractError::CannotExecute("DCA not yet active".to_string()));
+      if env.block.time.seconds() < *start_unix_s {
+        return Err(ContractError::CannotExecuteDcaNotActive);
+      }
+
+      if last_execution_unix_s + cooldown_s > env.block.time.seconds() {
+        return Err(ContractError::DcaWaitForCooldown(last_execution_unix_s + cooldown_s));
       }
 
       let remaining = action.reserved.get(&amount.info).map(|a| a.amount).unwrap_or_default();
 
       let mut use_amount = if to == *end_unix_s {
         // end already reached -> use remaining reserved of action
-        action.runtime = TreasuryActionRuntime::Vesting {
-          last_claim_unix_s: env.block.time.seconds(),
+        action.runtime = TreasuryActionRuntime::Dca {
+          last_execution_s: env.block.time.seconds(),
         };
 
         remaining
@@ -287,8 +307,8 @@ fn execute_dca(
         let distance = to - from;
         let send_amount = amount.amount.multiply_ratio(distance, delta);
 
-        action.runtime = TreasuryActionRuntime::Vesting {
-          last_claim_unix_s: env.block.time.seconds(),
+        action.runtime = TreasuryActionRuntime::Dca {
+          last_execution_s: env.block.time.seconds(),
         };
 
         send_amount
@@ -310,18 +330,90 @@ fn execute_dca(
 
       let swap_msgs = config.zapper(&deps.querier)?.swap_msgs(
         into.into(),
-        vec![use_asset],
+        vec![use_asset.clone()],
         min_received,
         None,
       )?;
 
       Ok(
         Response::new()
-          .add_attributes(vec![("action", "pdt/execute_dca"), ("id", &id.to_string())])
+          .add_attributes(vec![
+            ("action", "pdt/execute_dca"),
+            ("id", &id.to_string()),
+            ("offer", &use_asset.to_string()),
+          ])
           .add_messages(swap_msgs),
       )
     },
-    _ => Err(ContractError::CannotExecute("only available for DCA".to_string())),
+    _ => Err(ContractError::CannotExecuteOnlyDca),
+  }
+}
+
+fn execute_otc(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  id: u64,
+  offer_amount: Uint128,
+) -> Result<Response, ContractError> {
+  let mut action = ACTIONS.load(deps.storage, id)?;
+  assert_not_cancelled_or_done(&action)?;
+  assert_action_active(&env, &action)?;
+
+  match (&action.setup, &action.runtime) {
+    (
+      TreasuryActionSetup::Otc {
+        amount,
+        into,
+      },
+      TreasuryActionRuntime::Otc {},
+    ) => {
+      let remaining = action.reserved.get(&amount.info).map(|a| a.amount).unwrap_or_default();
+
+      if offer_amount.is_zero() {
+        return Err(ContractError::CannotExecuteMissingFunds);
+      }
+
+      let mut msgs: Vec<CosmosMsg> = vec![];
+      let expected = into.info.with_balance(offer_amount);
+
+      match &expected.info {
+        AssetInfoBase::Native(_) => expected.assert_sent(&info)?,
+        AssetInfoBase::Cw20(_) => {
+          msgs.push(expected.transfer_from_msg(info.sender.clone(), env.contract.address)?)
+        },
+        _ => todo!(),
+      }
+
+      let return_amount = offer_amount.multiply_ratio(amount.amount, into.amount);
+
+      if return_amount > remaining {
+        return Err(ContractError::OtcAmountBiggerThanAvailable(return_amount, remaining));
+      }
+
+      let return_asset = amount.info.with_balance(return_amount);
+
+      let mut state = STATE.load(deps.storage)?;
+      state.reserved.remove(&return_asset)?;
+      STATE.save(deps.storage, &state)?;
+
+      action.reserved.remove(&return_asset)?;
+      action.done = action.reserved.0.is_empty();
+      ACTIONS.save(deps.storage, id, &action)?;
+
+      msgs.push(return_asset.transfer_msg(info.sender)?);
+
+      Ok(
+        Response::new()
+          .add_attributes(vec![
+            ("action", "pdt/execute_otc"),
+            ("id", &id.to_string()),
+            ("returned", &return_amount.to_string()),
+          ])
+          .add_messages(msgs),
+      )
+    },
+    _ => Err(ContractError::CannotExecuteOnlyOtc),
   }
 }
 
@@ -343,9 +435,9 @@ fn execute_setup(
       let mut assets = Assets::default();
       let mut recipients = vec![];
 
-      for (recipient, asset) in payments {
-        assets.add(asset);
-        recipients.push(recipient);
+      for payment in payments {
+        assets.add(&payment.asset);
+        recipients.push(&payment.recipient);
       }
 
       (
@@ -356,20 +448,54 @@ fn execute_setup(
         },
       )
     },
+    TreasuryActionSetup::Otc {
+      amount,
+      into,
+    } => {
+      if amount.info == into.info {
+        return Err(ContractError::SwapAssetsSame);
+      }
+      into.info.check(deps.api)?;
+
+      let from_value = calculate_value(&deps, &amount.clone().into())?;
+      let to_value = calculate_value(&deps, &into.clone().into())?;
+
+      if to_value < MAX_OTC_DISCOUNT * from_value {
+        return Err(ContractError::OtcDiscountTooHigh(MAX_OTC_DISCOUNT));
+      }
+
+      (Assets::from(amount.clone()), vec![], TreasuryActionRuntime::Otc {})
+    },
 
     TreasuryActionSetup::Dca {
       amount,
+      start_s: start_unix_s,
+      into,
       ..
-    } => (Assets::from(amount.clone()), vec![], TreasuryActionRuntime::Empty {}),
+    } => {
+      if amount.info == *into {
+        return Err(ContractError::SwapAssetsSame);
+      }
+
+      into.check(deps.api)?;
+
+      (
+        Assets::from(amount.clone()),
+        vec![],
+        TreasuryActionRuntime::Dca {
+          last_execution_s: *start_unix_s,
+        },
+      )
+    },
 
     TreasuryActionSetup::Milestone {
       recipient,
       milestones,
-      asset,
+      asset_info,
     } => {
-      let amount = asset.with_balance(milestones.iter().map(|a| a.amount).sum());
+      let asset = asset_info.with_balance(milestones.iter().map(|a| a.amount).sum());
       (
-        Assets::from(amount),
+        Assets::from(asset),
         vec![recipient],
         TreasuryActionRuntime::Milestone {
           milestones: milestones
@@ -391,17 +517,28 @@ fn execute_setup(
       Assets::from(amount.clone()),
       vec![recipient],
       TreasuryActionRuntime::Vesting {
-        last_claim_unix_s: 0,
+        last_claim_s: 0,
       },
     ),
   };
+
+  if reserved.is_empty() {
+    return Err(ContractError::ActionNotReservingAnyFunds);
+  }
 
   let id = state.max_id + 1;
   state.max_id = id;
   state.reserved.add_multi(&reserved.0);
 
+  // index recipients for improved queries
+  for recipient in recipients {
+    let addr = deps.api.addr_validate(recipient)?;
+    USER_ACTIONS.save(deps.storage, (&addr, id), &())?;
+  }
+
   // check that contract has enough assets
   for asset in &reserved.0 {
+    // this validates that the asset is correct
     let balance = asset.info.query_balance(&deps.querier, env.contract.address.clone())?;
     let required = state
       .reserved
@@ -409,7 +546,7 @@ fn execute_setup(
       .ok_or(ContractError::ExpectedAssetReservation(asset.info.clone()))?;
 
     if balance < required.amount {
-      return Err(ContractError::NotEnoughBalance(balance, required));
+      return Err(ContractError::NotEnoughFunds(balance, required));
     }
   }
 
@@ -435,17 +572,11 @@ fn execute_setup(
       cancelled: false,
       done: false,
       setup: action.clone(),
-      claim_active_from: env.block.time.seconds() + delay,
-      value_usd,
+      active_from: env.block.time.seconds() + delay,
+      total_value_usd: value_usd,
       runtime,
     },
   )?;
-
-  // index recipients for improved queries
-  for recipient in recipients {
-    let addr = deps.api.addr_validate(recipient)?;
-    USER_ACTIONS.save(deps.storage, (&addr, id), &())?;
-  }
 
   STATE.save(deps.storage, &state)?;
 
@@ -461,15 +592,12 @@ fn execute_claim(
   let mut action = ACTIONS.load(deps.storage, id)?;
 
   assert_not_cancelled_or_done(&action)?;
-
-  if env.block.time.seconds() < action.claim_active_from {
-    return Err(ContractError::CannotClaim("not active".to_string()));
-  }
+  assert_action_active(&env, &action)?;
 
   let send_asset: Asset;
   let send_to: String;
 
-  match (&action.setup, &action.runtime) {
+  match (&action.setup, &mut action.runtime) {
     (
       TreasuryActionSetup::Payment {
         ..
@@ -478,19 +606,21 @@ fn execute_claim(
         open,
       },
     ) => {
-      let (recipient, asset) = open
+      let position = open
         .iter()
-        .find(|a| a.0 == info.sender)
-        .ok_or(ContractError::CannotClaim("no open payment for sender".to_string()))?;
+        .position(|a| a.recipient == info.sender && is_claimable(&env, a.claimable_after_s))
+        .ok_or(ContractError::CannotClaimNoOpenPayment)?;
 
-      send_asset = asset.clone();
-      send_to = recipient.clone();
+      let description = open.remove(position);
+
+      send_asset = description.asset;
+      send_to = description.recipient;
     },
 
     (
       TreasuryActionSetup::Milestone {
         recipient,
-        asset,
+        asset_info: asset,
         ..
       },
       TreasuryActionRuntime::Milestone {
@@ -520,18 +650,18 @@ fn execute_claim(
       TreasuryActionSetup::Vesting {
         recipient,
         amount,
-        start_unix_s,
-        end_unix_s,
+        start_s: start_unix_s,
+        end_s: end_unix_s,
       },
       TreasuryActionRuntime::Vesting {
-        last_claim_unix_s,
+        last_claim_s: last_claim_unix_s,
       },
     ) => {
       let from = *cmp::max(start_unix_s, last_claim_unix_s);
       let to = cmp::min(env.block.time.seconds(), *end_unix_s);
 
       if to <= from {
-        return Err(ContractError::CannotClaim("vesting not yet active".to_string()));
+        return Err(ContractError::CannotClaimVestingNotActive);
       }
 
       if to == *end_unix_s {
@@ -539,7 +669,7 @@ fn execute_claim(
         let remaining = action.reserved.get(&amount.info).map(|a| a.amount).unwrap_or_default();
 
         action.runtime = TreasuryActionRuntime::Vesting {
-          last_claim_unix_s: env.block.time.seconds(),
+          last_claim_s: env.block.time.seconds(),
         };
 
         send_asset = amount.info.with_balance(remaining);
@@ -550,14 +680,18 @@ fn execute_claim(
         let send_amount = amount.amount.multiply_ratio(distance, delta);
 
         action.runtime = TreasuryActionRuntime::Vesting {
-          last_claim_unix_s: env.block.time.seconds(),
+          last_claim_s: env.block.time.seconds(),
         };
 
         send_asset = amount.info.with_balance(send_amount);
         send_to = recipient.clone();
       }
     },
-    (_, _) => return Err(ContractError::CannotClaim("not allowed".to_string())),
+    (_, _) => return Err(ContractError::CannotClaimNotAllowed),
+  }
+
+  if send_asset.amount.is_zero() {
+    return Err(ContractError::CannotClaimNothingToClaim);
   }
 
   let mut state = STATE.load(deps.storage)?;
@@ -578,6 +712,20 @@ fn execute_claim(
   )
 }
 
+fn assert_action_active(env: &Env, action: &TreasuryAction) -> Result<(), ContractError> {
+  if env.block.time.seconds() < action.active_from {
+    return Err(ContractError::CannotExecuteNotActive);
+  }
+  Ok(())
+}
+
+fn is_claimable(env: &Env, claimable_after_unix_s: Option<u64>) -> bool {
+  match claimable_after_unix_s {
+    Some(claimable_after_unix_s) => env.block.time.seconds() >= claimable_after_unix_s,
+    None => true,
+  }
+}
+
 fn assert_not_cancelled_or_done(action: &TreasuryAction) -> Result<(), ContractError> {
   if action.cancelled {
     return Err(ContractError::ActionCancelled(action.id));
@@ -594,7 +742,9 @@ fn calculate_value(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Contrac
   let mut value_usd = Uint128::zero();
 
   for asset in &reserved.0 {
-    let oracle = ORACLES.load(deps.storage, &asset.info)?;
+    let oracle = ORACLES
+      .load(deps.storage, &asset.info)
+      .map_err(|_| ContractError::MissingOracle(asset.info.clone()))?;
 
     let added_usd = match oracle {
       Oracle::Usdc => asset.amount,

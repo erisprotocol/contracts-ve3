@@ -1,7 +1,7 @@
 use super::helpers::{u, Addr};
 use super::suite::{InitOptions, TestingSuite};
 use crate::common::suite_contracts::*;
-use crate::mocks::{alliance_rewards_mock, incentive_mock};
+use crate::mocks::{alliance_rewards_mock, astroport_pair_mock, incentive_mock};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20Coin;
 use cw_asset::{AssetInfoBase, AssetInfoUnchecked, AssetUnchecked};
@@ -9,10 +9,12 @@ use cw_multi_test::Executor;
 use eris::hub::DelegationStrategy;
 use serde::Serialize;
 use std::vec;
+use ve3_shared::extensions::asset_ext::AssetExt;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
+use ve3_shared::helpers::assets::Assets;
 use ve3_shared::msgs_asset_gauge::GaugeConfig;
 use ve3_shared::msgs_voting_escrow::DepositAsset;
-use ve3_shared::{msgs_connector_alliance, msgs_connector_emission};
+use ve3_shared::{msgs_connector_alliance, msgs_connector_emission, msgs_phoenix_treasury};
 
 impl TestingSuite {
   #[track_caller]
@@ -211,15 +213,43 @@ impl TestingSuite {
     self.addresses.ve3_voting_escrow = self.init_contract(code_id, msg, "ve3_voting_escrow");
   }
 
-  pub(super) fn create_zapper(&mut self) {
-    let code_id = self.app.store_code(ve3_zapper());
+  pub(super) fn create_zapper_mock(&mut self) {
+    let code_id = self.app.store_code(ve3_zapper_mock());
 
-    let msg = ve3_shared::msgs_zapper::InstantiateMsg {
-      global_config_addr: self.addresses.ve3_global_config.to_string(),
-      center_asset_infos: vec![self.addresses.uluna_info()],
+    let addr = self.addresses.clone();
+
+    let msg = crate::mocks::zapper_mock::InstantiateMsg {
+      exchange_rate: vec![(
+        addr.uluna_info_checked(),
+        addr.usdc_info_checked(),
+        Decimal::percent(30),
+      )],
+      assets: vec![addr.uluna(100_000000), addr.usdc(100_000000)].into(),
     };
 
     self.addresses.ve3_zapper = self.init_contract(code_id, msg, "ve3_zapper");
+    self
+      .app
+      .send_tokens(
+        self.address("user1"),
+        self.addresses.ve3_zapper.clone(),
+        &[addr.uluna(100_000000).to_coin().unwrap(), addr.usdc(100_000000).to_coin().unwrap()],
+      )
+      .unwrap();
+  }
+
+  pub(super) fn create_pdt(&mut self) {
+    let code_id = self.app.store_code(pdt());
+
+    let msg = msgs_phoenix_treasury::InstantiateMsg {
+      global_config_addr: self.addresses.ve3_global_config.to_string(),
+      alliance_token_denom: "vt".to_string(),
+      reward_denom: "uluna".to_string(),
+      oracles: vec![],
+      vetos: vec![],
+    };
+
+    self.addresses.pdt = self.init_contract(code_id, msg, "phoenix_treasury");
   }
 
   pub(super) fn create_hub_cw20(&mut self) {
@@ -251,6 +281,15 @@ impl TestingSuite {
           .unwrap(),
       )
       .unwrap();
+  }
+
+  pub(super) fn create_astroport_pair_mock(&mut self) {
+    let code_id = self.app.store_code(astroport_pair_mock());
+    let msg = astroport_pair_mock::InstantiateMsg {
+      price: Decimal::from_ratio(30u128, 100u128),
+    };
+
+    self.addresses.astroport_pair_mock = self.init_contract(code_id, msg, "incentive_mock");
   }
 
   pub(super) fn create_fake_cw20(&mut self) {

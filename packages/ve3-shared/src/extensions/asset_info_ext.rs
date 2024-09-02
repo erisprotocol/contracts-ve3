@@ -1,8 +1,9 @@
 use cosmwasm_std::{
-  Addr, BankQuery, MessageInfo, QuerierWrapper, QueryRequest, StdResult, SupplyResponse, Uint128,
+  Addr, Api, BankQuery, MessageInfo, QuerierWrapper, QueryRequest, StdResult, SupplyResponse,
+  Uint128,
 };
 use cw20::{Cw20QueryMsg, TokenInfoResponse};
-use cw_asset::{Asset, AssetError, AssetInfo};
+use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoUnchecked};
 
 use crate::error::SharedError;
 
@@ -21,6 +22,8 @@ pub trait AssetInfoExt {
   fn assert_received(&self, info: &MessageInfo) -> Result<Asset, SharedError>;
 
   fn total_supply(&self, querier: &QuerierWrapper) -> StdResult<Uint128>;
+
+  fn check(&self, api: &dyn Api) -> Result<AssetInfo, AssetError>;
 }
 
 impl AssetInfoExt for AssetInfo {
@@ -41,6 +44,11 @@ impl AssetInfoExt for AssetInfo {
       cw_asset::AssetInfoBase::Cw20(contract_addr) => Asset::cw20(contract_addr.clone(), amount),
       _ => todo!(),
     }
+  }
+
+  fn check(&self, api: &dyn Api) -> Result<AssetInfo, AssetError> {
+    let unchecked = AssetInfoUnchecked::from(self);
+    unchecked.check(api, None)
   }
 
   fn with_balance_u128(&self, amount: u128) -> Asset {

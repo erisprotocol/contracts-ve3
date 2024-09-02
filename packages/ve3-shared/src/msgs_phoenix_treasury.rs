@@ -51,52 +51,6 @@ impl Validate<Vec<VetoRight<Addr>>> for Vec<VetoRight<String>> {
 }
 
 #[cw_serde]
-pub enum ExecuteMsg {
-  UpdateVetoConfig {
-    vetos: Vec<VetoRight<String>>,
-  },
-
-  UpdateConfig {
-    add_oracle: Option<Vec<(AssetInfoBase<String>, Oracle<String>)>>,
-    remove_oracle: Option<Vec<AssetInfoBase<String>>>,
-  },
-
-  Setup {
-    name: String,
-    action: TreasuryActionSetup,
-  },
-  Cancel {
-    id: u64,
-  },
-  Veto {
-    id: u64,
-  },
-  Claim {
-    id: u64,
-  },
-  UpdateMilestone {
-    id: u64,
-    index: u64,
-    enabled: bool,
-  },
-  ExecuteDca {
-    id: u64,
-    min_received: Option<Uint128>,
-  },
-
-  // Privileged functions
-  ClaimRewards {},
-
-  AllianceDelegate(AllianceDelegateMsg),
-  AllianceUndelegate(AllianceUndelegateMsg),
-  AllianceRedelegate(AllianceRedelegateMsg),
-
-  RemoveValidator {
-    validator: String,
-  },
-}
-
-#[cw_serde]
 pub enum Oracle<T: AddressLike> {
   Usdc,
   Pair {
@@ -140,25 +94,30 @@ impl Oracle<String> {
 #[cw_serde]
 pub enum TreasuryActionSetup {
   Payment {
-    payments: Vec<(String, Asset)>,
+    payments: Vec<PaymentDescription>,
+  },
+  Otc {
+    amount: Asset,
+    into: Asset,
   },
   Dca {
     amount: Asset,
     into: AssetInfo,
     max_per_swap: Option<Uint128>,
-    start_unix_s: u64,
-    end_unix_s: u64,
+    start_s: u64,
+    end_s: u64,
+    cooldown_s: u64,
   },
   Milestone {
     recipient: String,
-    asset: AssetInfo,
+    asset_info: AssetInfo,
     milestones: Vec<Milestone>,
   },
   Vesting {
     recipient: String,
     amount: Asset,
-    start_unix_s: u64,
-    end_unix_s: u64,
+    start_s: u64,
+    end_s: u64,
   },
 }
 
@@ -170,26 +129,52 @@ pub struct TreasuryAction {
   pub cancelled: bool,
   pub done: bool,
   pub setup: TreasuryActionSetup,
-  pub claim_active_from: u64,
-  pub value_usd: Uint128,
+  pub active_from: u64,
+  pub total_value_usd: Uint128,
   pub runtime: TreasuryActionRuntime,
+}
+
+#[cw_serde]
+pub struct PaymentDescription {
+  pub recipient: String,
+  pub asset: Asset,
+  pub claimable_after_s: Option<u64>,
+}
+
+impl From<(String, Asset)> for PaymentDescription {
+  fn from(val: (String, Asset)) -> Self {
+    PaymentDescription {
+      asset: val.1,
+      recipient: val.0,
+      claimable_after_s: None,
+    }
+  }
+}
+impl From<(String, Asset, u64)> for PaymentDescription {
+  fn from(val: (String, Asset, u64)) -> Self {
+    PaymentDescription {
+      asset: val.1,
+      recipient: val.0,
+      claimable_after_s: Some(val.2),
+    }
+  }
 }
 
 #[cw_serde]
 pub enum TreasuryActionRuntime {
   Payment {
-    open: Vec<(String, Asset)>,
+    open: Vec<PaymentDescription>,
+  },
+  Otc {},
+  Dca {
+    last_execution_s: u64,
   },
   Milestone {
     milestones: Vec<MilestoneRuntime>,
   },
   Vesting {
-    last_claim_unix_s: u64,
+    last_claim_s: u64,
   },
-  Dca {
-    last_execution_unix_s: u64,
-  },
-  Empty {},
 }
 
 #[cw_serde]
@@ -254,6 +239,57 @@ pub struct State {
 }
 
 #[cw_serde]
+pub enum ExecuteMsg {
+  UpdateVetoConfig {
+    vetos: Vec<VetoRight<String>>,
+  },
+
+  UpdateConfig {
+    add_oracle: Option<Vec<(AssetInfoBase<String>, Oracle<String>)>>,
+    remove_oracle: Option<Vec<AssetInfoBase<String>>>,
+  },
+
+  Setup {
+    name: String,
+    action: TreasuryActionSetup,
+  },
+  Cancel {
+    id: u64,
+  },
+  Veto {
+    id: u64,
+  },
+  Claim {
+    id: u64,
+  },
+  UpdateMilestone {
+    id: u64,
+    index: u64,
+    enabled: bool,
+  },
+
+  ExecuteDca {
+    id: u64,
+    min_received: Option<Uint128>,
+  },
+  ExecuteOtc {
+    id: u64,
+    offer_amount: Uint128,
+  },
+
+  // Privileged functions
+  ClaimRewards {},
+
+  AllianceDelegate(AllianceDelegateMsg),
+  AllianceUndelegate(AllianceUndelegateMsg),
+  AllianceRedelegate(AllianceRedelegateMsg),
+
+  RemoveValidator {
+    validator: String,
+  },
+}
+
+#[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
   #[returns(Config)]
@@ -265,11 +301,17 @@ pub enum QueryMsg {
   #[returns(HashSet<Addr>)]
   Validators {},
 
+  #[returns(TreasuryAction)]
+  Action {
+    id: u64,
+  },
+
   #[returns(Vec<TreasuryAction>)]
   Actions {
     start_after: Option<u64>,
     limit: Option<u32>,
   },
+
   #[returns(Vec<TreasuryAction>)]
   UserActions {
     user: String,

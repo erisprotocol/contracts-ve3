@@ -1,12 +1,15 @@
 use std::fmt::Display;
 
 use crate::colored::Colorize;
-use cosmwasm_std::{Attribute, StdError};
+use cosmwasm_std::{attr, Attribute, StdError};
+use cw_asset::Asset;
 use cw_multi_test::AppResponse;
+use ve3_shared::extensions::asset_ext::AssetExt;
 
 pub trait EventChecker {
   fn assert_attribute_ty(&self, ty: impl Into<String>, attr: Attribute) -> String;
   fn assert_attribute(&self, attr: Attribute) -> String;
+  fn assert_transfer(&self, recipient: impl Into<String>, asset: Asset) -> String;
 }
 
 impl EventChecker for AppResponse {
@@ -35,6 +38,17 @@ impl EventChecker for AppResponse {
   fn assert_attribute(&self, attr: Attribute) -> String {
     self.assert_attribute_ty("wasm", attr)
   }
+
+  fn assert_transfer(&self, recipient: impl Into<String>, asset: Asset) -> String {
+    match asset.info {
+      cw_asset::AssetInfoBase::Native(_) => {
+        self.assert_attribute_ty("transfer", attr("recipient", recipient));
+        self.assert_attribute_ty("transfer", attr("amount", asset.to_coin().unwrap().to_string()))
+      },
+      cw_asset::AssetInfoBase::Cw20(_) => todo!(),
+      _ => todo!(),
+    }
+  }
 }
 
 impl EventChecker for Result<AppResponse, anyhow::Error> {
@@ -46,6 +60,11 @@ impl EventChecker for Result<AppResponse, anyhow::Error> {
   #[track_caller]
   fn assert_attribute(&self, attr: Attribute) -> String {
     self.as_ref().unwrap().assert_attribute(attr)
+  }
+
+  #[track_caller]
+  fn assert_transfer(&self, recipient: impl Into<String>, asset: Asset) -> String {
+    self.as_ref().unwrap().assert_transfer(recipient, asset)
   }
 }
 

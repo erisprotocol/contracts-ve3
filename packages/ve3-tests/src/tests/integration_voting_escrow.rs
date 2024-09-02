@@ -21,12 +21,10 @@ use ve3_voting_escrow::error::ContractError;
 #[test]
 fn test_locks() {
   let mut suite = TestingSuite::def();
-
+  let addr = suite.init();
   let user1 = suite.address("user1").to_string();
-  let addr = suite.addresses.clone();
 
   suite
-    .init()
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock"));
       res.assert_attribute(attr("token_id", "1"));
@@ -98,12 +96,10 @@ fn test_locks() {
 #[test]
 fn test_locks_transfer() {
   let mut suite = TestingSuite::def();
-  let addr = suite.addresses.clone();
-
+  let addr = suite.init();
   let user2 = addr.user2.to_string();
 
   suite
-    .init()
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock"));
       res.assert_attribute(attr("token_id", "1"));
@@ -255,13 +251,15 @@ fn test_locks_transfer() {
 #[test]
 fn test_locks_exchange_rate() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user2", |res| {
+      res.assert_valid()
+    })
     .q_ve_total_vamp(Some(Time::Period(300)), |res| {
       assert_eq!(
         res.unwrap(),
@@ -325,8 +323,7 @@ fn test_locks_exchange_rate() {
 #[test]
 fn test_locks_lock_extension() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
@@ -388,8 +385,7 @@ fn test_locks_lock_extension() {
 #[test]
 fn test_locks_lock_extension_ampluna() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
   let ampluna = addr.eris_hub_cw20_ampluna.to_string();
 
   suite
@@ -472,8 +468,7 @@ fn test_locks_lock_extension_ampluna() {
 #[test]
 fn test_locks_merge() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
   let fake = addr.fake_cw20.clone();
 
   suite
@@ -756,8 +751,7 @@ fn test_locks_merge() {
 #[test]
 fn test_locks_split() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
   let ampluna = suite.addresses.eris_hub_cw20_ampluna.clone();
 
   suite
@@ -940,8 +934,7 @@ fn test_locks_split() {
 #[test]
 fn test_lock_withdraw_cw20() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.ampluna(2000), "user1", |res| {
@@ -967,9 +960,7 @@ fn test_lock_withdraw_cw20() {
 #[test]
 fn test_lock_withdraw_native() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
-
+  let addr = suite.init();
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(2000), "user1", |res| {
       res.unwrap();
@@ -994,8 +985,7 @@ fn test_lock_withdraw_native() {
 #[test]
 fn test_lock_increase_cw20() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.ampluna(2000), "user1", |res| {
@@ -1038,8 +1028,7 @@ fn test_lock_increase_cw20() {
 #[test]
 fn test_lock_increase_native() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(2000), "user1", |res| {
@@ -1077,8 +1066,7 @@ fn test_lock_increase_native() {
 #[test]
 fn test_lock_permanent() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time_any(None, addr.ampluna(2000), "user1", |res| {
@@ -1286,8 +1274,7 @@ fn test_lock_permanent() {
 #[test]
 fn test_lock_make_permanent() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(2000), "user1", |res| {
@@ -1372,8 +1359,7 @@ fn test_lock_make_permanent() {
 #[test]
 fn test_lock_merge_permanent() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 10, addr.uluna(  2000), "user1", |res| {
@@ -1446,8 +1432,7 @@ fn test_lock_merge_permanent() {
 #[test]
 fn test_config() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite.q_ve_config(|res| {
     assert_eq!(

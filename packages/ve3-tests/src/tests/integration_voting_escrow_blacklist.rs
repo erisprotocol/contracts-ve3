@@ -14,8 +14,7 @@ use ve3_voting_escrow::error::ContractError;
 #[test]
 fn test_blacklist() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
@@ -90,8 +89,7 @@ fn test_blacklist() {
 #[test]
 fn test_blacklist_remove() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user1", |res| {
@@ -132,7 +130,9 @@ fn test_blacklist_remove() {
         }
       );
     })
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
     .add_one_period()
     .q_gauge_user_info("user1", Some(Time::Next), |res| {
       assert_eq!(

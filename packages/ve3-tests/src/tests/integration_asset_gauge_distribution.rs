@@ -11,8 +11,7 @@ use ve3_shared::{
 #[test]
 fn test_gauge_distribution() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time_any(None, addr.uluna(1000), "user1", |res| res.assert_valid())
@@ -52,8 +51,7 @@ fn test_gauge_distribution() {
 #[test]
 fn test_gauge_distributions() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time_any(None, addr.uluna(1000), "user1", |res| res.assert_valid())
@@ -203,8 +201,7 @@ fn test_gauge_distributions() {
 #[test]
 fn test_gauge_distributions_decay() {
   let mut suite = TestingSuite::def();
-  let suite = suite.init();
-  let addr = suite.addresses.clone();
+  let addr = suite.init();
 
   suite
     .e_ve_create_lock_time_any(Some(SECONDS_PER_WEEK * 10), addr.ampluna(1000), "user1", |res| {

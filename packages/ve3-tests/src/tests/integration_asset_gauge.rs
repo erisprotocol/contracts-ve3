@@ -25,13 +25,16 @@ use ve3_shared::{
 #[test]
 fn test_total_vp() {
   let mut suite = TestingSuite::def();
-
+  suite.init();
   let user1 = suite.address("user1").to_string();
 
   suite
-    .init()
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| {
+      res.assert_valid()
+    })
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user2", |res| {
+      res.assert_valid()
+    })
     .q_ve_all_tokens(None, None, |res| {
       assert_eq!(
         res.unwrap(),
@@ -96,11 +99,10 @@ fn test_total_vp() {
 #[test]
 fn test_locks_transfer() {
   let mut suite = TestingSuite::def();
-
+  suite.init();
   let user2 = suite.address("user2").to_string();
 
   suite
-    .init()
     .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, native("uluna", 1000u128), "user1", |res| {
       res.assert_attribute(attr("action", "ve/create_lock"));
       res.assert_attribute(attr("token_id", "1"));
@@ -823,8 +825,12 @@ fn test_user_infos() {
   let addr = suite.addresses.clone();
 
   suite
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| res.assert_valid())
-    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user2", |res| res.assert_valid())
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.uluna(1000), "user1", |res| {
+      res.assert_valid()
+    })
+    .e_ve_create_lock_time(SECONDS_PER_WEEK * 2, addr.ampluna(1000), "user2", |res| {
+      res.assert_valid()
+    })
     .q_gauge_user_infos(None, None, None, |res| {
       assert_eq!(
         res.unwrap(),
