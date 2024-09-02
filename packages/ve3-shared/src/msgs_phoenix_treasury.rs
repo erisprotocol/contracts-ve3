@@ -7,7 +7,7 @@ use crate::{
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Api, QuerierWrapper, Uint128};
 use cw_address_like::AddressLike;
-use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase};
+use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
@@ -26,7 +26,8 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub struct VetoRight<T: AddressLike> {
   pub vetoer: T,
-  pub min_amount_usd: Uint128,
+  pub spend_above_usd: Uint128,
+  pub spend_above_usd_30d: Uint128,
   pub delay_s: u64,
 }
 
@@ -34,7 +35,8 @@ impl VetoRight<String> {
   pub fn check(self, api: &dyn Api) -> Result<VetoRight<Addr>, SharedError> {
     Ok(VetoRight {
       vetoer: api.addr_validate(&self.vetoer)?,
-      min_amount_usd: self.min_amount_usd,
+      spend_above_usd: self.spend_above_usd,
+      spend_above_usd_30d: self.spend_above_usd_30d,
       delay_s: self.delay_s,
     })
   }
@@ -130,7 +132,8 @@ pub struct TreasuryAction {
   pub done: bool,
   pub setup: TreasuryActionSetup,
   pub active_from: u64,
-  pub total_value_usd: Uint128,
+  pub total_usd: Uint128,
+  pub total_usd_30d: Uint128,
   pub runtime: TreasuryActionRuntime,
 }
 
@@ -318,4 +321,15 @@ pub enum QueryMsg {
     start_after: Option<u64>,
     limit: Option<u32>,
   },
+
+  #[returns(BalancesResponse)]
+  Balances {
+    assets: Option<Vec<AssetInfoUnchecked>>,
+  },
+}
+
+#[cw_serde]
+pub struct BalancesResponse {
+  pub reserved: Assets,
+  pub available: Assets,
 }

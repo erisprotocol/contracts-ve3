@@ -94,4 +94,7 @@ pub enum ContractError {
 
   #[error("Swap assets cannot be the same")]
   SwapAssetsSame,
+
+  #[error("Cannot use VT in setup")]
+  CannotUseVt,
 }

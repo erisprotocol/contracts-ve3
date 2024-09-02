@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Uint128};
 use cw_asset::AssetInfo;
 use cw_storage_plus::{Item, Map};
 use std::collections::HashSet;
@@ -11,3 +11,5 @@ pub const STATE: Item<State> = Item::new("state");
 pub const ACTIONS: Map<u64, TreasuryAction> = Map::new("actions");
 pub const USER_ACTIONS: Map<(&Addr, u64), ()> = Map::new("user_actions");
 pub const ORACLES: Map<&AssetInfo, Oracle<Addr>> = Map::new("oracles");
+
+pub const SPENT_IN_EPOCH: Map<u64, Uint128> = Map::new("spent_in_month");

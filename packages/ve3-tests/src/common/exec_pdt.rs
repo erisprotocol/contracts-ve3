@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use cosmwasm_std::{Addr, StdResult, Uint128};
-use cw_asset::{Asset, AssetInfoBase};
+use cw_asset::{Asset, AssetInfoBase, AssetInfoUnchecked};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{extensions::asset_ext::AssetExt, msgs_phoenix_treasury::*};
 
@@ -293,6 +293,21 @@ impl TestingSuite {
       self.contract_pdt(),
       &QueryMsg::Action {
         id,
+      },
+    );
+    result(response);
+    self
+  }
+
+  pub fn q_pdt_balances(
+    &mut self,
+    assets: Option<Vec<AssetInfoUnchecked>>,
+    result: impl Fn(StdResult<BalancesResponse>),
+  ) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(
+      self.contract_pdt(),
+      &QueryMsg::Balances {
+        assets,
       },
     );
     result(response);

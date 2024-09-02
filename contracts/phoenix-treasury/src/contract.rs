@@ -5,18 +5,20 @@ use crate::domains::alliance::{
   alliance_delegate, alliance_redelegate, alliance_undelegate, claim_rewards, remove_validator,
 };
 use crate::error::ContractError;
-use crate::state::{ACTIONS, CONFIG, ORACLES, STATE, USER_ACTIONS, VALIDATORS};
+use crate::state::{ACTIONS, CONFIG, ORACLES, SPENT_IN_EPOCH, STATE, USER_ACTIONS, VALIDATORS};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Reply, Response, Uint128};
 use cw2::set_contract_version;
-use cw_asset::{Asset, AssetInfoBase};
+use cw_asset::{Asset, AssetInfo, AssetInfoBase};
 use std::cmp;
 use std::collections::HashSet;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::adapters::pair::Pair;
 use ve3_shared::adapters::router::Router;
-use ve3_shared::constants::{PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_VETO_CONFIG_OWNER};
+use ve3_shared::constants::{
+  PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_VETO_CONFIG_OWNER, SECONDS_PER_30D,
+};
 use ve3_shared::extensions::asset_ext::AssetExt;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::assets::Assets;
@@ -194,11 +196,10 @@ fn execute_veto(
   let action = ACTIONS.load(deps.storage, id)?;
   assert_not_cancelled_or_done(&action)?;
 
-  if veto_config.min_amount_usd > action.total_value_usd {
-    return Err(ContractError::ActionValueNotEnough(
-      veto_config.min_amount_usd,
-      action.total_value_usd,
-    ));
+  if veto_config.spend_above_usd > action.total_usd
+    && veto_config.spend_above_usd_30d > action.total_usd_30d
+  {
+    return Err(ContractError::ActionValueNotEnough(veto_config.spend_above_usd, action.total_usd));
   }
 
   cancel_action(&mut deps, state, action)?;
@@ -538,6 +539,10 @@ fn execute_setup(
 
   // check that contract has enough assets
   for asset in &reserved.0 {
+    if asset.info == AssetInfo::native(config.alliance_token_denom.clone()) {
+      return Err(ContractError::CannotUseVt);
+    }
+
     // this validates that the asset is correct
     let balance = asset.info.query_balance(&deps.querier, env.contract.address.clone())?;
     let required = state
@@ -553,10 +558,15 @@ fn execute_setup(
   // calculate usd value
   let value_usd = calculate_value(&deps, &reserved)?;
 
+  let epoch_30d = env.block.time.seconds() / SECONDS_PER_30D;
+  let mut spent_in_month = SPENT_IN_EPOCH.may_load(deps.storage, epoch_30d)?.unwrap_or_default();
+  spent_in_month += value_usd;
+  SPENT_IN_EPOCH.save(deps.storage, epoch_30d, &spent_in_month)?;
+
   // get delay by usd value
   let mut delay = 0u64;
   for veto in config.vetos {
-    if value_usd >= veto.min_amount_usd {
+    if value_usd >= veto.spend_above_usd || spent_in_month >= veto.spend_above_usd_30d {
       delay = cmp::max(veto.delay_s, delay);
     }
   }
@@ -573,7 +583,8 @@ fn execute_setup(
       done: false,
       setup: action.clone(),
       active_from: env.block.time.seconds() + delay,
-      total_value_usd: value_usd,
+      total_usd: value_usd,
+      total_usd_30d: spent_in_month,
       runtime,
     },
   )?;

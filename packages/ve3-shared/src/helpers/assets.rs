@@ -67,6 +67,10 @@ impl Assets {
     self.0.iter().find(|a| a.info == *info).cloned()
   }
 
+  pub fn get_mut(&mut self, info: &AssetInfo) -> Option<&mut Asset> {
+    self.0.iter_mut().find(|a| a.info == *info)
+  }
+
   pub fn remove_multi(&mut self, assets: &Vec<Asset>) -> Result<(), SharedError> {
     for asset in assets {
       self.remove(asset)?;

@@ -6,6 +6,7 @@ use crate::{
   extensions::app_response_ext::{EventChecker, Valid},
 };
 use cosmwasm_std::{attr, Decimal, StdError};
+use cw_asset::Asset;
 use eris::constants::{HOUR, WEEK};
 use phoenix_treasury::error::ContractError;
 use ve3_shared::{
@@ -169,7 +170,8 @@ fn test_payment() {
             setup: TreasuryActionSetup::Payment {
               payments: vec![(addr.user1.to_string(), addr.uluna(1000)).into()],
             },
-            total_value_usd: u(300),
+            total_usd: u(300),
+            total_usd_30d: u(300),
             runtime: TreasuryActionRuntime::Payment {
               open: vec![(addr.user1.to_string(), addr.uluna(1000)).into()]
             }
@@ -187,7 +189,8 @@ fn test_payment() {
                 (addr.user2.to_string(), addr.uluna(1000)).into()
               ],
             },
-            total_value_usd: u(800),
+            total_usd: u(800),
+            total_usd_30d: u(1100),
             runtime: TreasuryActionRuntime::Payment {
               open: vec![
                 (addr.user1.to_string(), addr.usdc(500)).into(),
@@ -214,7 +217,8 @@ fn test_payment() {
               (addr.user2.to_string(), addr.uluna(1000)).into()
             ],
           },
-          total_value_usd: u(800),
+          total_usd: u(800),
+          total_usd_30d: u(1100),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![
               (addr.user1.to_string(), addr.usdc(500)).into(),
@@ -240,7 +244,8 @@ fn test_payment() {
               (addr.user2.to_string(), addr.uluna(1000)).into()
             ],
           },
-          total_value_usd: u(800),
+          total_usd: u(800),
+          total_usd_30d: u(1100),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![
               (addr.user1.to_string(), addr.usdc(500)).into(),
@@ -263,7 +268,8 @@ fn test_payment() {
           setup: TreasuryActionSetup::Payment {
             payments: vec![(addr.user1.to_string(), addr.uluna(1000)).into()],
           },
-          total_value_usd: u(300),
+          total_usd: u(300),
+          total_usd_30d: u(300),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![(addr.user1.to_string(), addr.uluna(1000)).into()]
           }
@@ -276,6 +282,15 @@ fn test_payment() {
         State {
           max_id: 2,
           reserved: vec![addr.uluna(2000), addr.usdc(500)].into()
+        }
+      )
+    })
+    .q_pdt_balances(None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        BalancesResponse {
+          reserved: vec![addr.uluna(2000), addr.usdc(500)].into(),
+          available: vec![addr.usdc(100000000 - 500), addr.uluna(100000000 - 2000)].into(),
         }
       )
     })
@@ -304,6 +319,15 @@ fn test_payment() {
         }
       )
     })
+    .q_pdt_balances(None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        BalancesResponse {
+          reserved: vec![addr.uluna(1000), addr.usdc(500)].into(),
+          available: vec![addr.usdc(100000000 - 500), addr.uluna(100000000 - 2000)].into(),
+        }
+      )
+    })
     .q_pdt_actions(None, None, |res| {
       assert_eq!(
         res.unwrap(),
@@ -318,7 +342,8 @@ fn test_payment() {
             setup: TreasuryActionSetup::Payment {
               payments: vec![(addr.user1.to_string(), addr.uluna(1000)).into()],
             },
-            total_value_usd: u(300),
+            total_usd: u(300),
+            total_usd_30d: u(300),
             runtime: TreasuryActionRuntime::Payment {
               open: vec![(addr.user1.to_string(), addr.uluna(1000)).into()]
             }
@@ -336,7 +361,8 @@ fn test_payment() {
                 (addr.user2.to_string(), addr.uluna(1000)).into()
               ],
             },
-            total_value_usd: u(800),
+            total_usd: u(800),
+            total_usd_30d: u(1100),
             runtime: TreasuryActionRuntime::Payment {
               open: vec![(addr.user1.to_string(), addr.usdc(500)).into()]
             }
@@ -374,7 +400,8 @@ fn test_payment() {
             setup: TreasuryActionSetup::Payment {
               payments: vec![(addr.user1.to_string(), addr.uluna(1000)).into()],
             },
-            total_value_usd: u(300),
+            total_usd: u(300),
+            total_usd_30d: u(300),
             runtime: TreasuryActionRuntime::Payment {
               open: vec![(addr.user1.to_string(), addr.uluna(1000)).into()]
             }
@@ -392,7 +419,8 @@ fn test_payment() {
                 (addr.user2.to_string(), addr.uluna(1000)).into()
               ],
             },
-            total_value_usd: u(800),
+            total_usd: u(800),
+            total_usd_30d: u(1100),
             runtime: TreasuryActionRuntime::Payment {
               open: vec![]
             }
@@ -474,7 +502,8 @@ fn test_payment_cancel_half_claimed() {
               (addr.user2.to_string(), addr.uluna(1000)).into()
             ],
           },
-          total_value_usd: u(800),
+          total_usd: u(800),
+          total_usd_30d: u(800),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![(addr.user1.to_string(), addr.usdc(500)).into()]
           }
@@ -558,7 +587,8 @@ fn test_payment_veto_half_claimed() {
               (addr.user2.to_string(), addr.uluna(1000)).into()
             ],
           },
-          total_value_usd: u(800),
+          total_usd: u(800),
+          total_usd_30d: u(800),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![(addr.user1.to_string(), addr.usdc(500)).into()]
           }
@@ -654,7 +684,8 @@ fn test_payment_delay() {
               (addr.user1.to_string(), addr.usdc(500), current_time + 8 * WEEK).into(),
             ],
           },
-          total_value_usd: u(2000),
+          total_usd: u(2000),
+          total_usd_30d: u(2000),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![(addr.user1.to_string(), addr.usdc(500), current_time + 8 * WEEK).into()]
           }
@@ -704,7 +735,8 @@ fn test_veto_delay() {
               (addr.user2.to_string(), addr.uluna(1000)).into()
             ],
           },
-          total_value_usd: u(5300),
+          total_usd: u(5300),
+          total_usd_30d: u(5300),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![
               (addr.user1.to_string(), addr.usdc(5000)).into(),
@@ -762,7 +794,8 @@ fn test_veto_delay() {
               (addr.user2.to_string(), addr.uluna(1000)).into()
             ],
           },
-          total_value_usd: u(5300),
+          total_usd: u(5300),
+          total_usd_30d: u(5300),
           runtime: TreasuryActionRuntime::Payment {
             open: vec![(addr.user1.to_string(), addr.usdc(5000)).into()]
           }
@@ -855,7 +888,8 @@ fn test_milestones() {
               },
             ]
           },
-          total_value_usd: u(1800),
+          total_usd: u(1800),
+          total_usd_30d: u(1800),
           runtime: TreasuryActionRuntime::Milestone {
             milestones: vec![
               MilestoneRuntime {
@@ -960,7 +994,8 @@ fn test_milestones() {
               },
             ]
           },
-          total_value_usd: u(1800),
+          total_usd: u(1800),
+          total_usd_30d: u(1800),
           runtime: TreasuryActionRuntime::Milestone {
             milestones: vec![
               MilestoneRuntime {
@@ -1072,7 +1107,8 @@ fn test_milestones_done() {
               },
             ]
           },
-          total_value_usd: u(1800),
+          total_usd: u(1800),
+          total_usd_30d: u(1800),
           runtime: TreasuryActionRuntime::Milestone {
             milestones: vec![
               MilestoneRuntime {
@@ -1198,7 +1234,8 @@ fn test_otc() {
             amount: addr.uluna(10000),
             into: addr.usdc(1500),
           },
-          total_value_usd: u(3000),
+          total_usd: u(3000),
+          total_usd_30d: u(3000),
           runtime: TreasuryActionRuntime::Otc {}
         }]
       )
@@ -1217,7 +1254,8 @@ fn test_otc() {
             amount: addr.uluna(10000),
             into: addr.usdc(1500),
           },
-          total_value_usd: u(3000),
+          total_usd: u(3000),
+          total_usd_30d: u(3000),
           runtime: TreasuryActionRuntime::Otc {}
         }
       )
@@ -1245,7 +1283,8 @@ fn test_otc() {
             amount: addr.uluna(10000),
             into: addr.usdc(1500),
           },
-          total_value_usd: u(3000),
+          total_usd: u(3000),
+          total_usd_30d: u(3000),
           runtime: TreasuryActionRuntime::Otc {}
         }
       )
@@ -1326,7 +1365,8 @@ fn test_vesting() {
             start_s: current_time,
             end_s: current_time + WEEK * 10
           },
-          total_value_usd: u(3628800),
+          total_usd: u(3628800),
+          total_usd_30d: u(3628800),
           runtime: TreasuryActionRuntime::Vesting {
             last_claim_s: current_time + WEEK
           }
@@ -1364,7 +1404,8 @@ fn test_vesting() {
             start_s: current_time,
             end_s: current_time + WEEK * 10
           },
-          total_value_usd: u(3628800),
+          total_usd: u(3628800),
+          total_usd_30d: u(3628800),
           runtime: TreasuryActionRuntime::Vesting {
             last_claim_s: current_time + WEEK * 3
           }
@@ -1390,7 +1431,8 @@ fn test_vesting() {
             start_s: current_time,
             end_s: current_time + WEEK * 10
           },
-          total_value_usd: u(3628800),
+          total_usd: u(3628800),
+          total_usd_30d: u(3628800),
           runtime: TreasuryActionRuntime::Vesting {
             last_claim_s: current_time + WEEK * 53
           }
@@ -1483,7 +1525,8 @@ fn test_dca() {
             end_s: current_time + WEEK * 6,
             cooldown_s: HOUR
           },
-          total_value_usd: u(2177280),
+          total_usd: u(2177280),
+          total_usd_30d: u(2177280),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 2
           }
@@ -1520,7 +1563,8 @@ fn test_dca() {
             end_s: current_time + WEEK * 6,
             cooldown_s: HOUR
           },
-          total_value_usd: u(2177280),
+          total_usd: u(2177280),
+          total_usd_30d: u(2177280),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 3
           }
@@ -1556,7 +1600,8 @@ fn test_dca() {
             end_s: current_time + WEEK * 6,
             cooldown_s: HOUR
           },
-          total_value_usd: u(2177280),
+          total_usd: u(2177280),
+          total_usd_30d: u(2177280),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 7
           }
@@ -1590,7 +1635,8 @@ fn test_dca() {
             end_s: current_time + WEEK * 6,
             cooldown_s: HOUR
           },
-          total_value_usd: u(2177280),
+          total_usd: u(2177280),
+          total_usd_30d: u(2177280),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 8
           }
@@ -1603,6 +1649,266 @@ fn test_dca() {
         State {
           max_id: 1,
           reserved: vec![].into()
+        }
+      )
+    });
+}
+
+#[test]
+fn test_not_alliance() {
+  let mut suite = TestingSuite::def();
+  let addr = suite.init();
+  let alliance_token_denom = format!("factory/{0}/vt", addr.pdt);
+
+  suite
+    .q_pdt_config(|res| {
+      assert_eq!(
+        res.unwrap(),
+        Config {
+          global_config_addr: addr.ve3_global_config.clone(),
+          reward_denom: "uluna".to_string(),
+          alliance_token_denom: alliance_token_denom.clone(),
+          vetos: vec![]
+        }
+      )
+    })
+    .def_pdt()
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![
+          (addr.user1.to_string(), Asset::native(alliance_token_denom, 1000u128)).into()
+        ],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_error(ContractError::CannotUseVt),
+    );
+}
+
+#[test]
+fn test_monthly_spend() {
+  let mut suite = TestingSuite::def();
+  let addr = suite.init();
+  let current_time = suite.app.block_info().time.seconds();
+
+  suite
+    .def_pdt()
+    .q_pdt_balances(None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        BalancesResponse {
+          reserved: vec![].into(),
+          available: vec![addr.usdc(100000000), addr.uluna(100000000),].into(),
+        }
+      )
+    })
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .q_pdt_state(|res| {
+      assert_eq!(
+        res.unwrap(),
+        State {
+          max_id: 5,
+          reserved: vec![addr.usdc(999 * 5)].into()
+        }
+      )
+    })
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .q_pdt_actions(None, None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 1,
+            active_from: current_time,
+            name: "test".to_string(),
+            reserved: addr.usdc(999).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+            },
+            total_usd: u(999),
+            total_usd_30d: u(999),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.usdc(999)).into()]
+            }
+          },
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 2,
+            active_from: current_time,
+            name: "test".to_string(),
+            reserved: addr.usdc(999).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+            },
+            total_usd: u(999),
+            total_usd_30d: u(999 * 2),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.usdc(999)).into()]
+            }
+          },
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 3,
+            active_from: current_time,
+            name: "test".to_string(),
+            reserved: addr.usdc(999).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+            },
+            total_usd: u(999),
+            total_usd_30d: u(999 * 3),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.usdc(999)).into()]
+            }
+          },
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 4,
+            active_from: current_time,
+            name: "test".to_string(),
+            reserved: addr.usdc(999).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+            },
+            total_usd: u(999),
+            total_usd_30d: u(999 * 4),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.usdc(999)).into()]
+            }
+          },
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 5,
+            active_from: current_time,
+            name: "test".to_string(),
+            reserved: addr.usdc(999).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+            },
+            total_usd: u(999),
+            total_usd_30d: u(999 * 5),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.usdc(999)).into()]
+            }
+          },
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 6,
+            // delayed
+            active_from: current_time + WEEK,
+            name: "test".to_string(),
+            reserved: addr.usdc(999).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.usdc(999)).into()],
+            },
+            total_usd: u(999),
+            total_usd_30d: u(999 * 6),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.usdc(999)).into()]
+            }
+          },
+        ]
+      )
+    })
+    .add_periods(5)
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![(addr.user1.to_string(), addr.usdc(500)).into()],
+      },
+      PDT_CONTROLLER,
+      |res| res.assert_valid(),
+    )
+    .q_pdt_action(7, |res| {
+      assert_eq!(
+        res.unwrap(),
+        TreasuryAction {
+          cancelled: false,
+          done: false,
+          id: 7,
+          // delayed
+          active_from: current_time + WEEK * 5,
+          name: "test".to_string(),
+          reserved: addr.usdc(500).into(),
+          setup: TreasuryActionSetup::Payment {
+            payments: vec![(addr.user1.to_string(), addr.usdc(500)).into()],
+          },
+          total_usd: u(500),
+          total_usd_30d: u(500),
+          runtime: TreasuryActionRuntime::Payment {
+            open: vec![(addr.user1.to_string(), addr.usdc(500)).into()]
+          }
+        },
+      )
+    })
+    .q_pdt_state(|res| {
+      assert_eq!(
+        res.unwrap(),
+        State {
+          max_id: 7,
+          reserved: vec![addr.usdc(999 * 6 + 500)].into()
+        }
+      )
+    })
+    .q_pdt_balances(None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        BalancesResponse {
+          reserved: vec![addr.usdc(999 * 6 + 500)].into(),
+          available: vec![addr.usdc(100000000 - (999 * 6 + 500)), addr.uluna(100000000),].into(),
         }
       )
     });
@@ -1637,12 +1943,14 @@ impl TestingSuite {
         vec![
           VetoRight {
             vetoer: veto_always.to_string(),
-            min_amount_usd: u(0),
+            spend_above_usd: u(0),
+            spend_above_usd_30d: u(0),
             delay_s: 0,
           },
           VetoRight {
             vetoer: veto_big.to_string(),
-            min_amount_usd: u(1000),
+            spend_above_usd: u(1000),
+            spend_above_usd_30d: u(5000),
             delay_s: WEEK,
           },
         ],

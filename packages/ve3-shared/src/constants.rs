@@ -38,6 +38,8 @@ pub const SECONDS_PER_YEAR: u64 = 60 * 60 * 24 * 365;
 // mainnet: 7 * 86400
 // testnet: 60 * 60
 pub const SECONDS_PER_WEEK: u64 = 7 * 86400;
+pub const SECONDS_PER_30D: u64 = 30 * 86400;
+
 /// Seconds in 2 years which is the maximum lock period.
 pub const MAX_LOCK_TIME: u64 = 2 * 365 * 86400;
 // 2 years (104 weeks)

@@ -1,10 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order};
+use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
 use cw_storage_plus::Bound;
 use ve3_shared::{
   constants::{DEFAULT_LIMIT, MAX_LIMIT},
-  msgs_phoenix_treasury::{QueryMsg, TreasuryAction},
+  extensions::asset_info_ext::AssetInfoExt,
+  helpers::assets::Assets,
+  msgs_phoenix_treasury::{BalancesResponse, QueryMsg, TreasuryAction},
 };
 
 use crate::{
@@ -30,6 +33,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       limit,
       start_after,
     } => get_user_actions(deps, user, start_after, limit),
+    QueryMsg::Balances {
+      assets,
+    } => get_balances(deps, env, assets),
   }
 }
 
@@ -93,4 +99,43 @@ fn get_user_actions(
     .collect::<Result<Vec<_>, ContractError>>()?;
 
   Ok(to_json_binary(&actions)?)
+}
+
+fn get_balances(
+  deps: Deps,
+  env: Env,
+  assets: Option<Vec<AssetInfoUnchecked>>,
+) -> Result<Binary, ContractError> {
+  let state = STATE.load(deps.storage)?;
+  let config = CONFIG.load(deps.storage)?;
+
+  let total_assets: Vec<Asset> = match assets {
+    Some(assets) => assets
+      .into_iter()
+      .map(|a| {
+        Ok(a.check(deps.api, None)?.with_balance_query(&deps.querier, &env.contract.address)?)
+      })
+      .collect::<Result<Vec<Asset>, ContractError>>()?,
+    None => {
+      deps.querier.query_all_balances(env.contract.address)?.into_iter().map(|a| a.into()).collect()
+    },
+  };
+
+  let mut available: Assets = total_assets.into();
+  for reserved in &state.reserved.0 {
+    if let Some(available) = available.get_mut(&reserved.info) {
+      available.amount = available.amount.checked_sub(reserved.amount)?;
+    }
+  }
+
+  // alliance denom should be ignored
+  let alliance_token = AssetInfo::native(config.alliance_token_denom.clone());
+  if let Some(x) = available.get(&alliance_token) {
+    available.remove(&x)?;
+  }
+
+  Ok(to_json_binary(&BalancesResponse {
+    reserved: state.reserved,
+    available,
+  })?)
 }

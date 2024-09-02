@@ -11,7 +11,6 @@ use serde::Serialize;
 use std::vec;
 use ve3_shared::extensions::asset_ext::AssetExt;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
-use ve3_shared::helpers::assets::Assets;
 use ve3_shared::msgs_asset_gauge::GaugeConfig;
 use ve3_shared::msgs_voting_escrow::DepositAsset;
 use ve3_shared::{msgs_connector_alliance, msgs_connector_emission, msgs_phoenix_treasury};
