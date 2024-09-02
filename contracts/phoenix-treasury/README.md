@@ -17,9 +17,3 @@ Queries:
 - Query all actions per user - descending (user that is able to claim)
 - Query all actions - ascending
 - Query available balances (excludes reserved balances)
-
-## Notice
-
-This repository contains software developed by:
-
-- Alliance Protocol (Apache 2.0) <https://github.com/terra-money/alliance-protocol/>
