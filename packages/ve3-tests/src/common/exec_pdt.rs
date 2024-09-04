@@ -58,6 +58,23 @@ impl TestingSuite {
     self
   }
 
+  pub fn e_pdt_clawback(
+    &mut self,
+    recipient: &str,
+    assets: Vec<AssetInfoUnchecked>,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut Self {
+    let msg = ExecuteMsg::Clawback {
+      assets,
+      recipient: self.address(recipient).to_string(),
+    };
+
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_pdt(), &msg, &[]));
+    self
+  }
+
   pub fn e_pdt_cancel(
     &mut self,
     id: u64,
@@ -263,6 +280,26 @@ impl TestingSuite {
       &QueryMsg::Actions {
         start_after,
         limit,
+        direction: None,
+      },
+    );
+    result(response);
+    self
+  }
+
+  pub fn q_pdt_actions_direction(
+    &mut self,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+    direction: Direction,
+    result: impl Fn(StdResult<Vec<TreasuryAction>>),
+  ) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(
+      self.contract_pdt(),
+      &QueryMsg::Actions {
+        start_after,
+        limit,
+        direction: Some(direction),
       },
     );
     result(response);

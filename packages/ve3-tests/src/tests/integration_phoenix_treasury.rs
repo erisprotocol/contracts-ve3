@@ -10,7 +10,7 @@ use cw_asset::Asset;
 use eris::constants::{HOUR, WEEK};
 use phoenix_treasury::error::ContractError;
 use ve3_shared::{
-  constants::{AT_DELEGATION_CONTROLLER, PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_VETO_CONFIG_OWNER},
+  constants::{AT_DELEGATION_CONTROLLER, PDT_CONFIG_OWNER, PDT_CONTROLLER},
   error::SharedError,
   msgs_phoenix_treasury::*,
 };
@@ -201,6 +201,51 @@ fn test_payment() {
         ]
       )
     })
+    .q_pdt_actions_direction(None, None, Direction::Desc, |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 2,
+            active_from: current_time,
+            name: "test2".to_string(),
+            reserved: vec![addr.usdc(500), addr.uluna(1000)].into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![
+                (addr.user1.to_string(), addr.usdc(500)).into(),
+                (addr.user2.to_string(), addr.uluna(1000)).into()
+              ],
+            },
+            total_usd: u(800),
+            total_usd_30d: u(1100),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![
+                (addr.user1.to_string(), addr.usdc(500)).into(),
+                (addr.user2.to_string(), addr.uluna(1000)).into()
+              ]
+            }
+          },
+          TreasuryAction {
+            cancelled: false,
+            done: false,
+            id: 1,
+            active_from: current_time,
+            name: "test".to_string(),
+            reserved: addr.uluna(1000).into(),
+            setup: TreasuryActionSetup::Payment {
+              payments: vec![(addr.user1.to_string(), addr.uluna(1000)).into()],
+            },
+            total_usd: u(300),
+            total_usd_30d: u(300),
+            runtime: TreasuryActionRuntime::Payment {
+              open: vec![(addr.user1.to_string(), addr.uluna(1000)).into()]
+            }
+          }
+        ]
+      )
+    })
     .q_pdt_user_actions("user2", None, None, |res| {
       assert_eq!(
         res.unwrap(),
@@ -281,7 +326,8 @@ fn test_payment() {
         res.unwrap(),
         State {
           max_id: 2,
-          reserved: vec![addr.uluna(2000), addr.usdc(500)].into()
+          reserved: vec![addr.uluna(2000), addr.usdc(500)].into(),
+          clawback: false,
         }
       )
     })
@@ -315,7 +361,8 @@ fn test_payment() {
         res.unwrap(),
         State {
           max_id: 2,
-          reserved: vec![addr.uluna(1000), addr.usdc(500)].into()
+          reserved: vec![addr.uluna(1000), addr.usdc(500)].into(),
+          clawback: false,
         }
       )
     })
@@ -382,7 +429,8 @@ fn test_payment() {
         res.unwrap(),
         State {
           max_id: 2,
-          reserved: vec![addr.uluna(1000)].into()
+          reserved: vec![addr.uluna(1000)].into(),
+          clawback: false
         }
       )
     })
@@ -466,7 +514,8 @@ fn test_payment_cancel_half_claimed() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.usdc(500)].into()
+          reserved: vec![addr.usdc(500)].into(),
+          clawback: false
         }
       )
     })
@@ -479,7 +528,8 @@ fn test_payment_cancel_half_claimed() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     })
@@ -548,7 +598,8 @@ fn test_payment_veto_half_claimed() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.usdc(500)].into()
+          reserved: vec![addr.usdc(500)].into(),
+          clawback: false
         }
       )
     })
@@ -564,7 +615,8 @@ fn test_payment_veto_half_claimed() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     })
@@ -626,7 +678,8 @@ fn test_payment_delay() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.usdc(2000)].into()
+          reserved: vec![addr.usdc(2000)].into(),
+          clawback: false
         }
       )
     })
@@ -662,7 +715,8 @@ fn test_payment_delay() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.usdc(500)].into()
+          reserved: vec![addr.usdc(500)].into(),
+          clawback: false
         }
       )
     })
@@ -751,7 +805,8 @@ fn test_veto_delay() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.usdc(5000), addr.uluna(1000)].into()
+          reserved: vec![addr.usdc(5000), addr.uluna(1000)].into(),
+          clawback: false
         }
       )
     })
@@ -771,7 +826,8 @@ fn test_veto_delay() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     })
@@ -912,7 +968,8 @@ fn test_milestones() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna(6000)].into()
+          reserved: vec![addr.uluna(6000)].into(),
+          clawback: false
         }
       )
     })
@@ -944,7 +1001,8 @@ fn test_milestones() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna(5000)].into()
+          reserved: vec![addr.uluna(5000)].into(),
+          clawback: false
         }
       )
     })
@@ -966,7 +1024,8 @@ fn test_milestones() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     })
@@ -1067,7 +1126,8 @@ fn test_milestones_done() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     })
@@ -1201,7 +1261,8 @@ fn test_otc() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna(10000)].into()
+          reserved: vec![addr.uluna(10000)].into(),
+          clawback: false
         }
       )
     })
@@ -1216,7 +1277,8 @@ fn test_otc() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna(5000)].into()
+          reserved: vec![addr.uluna(5000)].into(),
+          clawback: false
         }
       )
     })
@@ -1294,7 +1356,8 @@ fn test_otc() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     });
@@ -1342,7 +1405,8 @@ fn test_vesting() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna((WEEK * 20) as u32)].into()
+          reserved: vec![addr.uluna((WEEK * 20) as u32)].into(),
+          clawback: false
         }
       )
     })
@@ -1378,7 +1442,8 @@ fn test_vesting() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna((WEEK * 18) as u32)].into()
+          reserved: vec![addr.uluna((WEEK * 18) as u32)].into(),
+          clawback: false
         }
       )
     })
@@ -1444,7 +1509,8 @@ fn test_vesting() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     });
@@ -1500,7 +1566,8 @@ fn test_dca() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![addr.uluna(week * 12)].into()
+          reserved: vec![addr.uluna(week * 12)].into(),
+          clawback: false
         }
       )
     })
@@ -1648,7 +1715,8 @@ fn test_dca() {
         res.unwrap(),
         State {
           max_id: 1,
-          reserved: vec![].into()
+          reserved: vec![].into(),
+          clawback: false
         }
       )
     });
@@ -1659,6 +1727,7 @@ fn test_not_alliance() {
   let mut suite = TestingSuite::def();
   let addr = suite.init();
   let alliance_token_denom = format!("factory/{0}/vt", addr.pdt);
+  let veto_owner = suite.address("PDT_VETO_CONFIG_OWNER");
 
   suite
     .q_pdt_config(|res| {
@@ -1668,7 +1737,8 @@ fn test_not_alliance() {
           global_config_addr: addr.ve3_global_config.clone(),
           reward_denom: "uluna".to_string(),
           alliance_token_denom: alliance_token_denom.clone(),
-          vetos: vec![]
+          vetos: vec![],
+          veto_owner: veto_owner.clone()
         }
       )
     })
@@ -1747,7 +1817,8 @@ fn test_monthly_spend() {
         res.unwrap(),
         State {
           max_id: 5,
-          reserved: vec![addr.usdc(999 * 5)].into()
+          reserved: vec![addr.usdc(999 * 5)].into(),
+          clawback: false
         }
       )
     })
@@ -1899,7 +1970,8 @@ fn test_monthly_spend() {
         res.unwrap(),
         State {
           max_id: 7,
-          reserved: vec![addr.usdc(999 * 6 + 500)].into()
+          reserved: vec![addr.usdc(999 * 6 + 500)].into(),
+          clawback: false
         }
       )
     })
@@ -1912,6 +1984,112 @@ fn test_monthly_spend() {
         }
       )
     });
+}
+
+#[test]
+fn test_veto_update() {
+  let mut suite = TestingSuite::def();
+  let addr = suite.init();
+  let alliance_token_denom = format!("factory/{0}/vt", addr.pdt);
+  let veto_owner = suite.address("PDT_VETO_CONFIG_OWNER");
+  let veto_always = suite.address("veto-always");
+  let veto_big = suite.address("veto-big");
+
+  suite
+    .q_pdt_config(|res| {
+      assert_eq!(
+        res.unwrap(),
+        Config {
+          global_config_addr: addr.ve3_global_config.clone(),
+          reward_denom: "uluna".to_string(),
+          alliance_token_denom: alliance_token_denom.clone(),
+          vetos: vec![],
+          veto_owner: veto_owner.clone()
+        }
+      )
+    })
+    .def_pdt()
+    .q_pdt_config(|res| {
+      assert_eq!(
+        res.unwrap(),
+        Config {
+          global_config_addr: addr.ve3_global_config.clone(),
+          reward_denom: "uluna".to_string(),
+          alliance_token_denom: alliance_token_denom.clone(),
+          vetos: vec![
+            VetoRight {
+              vetoer: veto_always.clone(),
+              spend_above_usd: u(0),
+              spend_above_usd_30d: u(0),
+              delay_s: 0,
+            },
+            VetoRight {
+              vetoer: veto_big.clone(),
+              spend_above_usd: u(1000),
+              spend_above_usd_30d: u(5000),
+              delay_s: WEEK,
+            },
+          ],
+          veto_owner: veto_owner.clone()
+        }
+      )
+    })
+    .e_pdt_update_veto_config(vec![], "user1", |res| {
+      res.assert_error(ContractError::SharedError(SharedError::Unauthorized {}))
+    })
+    .e_pdt_update_veto_config(vec![], "PDT_VETO_CONFIG_OWNER", |res| res.assert_valid())
+    .q_pdt_config(|res| {
+      assert_eq!(
+        res.unwrap(),
+        Config {
+          global_config_addr: addr.ve3_global_config.clone(),
+          reward_denom: "uluna".to_string(),
+          alliance_token_denom: alliance_token_denom.clone(),
+          vetos: vec![],
+          veto_owner: veto_owner.clone()
+        }
+      )
+    });
+}
+
+#[test]
+fn test_clawback() {
+  let mut suite = TestingSuite::def();
+  let addr = suite.init();
+
+  suite
+    .def_pdt()
+    .e_pdt_clawback("user1", vec![], "user1", |res| {
+      res.assert_error(ContractError::SharedError(SharedError::Unauthorized {}))
+    })
+    .e_pdt_clawback(
+      "user1",
+      vec![addr.uluna_info(), addr.usdc_info()],
+      "PDT_VETO_CONFIG_OWNER",
+      |res| {
+        res.assert_transfer(addr.user1.to_string(), addr.uluna(100000000));
+        res.assert_transfer(addr.user1.to_string(), addr.usdc(100000000));
+      },
+    )
+    .q_pdt_state(|res| {
+      assert_eq!(
+        res.unwrap(),
+        State {
+          max_id: 0,
+          reserved: vec![].into(),
+          clawback: true
+        }
+      )
+    })
+    .e_pdt_claim(1, "user2", |res| res.assert_error(ContractError::ClawbackTriggered))
+    .e_pdt_setup(
+      "test",
+      TreasuryActionSetup::Payment {
+        payments: vec![],
+      },
+      "user1",
+      |res| res.assert_error(ContractError::ClawbackTriggered),
+    );
 }
 
 impl TestingSuite {
@@ -1954,7 +2132,7 @@ impl TestingSuite {
             delay_s: WEEK,
           },
         ],
-        PDT_VETO_CONFIG_OWNER,
+        "PDT_VETO_CONFIG_OWNER",
         |res| res.assert_valid(),
       );
 

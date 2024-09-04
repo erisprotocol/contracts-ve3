@@ -48,10 +48,10 @@ fn test_config_default() {
             "PDT_CONTROLLER".to_string(),
             Addr::unchecked("terra1caaz4kfsu5w86mdc7c85a3zelyew2mlctdct7d64ygcc3myu7axqn9fugn")
           ),
-          (
-            "PDT_VETO_CONFIG_OWNER".to_string(),
-            Addr::unchecked("terra1pm88ac7093qmynm2u7lw9tsca7786frym623e3289dvh8yktnzss0h5x2c")
-          ),
+          // (
+          //   "PDT_VETO_CONFIG_OWNER".to_string(),
+          //   Addr::unchecked("terra1pm88ac7093qmynm2u7lw9tsca7786frym623e3289dvh8yktnzss0h5x2c")
+          // ),
           (
             "TAKE_RECIPIENT".to_string(),
             Addr::unchecked("terra1lx7v09sx6mwazws6nd4n499ue7z28d7wyst3js6rtcu47fuwnmtqh5r9xl")

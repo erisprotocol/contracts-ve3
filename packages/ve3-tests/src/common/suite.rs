@@ -460,7 +460,7 @@ impl TestingSuite {
         // pdt
         (PDT_CONFIG_OWNER.to_string(), self.address("PDT_CONFIG_OWNER").to_string()),
         (PDT_CONTROLLER.to_string(), self.address("PDT_CONTROLLER").to_string()),
-        (PDT_VETO_CONFIG_OWNER.to_string(), self.address("PDT_VETO_CONFIG_OWNER").to_string()),
+        // (PDT_VETO_CONFIG_OWNER.to_string(), self.address("PDT_VETO_CONFIG_OWNER").to_string()),
         // contracts
         (AT_VOTING_ESCROW.to_string(), self.addresses.ve3_voting_escrow.to_string()),
         (AT_ASSET_GAUGE.to_string(), self.addresses.ve3_asset_gauge.to_string()),

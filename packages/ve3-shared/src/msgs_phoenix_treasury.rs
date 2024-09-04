@@ -19,6 +19,7 @@ pub struct InstantiateMsg {
   pub reward_denom: String,
   pub alliance_token_denom: String,
   pub global_config_addr: String,
+  pub veto_owner: String,
   pub vetos: Vec<VetoRight<String>>,
   pub oracles: Vec<(AssetInfoBase<String>, Oracle<String>)>,
 }
@@ -226,6 +227,7 @@ pub struct Config {
   pub global_config_addr: Addr,
   pub reward_denom: String,
   pub alliance_token_denom: String,
+  pub veto_owner: Addr,
   pub vetos: Vec<VetoRight<Addr>>,
 }
 
@@ -239,54 +241,79 @@ impl Config {
 pub struct State {
   pub max_id: u64,
   pub reserved: Assets,
+  pub clawback: bool,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
+  // only allowed by veto owner to update what can be vetoed in what way
   UpdateVetoConfig {
     vetos: Vec<VetoRight<String>>,
   },
 
+  // controls what on-chain oracles are being used and what assets can be used
+  // asset can only be used if there is an oracle
   UpdateConfig {
     add_oracle: Option<Vec<(AssetInfoBase<String>, Oracle<String>)>>,
     remove_oracle: Option<Vec<AssetInfoBase<String>>>,
   },
 
+  // This method permanently stops any payment operation on the contract
+  // It will shutdown any open claims and vesting and stops everything. (Can break queries)
+  // It will return the specified assets to the specified recipient.
+  // It can only be called by the veto owner as a last resort.
+  // It can be called multiple times if assets have been forgotten to clawback.
+  Clawback {
+    recipient: String,
+    assets: Vec<AssetInfoUnchecked>,
+  },
+
+  // userd by the controller to setup payment actions
   Setup {
     name: String,
     action: TreasuryActionSetup,
   },
+  // cancel any unpaid action
   Cancel {
     id: u64,
   },
+  // vetoer if they have the right to veto, are allowed to cancel any action
   Veto {
     id: u64,
   },
+  // claiming actions is for payment recipients to claim their received amount.
   Claim {
     id: u64,
   },
+  // is used to update milestones and enable them for payout.
   UpdateMilestone {
     id: u64,
     index: u64,
     enabled: bool,
   },
 
+  // bot interface for executing DCAs through zapping, using cooldown and max trade size
   ExecuteDca {
     id: u64,
     min_received: Option<Uint128>,
   },
+
+  // interface to accept OTC offers from the PDT
   ExecuteOtc {
     id: u64,
     offer_amount: Uint128,
   },
 
   // Privileged functions
+  // claims staking rewards from alliance
   ClaimRewards {},
 
+  // Manage staked virtual token
   AllianceDelegate(AllianceDelegateMsg),
   AllianceUndelegate(AllianceUndelegateMsg),
   AllianceRedelegate(AllianceRedelegateMsg),
 
+  // Remove validators after undelegation to gas optimize claiming rewards.
   RemoveValidator {
     validator: String,
   },
@@ -295,26 +322,33 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
+  /// Returns config
   #[returns(Config)]
   Config {},
 
+  /// Returns config, including reserved amounts and if the clawback is active
   #[returns(State)]
   State {},
 
+  /// Returns validators that the contract stakes to
   #[returns(HashSet<Addr>)]
   Validators {},
 
+  /// Returns a specific action by id
   #[returns(TreasuryAction)]
   Action {
     id: u64,
   },
 
+  /// Returns a list of actions (define id sort direction)
   #[returns(Vec<TreasuryAction>)]
   Actions {
     start_after: Option<u64>,
     limit: Option<u32>,
+    direction: Option<Direction>,
   },
 
+  // Returns actions that have a claim associated to the user.
   #[returns(Vec<TreasuryAction>)]
   UserActions {
     user: String,
@@ -322,10 +356,17 @@ pub enum QueryMsg {
     limit: Option<u32>,
   },
 
+  // query balances of the contract (subtracting reserved amounts)
   #[returns(BalancesResponse)]
   Balances {
     assets: Option<Vec<AssetInfoUnchecked>>,
   },
+}
+
+#[cw_serde]
+pub enum Direction {
+  Asc,
+  Desc,
 }
 
 #[cw_serde]

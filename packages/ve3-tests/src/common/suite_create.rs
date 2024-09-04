@@ -246,6 +246,7 @@ impl TestingSuite {
       reward_denom: "uluna".to_string(),
       oracles: vec![],
       vetos: vec![],
+      veto_owner: self.address("PDT_VETO_CONFIG_OWNER").to_string(),
     };
 
     self.addresses.pdt = self.init_contract(code_id, msg, "phoenix_treasury");

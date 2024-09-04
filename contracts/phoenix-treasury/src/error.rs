@@ -97,4 +97,7 @@ pub enum ContractError {
 
   #[error("Cannot use VT in setup")]
   CannotUseVt,
+
+  #[error("Cannot interact with contract. Clawback triggered.")]
+  ClawbackTriggered,
 }

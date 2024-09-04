@@ -7,7 +7,7 @@ use ve3_shared::{
   constants::{DEFAULT_LIMIT, MAX_LIMIT},
   extensions::asset_info_ext::AssetInfoExt,
   helpers::assets::Assets,
-  msgs_phoenix_treasury::{BalancesResponse, QueryMsg, TreasuryAction},
+  msgs_phoenix_treasury::{BalancesResponse, Direction, QueryMsg, TreasuryAction},
 };
 
 use crate::{
@@ -24,7 +24,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::Actions {
       limit,
       start_after,
-    } => get_actions(deps, start_after, limit),
+      direction,
+    } => get_actions(deps, start_after, limit, direction),
     QueryMsg::Action {
       id,
     } => get_action(deps, id),
@@ -58,17 +59,30 @@ fn get_actions(
   deps: Deps,
   start_after: Option<u64>,
   limit: Option<u32>,
+  direction: Option<Direction>,
 ) -> Result<Binary, ContractError> {
+  let direction = direction.unwrap_or(Direction::Asc);
   let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
   let start_after = start_after.map(Bound::exclusive);
-  let actions: Vec<TreasuryAction> = ACTIONS
-    .range(deps.storage, start_after, None, Order::Ascending)
-    .map(|a| {
-      let (_, a) = a?;
-      Ok(a)
-    })
-    .take(limit)
-    .collect::<Result<Vec<_>, ContractError>>()?;
+
+  let actions: Vec<TreasuryAction> = match direction {
+    Direction::Asc => ACTIONS
+      .range(deps.storage, start_after, None, Order::Ascending)
+      .map(|a| {
+        let (_, a) = a?;
+        Ok(a)
+      })
+      .take(limit)
+      .collect::<Result<Vec<_>, ContractError>>()?,
+    Direction::Desc => ACTIONS
+      .range(deps.storage, None, start_after, Order::Descending)
+      .map(|a| {
+        let (_, a) = a?;
+        Ok(a)
+      })
+      .take(limit)
+      .collect::<Result<Vec<_>, ContractError>>()?,
+  };
 
   Ok(to_json_binary(&actions)?)
 }

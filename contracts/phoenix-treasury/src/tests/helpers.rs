@@ -31,6 +31,7 @@ pub fn setup_contract(deps: DepsMut) -> Response {
     global_config_addr: "global_config".to_string(),
     oracles: vec![],
     vetos: vec![],
+    veto_owner: "veto_owner".to_string(),
   };
   instantiate(deps, env, info, init_msg).unwrap()
 }

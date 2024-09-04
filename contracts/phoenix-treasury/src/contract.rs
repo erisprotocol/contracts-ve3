@@ -10,15 +10,14 @@ use crate::state::{ACTIONS, CONFIG, ORACLES, SPENT_IN_EPOCH, STATE, USER_ACTIONS
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Reply, Response, Uint128};
 use cw2::set_contract_version;
-use cw_asset::{Asset, AssetInfo, AssetInfoBase};
+use cw_asset::{Asset, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 use std::cmp;
 use std::collections::HashSet;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::adapters::pair::Pair;
 use ve3_shared::adapters::router::Router;
-use ve3_shared::constants::{
-  PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_VETO_CONFIG_OWNER, SECONDS_PER_30D,
-};
+use ve3_shared::constants::{PDT_CONFIG_OWNER, PDT_CONTROLLER, SECONDS_PER_30D};
+use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_ext::AssetExt;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::assets::Assets;
@@ -58,6 +57,7 @@ pub fn instantiate(
     alliance_token_denom: vt_full_denom.clone(),
     reward_denom: msg.reward_denom,
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
+    veto_owner: deps.api.addr_validate(&msg.veto_owner)?,
     vetos: msg.vetos.check(deps.api)?,
   };
 
@@ -67,6 +67,7 @@ pub fn instantiate(
     &State {
       reserved: Assets::default(),
       max_id: 0,
+      clawback: false,
     },
   )?;
 
@@ -135,6 +136,11 @@ pub fn execute(
       Ok(Response::new().add_attributes(vec![("action", "pdt/update_veto_config")]))
     },
 
+    ExecuteMsg::Clawback {
+      assets,
+      recipient,
+    } => execute_clawback(deps, env, info, recipient, assets),
+
     ExecuteMsg::Setup {
       name,
       action,
@@ -179,6 +185,35 @@ pub fn execute(
   }
 }
 
+fn execute_clawback(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  recipient: String,
+  assets: Vec<AssetInfoUnchecked>,
+) -> Result<Response, ContractError> {
+  let config = CONFIG.load(deps.storage)?;
+  let mut state = STATE.load(deps.storage)?;
+  assert_veto_config_owner(&deps, &info, &config)?;
+
+  state.clawback = true;
+  STATE.save(deps.storage, &state)?;
+
+  let recipient = deps.api.addr_validate(&recipient)?;
+
+  let mut msgs = vec![];
+  for asset in assets {
+    let asset = asset.check(deps.api, None)?;
+    msgs.push(
+      asset
+        .with_balance_query(&deps.querier, &env.contract.address)?
+        .transfer_msg(recipient.clone())?,
+    )
+  }
+
+  Ok(Response::new().add_attributes(vec![("action", "pdt/clawback")]).add_messages(msgs))
+}
+
 fn execute_veto(
   mut deps: DepsMut,
   _env: Env,
@@ -215,6 +250,9 @@ fn execute_update_milestone(
   index: u64,
   enabled: bool,
 ) -> Result<Response, ContractError> {
+  let state = STATE.load(deps.storage)?;
+  assert_not_clawback(&state)?;
+
   let config = CONFIG.load(deps.storage)?;
   let mut action = ACTIONS.load(deps.storage, id)?;
   assert_not_cancelled_or_done(&action)?;
@@ -264,6 +302,9 @@ fn execute_dca(
   id: u64,
   min_received: Option<Uint128>,
 ) -> Result<Response, ContractError> {
+  let mut state = STATE.load(deps.storage)?;
+  assert_not_clawback(&state)?;
+
   let config = CONFIG.load(deps.storage)?;
   let mut action = ACTIONS.load(deps.storage, id)?;
   assert_not_cancelled_or_done(&action)?;
@@ -321,7 +362,6 @@ fn execute_dca(
 
       let use_asset = amount.info.with_balance(use_amount);
 
-      let mut state = STATE.load(deps.storage)?;
       state.reserved.remove(&use_asset)?;
       STATE.save(deps.storage, &state)?;
 
@@ -357,6 +397,9 @@ fn execute_otc(
   id: u64,
   offer_amount: Uint128,
 ) -> Result<Response, ContractError> {
+  let mut state = STATE.load(deps.storage)?;
+  assert_not_clawback(&state)?;
+
   let mut action = ACTIONS.load(deps.storage, id)?;
   assert_not_cancelled_or_done(&action)?;
   assert_action_active(&env, &action)?;
@@ -394,7 +437,6 @@ fn execute_otc(
 
       let return_asset = amount.info.with_balance(return_amount);
 
-      let mut state = STATE.load(deps.storage)?;
       state.reserved.remove(&return_asset)?;
       STATE.save(deps.storage, &state)?;
 
@@ -425,8 +467,10 @@ fn execute_setup(
   name: String,
   action: TreasuryActionSetup,
 ) -> Result<Response, ContractError> {
-  let config = CONFIG.load(deps.storage)?;
   let mut state = STATE.load(deps.storage)?;
+  assert_not_clawback(&state)?;
+
+  let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
 
   let (reserved, recipients, runtime) = match &action {
@@ -594,14 +638,23 @@ fn execute_setup(
   Ok(Response::new().add_attributes(vec![("action", "pdt/setup"), ("id", &id.to_string())]))
 }
 
+fn assert_not_clawback(state: &State) -> Result<(), ContractError> {
+  if state.clawback {
+    return Err(ContractError::ClawbackTriggered);
+  }
+  Ok(())
+}
+
 fn execute_claim(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
   id: u64,
 ) -> Result<Response, ContractError> {
-  let mut action = ACTIONS.load(deps.storage, id)?;
+  let mut state = STATE.load(deps.storage)?;
+  assert_not_clawback(&state)?;
 
+  let mut action = ACTIONS.load(deps.storage, id)?;
   assert_not_cancelled_or_done(&action)?;
   assert_action_active(&env, &action)?;
 
@@ -705,7 +758,6 @@ fn execute_claim(
     return Err(ContractError::CannotClaimNothingToClaim);
   }
 
-  let mut state = STATE.load(deps.storage)?;
   state.reserved.remove(&send_asset)?;
   STATE.save(deps.storage, &state)?;
 
@@ -832,12 +884,16 @@ fn assert_controller(
   config.global_config().assert_has_access(&deps.querier, PDT_CONTROLLER, &info.sender)?;
   Ok(())
 }
+
 fn assert_veto_config_owner(
-  deps: &DepsMut,
+  _deps: &DepsMut,
   info: &MessageInfo,
   config: &Config,
 ) -> Result<(), ContractError> {
-  config.global_config().assert_has_access(&deps.querier, PDT_VETO_CONFIG_OWNER, &info.sender)?;
+  if config.veto_owner != info.sender {
+    return Err(ContractError::SharedError(SharedError::Unauthorized {}));
+  }
+
   Ok(())
 }
 

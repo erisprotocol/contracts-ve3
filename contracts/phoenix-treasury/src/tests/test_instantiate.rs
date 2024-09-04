@@ -49,6 +49,7 @@ fn test_setup_contract() {
       alliance_token_denom: full_denom.to_string(),
       global_config_addr: Addr::unchecked("global_config"),
       vetos: vec![],
+      veto_owner: Addr::unchecked("veto_owner")
     }
   );
 }
