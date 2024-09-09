@@ -2092,6 +2092,27 @@ fn test_clawback() {
     );
 }
 
+#[test]
+fn test_oracle_prices() {
+  let mut suite = TestingSuite::def();
+  let addr = suite.init();
+
+  suite
+    .def_pdt()
+    .q_pdt_oracle_prices(None, |res| {
+      assert_eq!(
+        res.unwrap(),
+        vec![
+          (addr.usdc_info_checked(), Decimal::one()),
+          (addr.uluna_info_checked(), Decimal::percent(30))
+        ]
+      )
+    })
+    .q_pdt_oracle_prices(Some(vec![addr.uluna_info()]), |res| {
+      assert_eq!(res.unwrap(), vec![(addr.uluna_info_checked(), Decimal::percent(30))])
+    });
+}
+
 impl TestingSuite {
   pub fn def_pdt(&mut self) -> &mut TestingSuite {
     let addr = self.addresses.clone();

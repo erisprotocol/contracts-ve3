@@ -350,4 +350,19 @@ impl TestingSuite {
     result(response);
     self
   }
+
+  pub fn q_pdt_oracle_prices(
+    &mut self,
+    assets: Option<Vec<AssetInfoUnchecked>>,
+    result: impl Fn(StdResult<OraclesResponse>),
+  ) -> &mut Self {
+    let response = self.app.wrap().query_wasm_smart(
+      self.contract_pdt(),
+      &QueryMsg::OraclePrices {
+        assets,
+      },
+    );
+    result(response);
+    self
+  }
 }

@@ -1,18 +1,21 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order};
+use cosmwasm_std::{to_json_binary, Addr, Binary, Decimal, Deps, Env, Order, StdError};
 use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
 use cw_storage_plus::Bound;
 use ve3_shared::{
+  adapters::{pair::Pair, router::Router},
   constants::{DEFAULT_LIMIT, MAX_LIMIT},
   extensions::asset_info_ext::AssetInfoExt,
   helpers::assets::Assets,
-  msgs_phoenix_treasury::{BalancesResponse, Direction, QueryMsg, TreasuryAction},
+  msgs_phoenix_treasury::{
+    BalancesResponse, Direction, Oracle, OraclesResponse, QueryMsg, TreasuryAction,
+  },
 };
 
 use crate::{
   error::ContractError,
-  state::{ACTIONS, CONFIG, STATE, USER_ACTIONS, VALIDATORS},
+  state::{ACTIONS, CONFIG, ORACLES, STATE, USER_ACTIONS, VALIDATORS},
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -37,6 +40,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::Balances {
       assets,
     } => get_balances(deps, env, assets),
+    QueryMsg::OraclePrices {
+      assets,
+    } => get_oracle_prices(deps, env, assets),
   }
 }
 
@@ -152,4 +158,62 @@ fn get_balances(
     reserved: state.reserved,
     available,
   })?)
+}
+
+fn get_oracle_prices(
+  deps: Deps,
+  _env: Env,
+  assets: Option<Vec<AssetInfoUnchecked>>,
+) -> Result<Binary, ContractError> {
+  let oracles = match assets {
+    Some(assets) => {
+      let mut result = vec![];
+      for asset in assets {
+        let asset = asset.check(deps.api, None)?;
+        result.push((asset.clone(), ORACLES.load(deps.storage, &asset)?));
+      }
+      result
+    },
+    None => ORACLES
+      .range(deps.storage, None, None, Order::Ascending)
+      .collect::<Result<Vec<(AssetInfo, Oracle<Addr>)>, StdError>>()?,
+  };
+
+  let mut prices: OraclesResponse = vec![];
+
+  for (info, oracle) in oracles {
+    let price = match oracle {
+      Oracle::Usdc => Decimal::one(),
+      Oracle::Pair {
+        contract,
+        simulation_amount,
+      } => {
+        let result = Pair(contract).query_simulate(
+          &deps.querier,
+          info.with_balance(simulation_amount),
+          None,
+        )?;
+
+        Decimal::from_ratio(result.return_amount, simulation_amount)
+      },
+
+      Oracle::Route {
+        contract,
+        path,
+        simulation_amount,
+      } => {
+        let result = Router(contract).query_simulate(
+          &deps.querier,
+          info.with_balance(simulation_amount),
+          path,
+        )?;
+
+        Decimal::from_ratio(result.amount, simulation_amount)
+      },
+    };
+
+    prices.push((info, price));
+  }
+
+  Ok(to_json_binary(&prices)?)
 }

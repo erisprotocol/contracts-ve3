@@ -5,7 +5,7 @@ use crate::{
   helpers::assets::Assets,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Api, QuerierWrapper, Uint128};
+use cosmwasm_std::{Addr, Api, Decimal, QuerierWrapper, Uint128};
 use cw_address_like::AddressLike;
 use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 #[allow(unused_imports)]
@@ -361,6 +361,11 @@ pub enum QueryMsg {
   Balances {
     assets: Option<Vec<AssetInfoUnchecked>>,
   },
+
+  #[returns(OraclesResponse)]
+  OraclePrices {
+    assets: Option<Vec<AssetInfoUnchecked>>,
+  },
 }
 
 #[cw_serde]
@@ -374,3 +379,6 @@ pub struct BalancesResponse {
   pub reserved: Assets,
   pub available: Assets,
 }
+
+// #[cw_serde]
+pub type OraclesResponse = Vec<(AssetInfo, Decimal)>;
