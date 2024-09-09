@@ -932,7 +932,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "phoenix-treasury"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1386,7 +1386,7 @@ checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
 
 [[package]]
 name = "ve3-asset-gauge"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1401,7 +1401,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-asset-staking"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1419,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-bribe-manager"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-connector-alliance"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1453,7 +1453,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-connector-emission"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1468,7 +1468,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-global-config"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1483,7 +1483,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-shared"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1505,7 +1505,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-tests"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "colored",
@@ -1543,7 +1543,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-voting-escrow"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1561,7 +1561,7 @@ dependencies = [
 
 [[package]]
 name = "ve3-zapper"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",

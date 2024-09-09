@@ -662,10 +662,15 @@ fn distribute_bribes(
   if update == Some(true) {
     let mut msgs = vec![];
     for asset in assets.iter() {
-      let asset_config = ASSET_CONFIG.may_load(deps.storage, asset)?.unwrap_or_default();
-      let claim_msgs =
-        asset_config.stake_config.claim_check_received_msg(&deps, &env, asset.clone())?;
-      msgs.extend(claim_msgs)
+      let (_, shares) = TOTAL.may_load(deps.storage, asset)?.unwrap_or_default();
+      if !shares.is_zero() {
+        let asset_config = ASSET_CONFIG.may_load(deps.storage, asset)?.unwrap_or_default();
+
+        // only if there is staked amount
+        let claim_msgs =
+          asset_config.stake_config.claim_check_received_msg(&deps, &env, asset.clone())?;
+        msgs.extend(claim_msgs)
+      }
     }
 
     msgs.push(env.callback_msg(ExecuteMsg::Callback(CallbackMsg::DistributeBribes {
