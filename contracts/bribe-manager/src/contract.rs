@@ -7,7 +7,7 @@ use crate::{
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{attr, DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetInfo};
 use ve3_shared::{
@@ -270,6 +270,7 @@ fn claim_bribes(
   let mut bribe_total = Assets::default();
 
   let mut periods = vec![];
+  let mut attrs = vec![];
 
   for share in shares.shares {
     // shares list sorted by period, each time we find a new one, context is updated.
@@ -331,17 +332,34 @@ fn claim_bribes(
     // see how much total bribe rewards for the asset in the gauge
     let total_bribe_bucket = context.bribe_totals.get(&gauge, &asset);
     // calculate the reward share based on the user vp compared to total vp
-    let rewards = total_bribe_bucket.assets.calc_share_amounts(vp, total_vp)?;
+    let mut rewards = total_bribe_bucket.assets.calc_share_amounts(vp, total_vp)?;
     // add these rewards to the claimed bucket by the user
     context.bribe_claimed.get(&gauge, &asset).assets.add_multi(&rewards);
+
     // remove the rewards from the available bribe bucket
-    context.bribe_available.get(&gauge, &asset).assets.remove_multi(&rewards).map_err(|s| {
-      // safety if we try to take more than what is available in the bucket for the asset, then it fails for the user
-      ContractError::SharedErrorExtended(
-        s,
-        format!("gauge: {gauge} asset {asset} vp {vp} total {total_vp} user {user}"),
-      )
-    })?;
+    // in case it wants to take more than available, rewards are being reduced by the overtaken amount, and overtaken amount returned.
+    let overtakens = context
+      .bribe_available
+      .get(&gauge, &asset)
+      .assets
+      .remove_multi_overtaken(&mut rewards)
+      .map_err(|s| {
+        // safety if we try to take more than what is available in the bucket for the asset, then it fails for the user
+        ContractError::SharedErrorExtended(
+          s,
+          format!("gauge {gauge} asset {asset} vp {vp} total {total_vp} user {user}"),
+        )
+      })?;
+
+    for overtaken in overtakens {
+      attrs.push(attr(
+        "overtaken",
+        format!(
+          "gauge {gauge} asset {asset} vp {vp} total {total_vp} user {user} overtaken {overtaken}"
+        ),
+      ))
+    }
+
     // add the rewards also to the flattened
     bribe_total.add_multi(&rewards);
   }
@@ -354,6 +372,7 @@ fn claim_bribes(
     Response::new()
       .add_attribute("action", "bribe/claim_bribes")
       .add_attribute("periods", periods)
+      .add_attributes(attrs)
       .add_messages(transfer_msgs),
   )
 }

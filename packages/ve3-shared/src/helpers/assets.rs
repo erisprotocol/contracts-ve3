@@ -63,6 +63,35 @@ impl Assets {
     }
   }
 
+  pub fn remove_overtaken(&mut self, asset: &mut Asset) -> Result<Option<Asset>, SharedError> {
+    let existing = self.0.iter_mut().find(|a| a.info == asset.info);
+
+    match existing {
+      Some(existing) if existing.amount < asset.amount => {
+        let overtaken_amount = asset.amount - existing.amount;
+        let overtaken = existing.info.with_balance(overtaken_amount);
+        asset.amount -= overtaken_amount;
+
+        existing.amount = Uint128::zero();
+
+        if existing.amount.is_zero() {
+          self.0.retain(|a| !a.amount.is_zero())
+        }
+
+        Ok(Some(overtaken))
+      },
+      Some(existing) => {
+        existing.amount -= asset.amount;
+
+        if existing.amount.is_zero() {
+          self.0.retain(|a| !a.amount.is_zero())
+        }
+        Ok(None)
+      },
+      None => Err(SharedError::NotFound(format!("asset {0}", asset.info))),
+    }
+  }
+
   pub fn get(&mut self, info: &AssetInfo) -> Option<Asset> {
     self.0.iter().find(|a| a.info == *info).cloned()
   }
@@ -77,6 +106,20 @@ impl Assets {
     }
 
     Ok(())
+  }
+
+  pub fn remove_multi_overtaken(
+    &mut self,
+    assets: &mut Vec<Asset>,
+  ) -> Result<Vec<Asset>, SharedError> {
+    let mut overtakens = vec![];
+    for asset in assets {
+      if let Some(overtaken) = self.remove_overtaken(asset)? {
+        overtakens.push(overtaken);
+      }
+    }
+
+    Ok(overtakens)
   }
 
   pub fn add(&mut self, asset: &Asset) {
