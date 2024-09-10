@@ -215,7 +215,7 @@ fn handle_vote(
       .unwrap_or_default();
 
   let allowed =
-    config.get_asset_staking(&deps, gauge)?.query_whitelisted_assets_str(&deps.querier)?;
+    config.get_asset_staking(&deps.as_ref(), gauge)?.query_whitelisted_assets_str(&deps.querier)?;
 
   let mut values_set: HashSet<_> = HashSet::new();
   let mut changes =
@@ -449,7 +449,7 @@ fn set_distribution(mut deps: DepsMut, env: Env) -> Result<Response, ContractErr
   let mut msgs = vec![];
   for gauge_config in config.gauges.iter() {
     let gauge = &gauge_config.name;
-    let asset_staking = config.get_asset_staking(&deps, gauge)?;
+    let asset_staking = config.get_asset_staking(&deps.as_ref(), gauge)?;
     let assets = asset_staking.query_whitelisted_assets(&deps.branch().querier)?;
     let mut periods = vec![];
 

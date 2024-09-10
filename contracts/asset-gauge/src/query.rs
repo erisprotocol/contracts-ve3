@@ -5,18 +5,23 @@ use crate::state::{
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, StdResult, Uint128, Uint256};
+use cosmwasm_std::{
+  to_json_binary, Addr, Binary, Decimal, Deps, Env, StdError, StdResult, Uint128, Uint256,
+};
 use cw_asset::AssetInfoUnchecked;
 use cw_storage_plus::Bound;
+use itertools::Itertools;
 use std::str::FromStr;
 use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT};
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::helpers::time::{GetPeriod, GetPeriods, Time, Times};
 use ve3_shared::msgs_asset_gauge::{
-  GaugeDistributionResponse, GaugeInfosResponse, GaugeVote, LastDistributionPeriodResponse,
-  QueryMsg, UserFirstParticipationResponse, UserInfoExtendedResponse, UserInfosResponse,
-  UserPendingRebaseResponse, UserShare, UserSharesResponse, VotedInfoResponse,
+  Config, GaugeConfig, GaugeDistributionResponse, GaugeInfosResponse, GaugeVote,
+  LastDistributionPeriodResponse, QueryMsg, UserFirstParticipationResponse,
+  UserInfoExtendedResponse, UserInfosResponse, UserPendingRebaseResponse, UserShare,
+  UserSharesResponse, VotedInfoResponse,
 };
+use ve3_shared::msgs_asset_staking::AssetDistribution;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
@@ -273,25 +278,104 @@ fn distribution(
   env: Env,
   gauge: String,
   time: Option<Time>,
-) -> StdResult<GaugeDistributionResponse> {
+) -> Result<GaugeDistributionResponse, ContractError> {
   let period = time.get_period(&env)?;
-  get_gauge_distribution(deps, gauge, period)
+  get_gauge_distribution(deps, &env, gauge, period, None, None)
 }
 
 fn get_gauge_distribution(
   deps: Deps,
+  env: &Env,
   gauge: String,
   period: u64,
-) -> StdResult<GaugeDistributionResponse> {
-  GAUGE_DISTRIBUTION.may_load(deps.storage, (&gauge, period)).map(|distribution| {
-    let distribution = distribution.unwrap_or_default();
-    GaugeDistributionResponse {
+  config: Option<Config>,
+  gauge_config: Option<GaugeConfig>,
+) -> Result<GaugeDistributionResponse, ContractError> {
+  let current_period = Time::Current.get_period(env)?;
+
+  if period > current_period {
+    let config = match config {
+      Some(config) => config,
+      None => CONFIG.load(deps.storage)?,
+    };
+
+    let gauge_config = match gauge_config {
+      Some(gauge_config) => gauge_config,
+      None => config
+        .gauges
+        .iter()
+        .find(|a| a.name == gauge)
+        .ok_or(StdError::generic_err("did not find gauge"))?
+        .clone(),
+    };
+    let asset_staking = config.get_asset_staking(&deps, &gauge)?;
+    let assets = asset_staking.query_whitelisted_assets(&deps.querier)?;
+    let asset_index = AssetIndex::new(&gauge);
+    let asset_index = asset_index.idx();
+
+    let allowed_votes: Vec<_> = assets
+      .iter()
+      .map(|key| {
+        let key_raw = &key.to_string();
+        let vote_info = asset_index.get_latest_data(deps.storage, period, key_raw)?;
+        let vp = vote_info.total_vp()?;
+
+        Ok((key.clone(), vp))
+      })
+      .collect::<StdResult<Vec<_>>>()?
+      .into_iter()
+      .filter(|(_, vp)| !vp.is_zero())
+      .sorted_by(|(_, a), (_, b)| b.cmp(a)) // Sort in descending order
+      .collect();
+
+    let total_gauge_vp: Uint128 = allowed_votes.iter().map(|(_, b)| b).sum();
+    let min_voting_power = gauge_config.min_gauge_percentage * total_gauge_vp;
+
+    let relevant_votes =
+      allowed_votes.into_iter().filter(|(_, amount)| *amount > min_voting_power).collect_vec();
+
+    let sum_relevant: Uint128 = relevant_votes.iter().map(|(_, amount)| amount).sum();
+
+    let mut save_distribution = relevant_votes
+      .into_iter()
+      .map(|(asset, vp)| {
+        Ok(AssetDistribution {
+          asset,
+          total_vp: vp,
+          distribution: Decimal::from_ratio(vp, sum_relevant),
+        })
+      })
+      .collect::<StdResult<Vec<_>>>()?;
+
+    let total: Decimal = save_distribution.iter().map(|a| a.distribution).sum();
+
+    if !save_distribution.is_empty() {
+      if total > Decimal::percent(100) {
+        let remove = total - Decimal::percent(100);
+        save_distribution[0].distribution -= remove;
+      } else {
+        let add = Decimal::percent(100) - total;
+        save_distribution[0].distribution += add;
+      }
+    }
+
+    Ok(GaugeDistributionResponse {
       gauge,
       period,
-      total_gauge_vp: distribution.total_gauge_vp,
-      assets: distribution.assets,
-    }
-  })
+      total_gauge_vp,
+      assets: save_distribution,
+    })
+  } else {
+    Ok(GAUGE_DISTRIBUTION.may_load(deps.storage, (&gauge, period)).map(|distribution| {
+      let distribution = distribution.unwrap_or_default();
+      GaugeDistributionResponse {
+        gauge,
+        period,
+        total_gauge_vp: distribution.total_gauge_vp,
+        assets: distribution.assets,
+      }
+    })?)
+  }
 }
 
 fn get_last_gauge_distribution(deps: Deps, gauge: String) -> StdResult<GaugeDistributionResponse> {
@@ -316,15 +400,18 @@ fn distributions(
   deps: Deps,
   env: Env,
   time: Option<Time>,
-) -> StdResult<Vec<GaugeDistributionResponse>> {
+) -> Result<Vec<GaugeDistributionResponse>, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let period = time.get_period(&env)?;
 
   config
     .gauges
+    .clone()
     .into_iter()
-    .map(|a| get_gauge_distribution(deps, a.name, period))
-    .collect::<StdResult<Vec<_>>>()
+    .map(|a| {
+      get_gauge_distribution(deps, &env, a.name.clone(), period, Some(config.clone()), Some(a))
+    })
+    .collect::<Result<Vec<_>, ContractError>>()
 }
 
 fn last_distributions(deps: Deps, _env: Env) -> StdResult<Vec<GaugeDistributionResponse>> {

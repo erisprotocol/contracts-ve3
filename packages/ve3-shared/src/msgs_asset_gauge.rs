@@ -9,7 +9,7 @@ use crate::{
   msgs_voting_escrow::LockInfoResponse,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, DepsMut, Uint128};
+use cosmwasm_std::{Addr, Decimal, Deps, DepsMut, Uint128};
 use cw20::Cw20ReceiveMsg;
 use cw_asset::{AssetInfo, AssetInfoUnchecked};
 
@@ -189,11 +189,7 @@ impl Config {
   //   self.global_config().assert_has_access(&deps.querier, AT_GAUGE_CONTROLLER, sender)
   // }
 
-  pub fn get_asset_staking(
-    &self,
-    deps: &DepsMut,
-    gauge: &str,
-  ) -> Result<AssetStaking, SharedError> {
+  pub fn get_asset_staking(&self, deps: &Deps, gauge: &str) -> Result<AssetStaking, SharedError> {
     self.global_config().get_address(&deps.querier, &at_asset_staking(gauge)).map(AssetStaking)
   }
 
