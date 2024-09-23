@@ -25,6 +25,7 @@ pub fn at_connector(gauge: &str) -> String {
 // PDT rights
 pub const PDT_CONTROLLER: &str = "PDT_CONTROLLER";
 pub const PDT_CONFIG_OWNER: &str = "PDT_CONFIG_OWNER";
+pub const PDT_DCA_EXECUTOR: &str = "PDT_DCA_EXECUTOR";
 // pub const PDT_VETO_CONFIG_OWNER: &str = "PDT_VETO_CONFIG_OWNER";
 
 pub const DEFAULT_LIMIT: u32 = 30;

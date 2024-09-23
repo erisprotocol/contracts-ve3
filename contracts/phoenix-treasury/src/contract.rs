@@ -298,7 +298,7 @@ fn execute_update_milestone(
 fn execute_dca(
   deps: DepsMut,
   env: Env,
-  _info: MessageInfo,
+  info: MessageInfo,
   id: u64,
   min_received: Option<Uint128>,
 ) -> Result<Response, ContractError> {
@@ -307,6 +307,7 @@ fn execute_dca(
 
   let config = CONFIG.load(deps.storage)?;
   let mut action = ACTIONS.load(deps.storage, id)?;
+  assert_dca_executor(&deps, &info, &config)?;
   assert_not_cancelled_or_done(&action)?;
   assert_action_active(&env, &action)?;
 
@@ -882,6 +883,15 @@ fn assert_controller(
   config: &Config,
 ) -> Result<(), ContractError> {
   config.global_config().assert_has_access(&deps.querier, PDT_CONTROLLER, &info.sender)?;
+  Ok(())
+}
+
+fn assert_dca_executor(
+  deps: &DepsMut,
+  info: &MessageInfo,
+  config: &Config,
+) -> Result<(), ContractError> {
+  config.global_config().assert_has_access(&deps.querier, PDT_DCA_EXECUTOR, &info.sender)?;
   Ok(())
 }
 
