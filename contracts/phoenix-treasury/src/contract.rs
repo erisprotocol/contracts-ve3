@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::adapters::pair::Pair;
 use ve3_shared::adapters::router::Router;
-use ve3_shared::constants::{PDT_CONFIG_OWNER, PDT_CONTROLLER, SECONDS_PER_30D};
+use ve3_shared::constants::{PDT_CONFIG_OWNER, PDT_CONTROLLER, PDT_DCA_EXECUTOR, SECONDS_PER_30D};
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_ext::AssetExt;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
@@ -291,7 +291,7 @@ fn execute_update_milestone(
           .add_attributes(vec![("action", "pdt/update_milestone"), ("id", &id.to_string())]),
       )
     },
-    _ => Err(ContractError::CannotExecuteOnlyDca),
+    _ => Err(ContractError::CannotExecuteOnlyMilestone),
   }
 }
 

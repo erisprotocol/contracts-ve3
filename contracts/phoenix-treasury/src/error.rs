@@ -62,8 +62,11 @@ pub enum ContractError {
   #[error("Cannot execute: Only OTC")]
   CannotExecuteOnlyOtc,
 
-  #[error("Cannot execute: Only OTC")]
+  #[error("Cannot execute: Only DCA")]
   CannotExecuteOnlyDca,
+
+  #[error("Cannot execute: Only Milestones")]
+  CannotExecuteOnlyMilestone,
 
   #[error("Cannot execute: Missing funds")]
   CannotExecuteMissingFunds,
