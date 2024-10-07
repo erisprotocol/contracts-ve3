@@ -75,7 +75,7 @@ impl TestingSuite {
   #[track_caller]
   pub fn e_gauge_add_rebase_in_ampluna(
     &mut self,
-    amount: u32,
+    amount: u128,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::AddRebase {};

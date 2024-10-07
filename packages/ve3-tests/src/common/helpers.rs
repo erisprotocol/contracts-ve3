@@ -12,7 +12,7 @@ pub fn cw20_info(d: &str) -> AssetInfo {
   AssetInfo::cw20(Addr::unchecked(d))
 }
 
-pub fn uluna(amount: u32) -> Asset {
+pub fn uluna(amount: u128) -> Asset {
   native("uluna", u(amount))
 }
 
@@ -33,8 +33,8 @@ pub fn cw20<A: Into<Addr>, B: Into<Uint128>>(addr: A, a: B) -> Asset {
   Asset::cw20(addr, a)
 }
 
-pub fn u(a: u32) -> Uint128 {
-  Uint128::new(a.into())
+pub fn u(a: u128) -> Uint128 {
+  Uint128::new(a)
 }
 
 #[allow(non_snake_case)]

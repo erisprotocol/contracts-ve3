@@ -7,7 +7,7 @@ module.exports = {
     },
     schema: {
       default:
-        "nps schema.create   schema.asset-gauge schema.asset-staking schema.bribe-manager schema.connector-alliance schema.connector-emission schema.global-config schema.voting-escrow schema.zapper",
+        "nps schema.create   schema.asset-gauge schema.asset-staking schema.bribe-manager schema.connector-alliance schema.connector-emission schema.global-config schema.voting-escrow schema.zapper schema.phoenix-treasury",
 
       create: "bash scripts/build_schema.sh",
 
@@ -27,6 +27,8 @@ module.exports = {
         "json2ts -i contracts/voting-escrow/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/voting-escrow",
       zapper:
         "json2ts -i contracts/zapper/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/zapper",
+      "phoenix-treasury":
+        "json2ts -i contracts/phoenix-treasury/schema/raw/*.json -o ../liquid-staking-scripts/types/ve3/phoenix-treasury",
     },
   },
 };

@@ -39,6 +39,7 @@ impl EventChecker for AppResponse {
     self.assert_attribute_ty("wasm", attr)
   }
 
+  #[track_caller]
   fn assert_transfer(&self, recipient: impl Into<String>, asset: Asset) -> String {
     match asset.info {
       cw_asset::AssetInfoBase::Native(_) => {

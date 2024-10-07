@@ -158,10 +158,10 @@ fn test_emission_connector_rebase() {
       res.assert_attribute(attr("action", "asset/update_rewards"));
       res.assert_attribute(attr("action", "ce/claim_rewards"));
       res.assert_attribute(attr("emission_amount", "10000"));
-      res.assert_attribute(attr("rebase_amount", "2244"));
+      res.assert_attribute(attr("rebase_amount", "4999"));
       res.assert_attribute(attr("team_amount", "1000"));
       res.assert_attribute(attr("action", "gauge/add_rebase"));
-      res.assert_attribute(attr("rebase", "native:uluna:2244"));
+      res.assert_attribute(attr("rebase", "native:uluna:4999"));
       res.assert_attribute(attr("action", "asset/update_rewards_callback"));
       res.assert_attribute(attr("rewards", "native:uluna:10000"));
     });

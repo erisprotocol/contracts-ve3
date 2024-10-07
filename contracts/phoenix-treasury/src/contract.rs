@@ -1,5 +1,5 @@
 use crate::constants::{
-  CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION, MAX_OTC_DISCOUNT,
+  CLAIM_REWARD_ERROR_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION, MAX_OTC_DISCOUNT, UFACTOR,
 };
 use crate::domains::alliance::{
   alliance_delegate, alliance_redelegate, alliance_undelegate, claim_rewards, remove_validator,
@@ -503,8 +503,8 @@ fn execute_setup(
       }
       into.info.check(deps.api)?;
 
-      let from_value = calculate_value(&deps, &amount.clone().into())?;
-      let to_value = calculate_value(&deps, &into.clone().into())?;
+      let from_value = calculate_value_usd(&deps, &amount.clone().into())?;
+      let to_value = calculate_value_usd(&deps, &into.clone().into())?;
 
       if to_value < MAX_OTC_DISCOUNT * from_value {
         return Err(ContractError::OtcDiscountTooHigh(MAX_OTC_DISCOUNT));
@@ -601,7 +601,7 @@ fn execute_setup(
   }
 
   // calculate usd value
-  let value_usd = calculate_value(&deps, &reserved)?;
+  let value_usd = calculate_value_usd(&deps, &reserved)?;
 
   let epoch_30d = env.block.time.seconds() / SECONDS_PER_30D;
   let mut spent_in_month = SPENT_IN_EPOCH.may_load(deps.storage, epoch_30d)?.unwrap_or_default();
@@ -802,8 +802,8 @@ fn assert_not_cancelled_or_done(action: &TreasuryAction) -> Result<(), ContractE
   Ok(())
 }
 
-fn calculate_value(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, ContractError> {
-  let mut value_usd = Uint128::zero();
+fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, ContractError> {
+  let mut value_uusd = Uint128::zero();
 
   for asset in &reserved.0 {
     let oracle = ORACLES
@@ -846,9 +846,13 @@ fn calculate_value(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Contrac
       return Err(ContractError::OracleReturnedZeroUsd(asset.clone()));
     }
 
-    value_usd = value_usd.checked_add(added_usd)?;
+    value_uusd = value_uusd.checked_add(added_usd)?;
   }
 
+  let value_usd = value_uusd.multiply_ratio(Uint128::one(), UFACTOR);
+
+  // println!("value_uusd: {value_uusd}");
+  // println!("value_usd: {value_usd}");
   Ok(value_usd)
 }
 

@@ -223,7 +223,7 @@ impl TestingSuite {
         addr.usdc_info_checked(),
         Decimal::percent(30),
       )],
-      assets: vec![addr.uluna(100_000000), addr.usdc(100_000000)].into(),
+      assets: vec![addr.uluna(100_000000_000000), addr.usdc(100_000000_000000)].into(),
     };
 
     self.addresses.ve3_zapper = self.init_contract(code_id, msg, "ve3_zapper");
@@ -232,7 +232,10 @@ impl TestingSuite {
       .send_tokens(
         self.address("user1"),
         self.addresses.ve3_zapper.clone(),
-        &[addr.uluna(100_000000).to_coin().unwrap(), addr.usdc(100_000000).to_coin().unwrap()],
+        &[
+          addr.uluna(100_000000_000000).to_coin().unwrap(),
+          addr.usdc(100_000000_000000).to_coin().unwrap(),
+        ],
       )
       .unwrap();
   }

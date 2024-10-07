@@ -43,6 +43,7 @@ pub struct Addresses {
   pub creator: Addr,
   pub user1: Addr,
   pub user2: Addr,
+  pub dca1: Addr,
 
   pub ve3_asset_gauge: Addr,
   pub ve3_bribe_manager: Addr,
@@ -131,8 +132,8 @@ impl Addresses {
   pub(crate) fn uluna_info_checked(&self) -> AssetInfo {
     AssetInfo::native("uluna".to_string())
   }
-  pub(crate) fn uluna(&self, a: u32) -> Asset {
-    native("uluna", Uint128::new(a.into()))
+  pub(crate) fn uluna(&self, a: u128) -> Asset {
+    native("uluna", Uint128::new(a))
   }
 
   pub(crate) fn usdc_info(&self) -> AssetInfoUnchecked {
@@ -141,8 +142,8 @@ impl Addresses {
   pub(crate) fn usdc_info_checked(&self) -> AssetInfo {
     AssetInfo::native("ibc/usdc".to_string())
   }
-  pub(crate) fn usdc(&self, a: u32) -> Asset {
-    native("ibc/usdc", Uint128::new(a.into()))
+  pub(crate) fn usdc(&self, a: u128) -> Asset {
+    native("ibc/usdc", Uint128::new(a))
   }
 
   pub(crate) fn fake_cw20(&self, a: u32) -> Asset {
@@ -216,12 +217,12 @@ impl TestingSuite {
 impl TestingSuite {
   pub fn def() -> Self {
     TestingSuite::default_with_balances(vec![
-      coin(1_000_000_000_000u128, "uluna".to_string()),
-      coin(1_000_000_000_000u128, "xxx".to_string()),
-      coin(1_000_000_000_000u128, "usdc".to_string()),
-      coin(1_000_000_000_000u128, "lp".to_string()),
-      coin(1_000_000_000_000u128, "astro".to_string()),
-      coin(1_000_000_000_000u128, "ibc/usdc".to_string()),
+      coin(1_000_000_000_000_000_000u128, "uluna".to_string()),
+      coin(1_000_000_000_000_000_000u128, "xxx".to_string()),
+      coin(1_000_000_000_000_000_000u128, "usdc".to_string()),
+      coin(1_000_000_000_000_000_000u128, "lp".to_string()),
+      coin(1_000_000_000_000_000_000u128, "astro".to_string()),
+      coin(1_000_000_000_000_000_000u128, "ibc/usdc".to_string()),
     ])
   }
 
@@ -232,6 +233,7 @@ impl TestingSuite {
     let user1 = api.addr_make("user1");
     let user2 = api.addr_make("user2");
     let fee_recipient = api.addr_make("AT_FEE_COLLECTOR");
+    let dca1 = api.addr_make("dca1");
 
     let bank = BankKeeper::new();
 
@@ -327,6 +329,7 @@ impl TestingSuite {
         user1,
         user2,
         fee_recipient,
+        dca1,
 
         active_asset_staking: Addr(""),
         active_connector_alliance: Addr(""),
@@ -473,15 +476,18 @@ impl TestingSuite {
         (at_asset_staking(&self.gauge2()), self.addresses.ve3_asset_staking_2.to_string()),
         (at_asset_staking(&self.gauge3()), self.addresses.ve3_asset_staking_3.to_string()),
       ],
-      vec![(
-        AT_FREE_BRIBES.to_string(),
-        vec![
-          self.addresses.ve3_asset_staking_1.to_string(),
-          self.addresses.ve3_asset_staking_2.to_string(),
-          self.addresses.ve3_asset_staking_3.to_string(),
-          self.addresses.creator.to_string(),
-        ],
-      )],
+      vec![
+        (
+          AT_FREE_BRIBES.to_string(),
+          vec![
+            self.addresses.ve3_asset_staking_1.to_string(),
+            self.addresses.ve3_asset_staking_2.to_string(),
+            self.addresses.ve3_asset_staking_3.to_string(),
+            self.addresses.creator.to_string(),
+          ],
+        ),
+        (PDT_DCA_EXECUTOR.to_string(), vec![self.addresses.dca1.to_string()]),
+      ],
       "creator",
       |a| {
         a.unwrap();

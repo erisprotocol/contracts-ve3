@@ -141,7 +141,7 @@ impl TestingSuite {
     )
   }
 
-  pub fn def_get_ampluna(&mut self, sender: &str, amount: u32) -> &mut TestingSuite {
+  pub fn def_get_ampluna(&mut self, sender: &str, amount: u128) -> &mut TestingSuite {
     let addr = self.addresses.clone();
 
     let sender = self.address(sender);
@@ -261,7 +261,7 @@ impl TestingSuite {
     self
   }
 
-  pub fn def_add_staking_rewards(&mut self, amount: u32) -> &mut TestingSuite {
+  pub fn def_add_staking_rewards(&mut self, amount: u128) -> &mut TestingSuite {
     let addr = self.addresses.clone();
 
     self

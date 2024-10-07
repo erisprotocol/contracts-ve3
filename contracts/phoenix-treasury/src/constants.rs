@@ -7,3 +7,4 @@ pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const CLAIM_REWARD_ERROR_REPLY_ID: u64 = 2;
 
 pub const MAX_OTC_DISCOUNT: Decimal = Decimal::percent(50);
+pub const UFACTOR: u128 = 1000000;
