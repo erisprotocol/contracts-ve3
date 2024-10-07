@@ -44,8 +44,8 @@ pub enum ContractError {
   #[error("Period {0} not yet finished.")]
   PeriodNotFinished(u64),
 
-  #[error("Gauge distribution not yet executed. gauge: {0}, period {1}")]
-  GaugeDistributionNotExecuted(String, u64),
+  #[error("Gauge distribution not yet executed. period {0}")]
+  GaugeDistributionNotExecuted(u64),
 
   #[error("Rebases can only be claimed to a permanent lock.")]
   RebaseClaimingOnlyForPermanent,

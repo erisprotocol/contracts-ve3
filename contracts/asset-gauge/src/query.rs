@@ -159,41 +159,47 @@ fn user_shares(
       return Err(ContractError::ZeroVotingPower(user.to_string(), period));
     }
 
+    let mut all_missing = true;
+
     for gauge_config in config.gauges.iter() {
       let gauge = &gauge_config.name;
 
-      let distribution = GAUGE_DISTRIBUTION
-        .load(deps.storage, (gauge, period))
-        .map_err(|_| ContractError::GaugeDistributionNotExecuted(gauge.to_string(), period))?;
-      let user_vote = fetch_last_gauge_vote(deps.storage, gauge, user.as_str(), period)?;
+      if let Some(distribution) = GAUGE_DISTRIBUTION.may_load(deps.storage, (gauge, period))? {
+        all_missing = false;
+        let user_vote = fetch_last_gauge_vote(deps.storage, gauge, user.as_str(), period)?;
 
-      if let Some((_, votes)) = user_vote {
-        for (asset, bps) in votes.votes {
-          if bps.is_zero() {
-            continue;
+        if let Some((_, votes)) = user_vote {
+          for (asset, bps) in votes.votes {
+            if bps.is_zero() {
+              continue;
+            }
+
+            let asset = AssetInfoUnchecked::from_str(&asset)?.check(deps.api, None)?;
+
+            let vp = bps * user_vp;
+            let total_vp = distribution
+              .assets
+              .iter()
+              .find(|a| a.asset == asset)
+              .map(|a| a.total_vp)
+              .unwrap_or_default();
+
+            let share = UserShare {
+              gauge: gauge.to_string(),
+              asset,
+              period,
+              user_vp: vp,
+              total_vp,
+            };
+
+            response.shares.push(share);
           }
-
-          let asset = AssetInfoUnchecked::from_str(&asset)?.check(deps.api, None)?;
-
-          let vp = bps * user_vp;
-          let total_vp = distribution
-            .assets
-            .iter()
-            .find(|a| a.asset == asset)
-            .map(|a| a.total_vp)
-            .unwrap_or_default();
-
-          let share = UserShare {
-            gauge: gauge.to_string(),
-            asset,
-            period,
-            user_vp: vp,
-            total_vp,
-          };
-
-          response.shares.push(share);
         }
       }
+    }
+
+    if all_missing {
+      Err(ContractError::GaugeDistributionNotExecuted(period))?;
     }
   }
 
