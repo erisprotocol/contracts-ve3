@@ -445,7 +445,7 @@ fn test_query_infos() {
     })
     .q_gauge_user_shares("user1", None, |res| {
       let res = res.unwrap_err();
-      assert_eq!(res.to_string(), "Generic error: Querier contract error: Gauge distribution not yet executed. gauge: stable, period 75".to_string());
+      assert_eq!(res.to_string(), "Generic error: Querier contract error: Gauge distribution not yet executed. period 75".to_string());
     })
     .e_gauge_set_distribution("user1", |res| {
       res.unwrap();

@@ -77,6 +77,9 @@ pub enum ContractError {
   #[error("Action not reserving any funds")]
   ActionNotReservingAnyFunds,
 
+  #[error("Action not allowed")]
+  ActionNotAllowed,
+
   #[error("Milestone already claimed")]
   MilestoneClaimed,
 

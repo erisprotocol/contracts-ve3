@@ -22,6 +22,7 @@ pub struct InstantiateMsg {
   pub veto_owner: String,
   pub vetos: Vec<VetoRight<String>>,
   pub oracles: Vec<(AssetInfoBase<String>, Oracle<String>)>,
+  pub allowed_actions: Option<Vec<String>>,
 }
 
 #[cw_serde]
@@ -122,6 +123,28 @@ pub enum TreasuryActionSetup {
     start_s: u64,
     end_s: u64,
   },
+}
+
+impl TreasuryActionSetup {
+  pub fn to_action_str(&self) -> String {
+    match self {
+      TreasuryActionSetup::Payment {
+        ..
+      } => "payment".to_string(),
+      TreasuryActionSetup::Otc {
+        ..
+      } => "otc".to_string(),
+      TreasuryActionSetup::Dca {
+        ..
+      } => "dca".to_string(),
+      TreasuryActionSetup::Milestone {
+        ..
+      } => "milestone".to_string(),
+      TreasuryActionSetup::Vesting {
+        ..
+      } => "vesting".to_string(),
+    }
+  }
 }
 
 #[cw_serde]
@@ -229,6 +252,8 @@ pub struct Config {
   pub alliance_token_denom: String,
   pub veto_owner: Addr,
   pub vetos: Vec<VetoRight<Addr>>,
+  #[serde(default)]
+  pub allowed_actions: Option<Vec<String>>,
 }
 
 impl Config {

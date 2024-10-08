@@ -32,6 +32,7 @@ pub fn setup_contract(deps: DepsMut) -> Response {
     oracles: vec![],
     vetos: vec![],
     veto_owner: "veto_owner".to_string(),
+    allowed_actions: None,
   };
   instantiate(deps, env, info, init_msg).unwrap()
 }

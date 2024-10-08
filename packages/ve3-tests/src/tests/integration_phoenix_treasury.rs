@@ -1767,7 +1767,8 @@ fn test_not_alliance() {
           reward_denom: "uluna".to_string(),
           alliance_token_denom: alliance_token_denom.clone(),
           vetos: vec![],
-          veto_owner: veto_owner.clone()
+          veto_owner: veto_owner.clone(),
+          allowed_actions: None,
         }
       )
     })
@@ -2037,7 +2038,8 @@ fn test_veto_update() {
           reward_denom: "uluna".to_string(),
           alliance_token_denom: alliance_token_denom.clone(),
           vetos: vec![],
-          veto_owner: veto_owner.clone()
+          veto_owner: veto_owner.clone(),
+          allowed_actions: None,
         }
       )
     })
@@ -2063,7 +2065,8 @@ fn test_veto_update() {
               delay_s: WEEK,
             },
           ],
-          veto_owner: veto_owner.clone()
+          veto_owner: veto_owner.clone(),
+          allowed_actions: None,
         }
       )
     })
@@ -2079,7 +2082,8 @@ fn test_veto_update() {
           reward_denom: "uluna".to_string(),
           alliance_token_denom: alliance_token_denom.clone(),
           vetos: vec![],
-          veto_owner: veto_owner.clone()
+          veto_owner: veto_owner.clone(),
+          allowed_actions: None,
         }
       )
     });

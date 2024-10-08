@@ -59,6 +59,7 @@ pub fn instantiate(
     global_config_addr: deps.api.addr_validate(&msg.global_config_addr)?,
     veto_owner: deps.api.addr_validate(&msg.veto_owner)?,
     vetos: msg.vetos.check(deps.api)?,
+    allowed_actions: msg.allowed_actions,
   };
 
   CONFIG.save(deps.storage, &config)?;
@@ -474,6 +475,8 @@ fn execute_setup(
   let config = CONFIG.load(deps.storage)?;
   assert_controller(&deps, &info, &config)?;
 
+  assert_allowed_action(&config, &action)?;
+
   let (reserved, recipients, runtime) = match &action {
     TreasuryActionSetup::Payment {
       payments,
@@ -637,6 +640,19 @@ fn execute_setup(
   STATE.save(deps.storage, &state)?;
 
   Ok(Response::new().add_attributes(vec![("action", "pdt/setup"), ("id", &id.to_string())]))
+}
+
+fn assert_allowed_action(
+  config: &Config,
+  action: &TreasuryActionSetup,
+) -> Result<(), ContractError> {
+  if let Some(allowed) = &config.allowed_actions {
+    if !allowed.contains(&action.to_action_str()) {
+      return Err(ContractError::ActionNotAllowed);
+    }
+  }
+
+  Ok(())
 }
 
 fn assert_not_clawback(state: &State) -> Result<(), ContractError> {
