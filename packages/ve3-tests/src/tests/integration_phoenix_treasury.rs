@@ -120,6 +120,7 @@ fn test_payment() {
           Oracle::Pair {
             contract: addr.astroport_pair_mock.to_string(),
             simulation_amount: u(1_000000),
+            from_decimals: None,
           },
         ),
         (addr.usdc_info(), Oracle::Usdc),
@@ -2165,6 +2166,7 @@ impl TestingSuite {
             Oracle::Pair {
               contract: addr.astroport_pair_mock.to_string(),
               simulation_amount: u(1_000000),
+              from_decimals: None,
             },
           ),
           (addr.usdc_info(), Oracle::Usdc),

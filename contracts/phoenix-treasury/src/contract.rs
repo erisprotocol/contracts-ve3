@@ -836,6 +836,7 @@ fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Con
       Oracle::Pair {
         contract,
         simulation_amount,
+        ..
       } => {
         let result = Pair(contract).query_simulate(
           &deps.querier,
@@ -845,12 +846,15 @@ fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Con
 
         let price = Decimal::from_ratio(result.return_amount, simulation_amount);
         price * asset.amount
+        // Factor not needed as asset.amount already has it.
+        // * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))
       },
 
       Oracle::Route {
         contract,
         path,
         simulation_amount,
+        ..
       } => {
         let result = Router(contract).query_simulate(
           &deps.querier,
@@ -860,6 +864,8 @@ fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Con
 
         let price = Decimal::from_ratio(result.amount, simulation_amount);
         price * asset.amount
+        // Factor not needed as asset.amount already has it.
+        // * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))
       },
     };
 

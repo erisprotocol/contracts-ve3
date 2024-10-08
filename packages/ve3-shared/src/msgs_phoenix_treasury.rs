@@ -60,11 +60,15 @@ pub enum Oracle<T: AddressLike> {
   Pair {
     contract: T,
     simulation_amount: Uint128,
+    #[serde(default)]
+    from_decimals: Option<u32>,
   },
   Route {
     contract: T,
     path: Vec<AssetInfoBase<T>>,
     simulation_amount: Uint128,
+    #[serde(default)]
+    from_decimals: Option<u32>,
   },
 }
 
@@ -75,14 +79,17 @@ impl Oracle<String> {
       Oracle::Pair {
         contract,
         simulation_amount,
+        from_decimals,
       } => Oracle::Pair {
         contract: api.addr_validate(&contract)?,
         simulation_amount,
+        from_decimals,
       },
       Oracle::Route {
         contract,
         path,
         simulation_amount,
+        from_decimals,
       } => Oracle::Route {
         contract: api.addr_validate(&contract)?,
         simulation_amount,
@@ -90,6 +97,7 @@ impl Oracle<String> {
           .into_iter()
           .map(|a| a.check(api, None))
           .collect::<Result<Vec<AssetInfo>, AssetError>>()?,
+        from_decimals,
       },
     })
   }
