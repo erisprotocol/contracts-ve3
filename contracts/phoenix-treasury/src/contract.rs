@@ -73,6 +73,11 @@ pub fn instantiate(
   )?;
 
   VALIDATORS.save(deps.storage, &HashSet::new())?;
+
+  for (asset_info, oracle) in msg.oracles {
+    ORACLES.save(deps.storage, &asset_info.check(deps.api, None)?, &oracle.check(deps.api)?)?
+  }
+
   Ok(
     Response::new()
       .add_attributes(vec![
