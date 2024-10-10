@@ -12,7 +12,9 @@ use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 use std::collections::HashSet;
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+  pub update_vetos: Option<Vec<VetoRight<String>>>,
+}
 
 #[cw_serde]
 pub struct InstantiateMsg {
