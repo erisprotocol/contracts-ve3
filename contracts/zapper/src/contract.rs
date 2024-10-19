@@ -248,24 +248,28 @@ fn zap(
 ) -> Result<Vec<CosmosMsg>, ContractError> {
   assert_uniq_assets(&assets)?;
 
-  let token_config = get_token_config(&mut deps, into.clone())?;
+  let no_swap_required = assets.len() == 1 && assets[0] == into;
+  let mut callbacks = if no_swap_required {
+    vec![]
+  } else {
+    let token_config = get_token_config(&mut deps, into.clone())?;
+    match token_config {
+      TokenConfig::TargetPair(stage) => {
+        let pair_info = stage.get_pair_info(&deps.querier)?;
+        let mut pair_msgs = get_swap_stages(deps.storage, &assets, &pair_info.asset_infos)?;
 
-  let mut callbacks = match token_config {
-    TokenConfig::TargetPair(stage) => {
-      let pair_info = stage.get_pair_info(&deps.querier)?;
-      let mut pair_msgs = get_swap_stages(deps.storage, &assets, &pair_info.asset_infos)?;
+        pair_msgs.push(CallbackMsg::OptimalSwap {
+          pair_info: pair_info.clone(),
+        });
 
-      pair_msgs.push(CallbackMsg::OptimalSwap {
-        pair_info: pair_info.clone(),
-      });
-
-      pair_msgs.push(CallbackMsg::ProvideLiquidity {
-        pair_info,
-        receiver: None,
-      });
-      pair_msgs
-    },
-    TokenConfig::TargetSwap => get_swap_stages(deps.storage, &assets, &vec![into.clone()])?,
+        pair_msgs.push(CallbackMsg::ProvideLiquidity {
+          pair_info,
+          receiver: None,
+        });
+        pair_msgs
+      },
+      TokenConfig::TargetSwap => get_swap_stages(deps.storage, &assets, &vec![into.clone()])?,
+    }
   };
 
   if let Some(min_received) = min_received {
@@ -642,11 +646,11 @@ fn callback_liquid_stake_result(
   gauge: String,
   receiver: String,
 ) -> Result<Response, ContractError> {
-  let amount = info.with_balance_query(&deps.querier, &env.contract.address)?;
+  let asset = info.with_balance_query(&deps.querier, &env.contract.address)?;
 
   Ok(
     Response::new()
-      .add_message(Compounder(compounder).deposit_msg(amount, gauge, Some(receiver))?)
+      .add_message(Compounder(compounder).deposit_msg(asset, gauge, Some(receiver))?)
       .add_attribute("action", "zapper/callback_liquid_stake_result"),
   )
 }

@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, Response, StdError};
+use cosmwasm_std::{CheckedFromRatioError, OverflowError, Response, StdError};
 use cw_asset::AssetError;
 use cw_ownable::OwnershipError;
 use thiserror::Error;
@@ -22,6 +22,8 @@ pub enum ContractError {
 
   #[error("{0}")]
   OverflowError(#[from] OverflowError),
+  #[error("{0}")]
+  CheckedFromRatioError(#[from] CheckedFromRatioError),
 
   #[error("config value too high: {0}")]
   ConfigValueTooHigh(String),

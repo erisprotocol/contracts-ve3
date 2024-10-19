@@ -183,10 +183,12 @@ fn stake(
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let asset_config = assert_asset_whitelisted(&deps, &gauge, &asset_info)?;
-  let asset_staking = config.asset_staking(&deps.querier, &gauge)?;
 
-  let staked_balance =
-    asset_staking.query_staked_balance(&deps.querier, &env.contract.address, asset_info.clone())?;
+  let staked_balance = asset_config.staking.query_staked_balance(
+    &deps.querier,
+    &env.contract.address,
+    asset_info.clone(),
+  )?;
 
   let amplp_supply = deps.querier.query_supply(asset_config.amp_denom.clone())?.amount;
   let lp_staked = staked_balance.asset.amount;
@@ -333,11 +335,9 @@ fn unstake(
   let amplp_denom = info.funds[0].denom.clone();
   let amplp_amount = info.funds[0].amount;
 
-  let config = CONFIG.load(deps.storage)?;
   let asset_config = assert_asset_whitelisted_by_amplp_denom(&deps, &amplp_denom)?;
-  let asset_staking = config.asset_staking(&deps.querier, &asset_config.gauge)?;
 
-  let staked_balance = asset_staking.query_staked_balance(
+  let staked_balance = asset_config.staking.query_staked_balance(
     &deps.querier,
     &env.contract.address,
     asset_config.asset_info.clone(),
@@ -358,7 +358,8 @@ fn unstake(
     burn_from_address: env.contract.address.to_string(),
   }
   .into();
-  let withdraw_msg = asset_staking.withdraw_msg(returned.clone(), Some(recipient.to_string()))?;
+  let withdraw_msg =
+    asset_config.staking.withdraw_msg(returned.clone(), Some(recipient.to_string()))?;
 
   Ok(
     Response::new()
@@ -386,12 +387,11 @@ fn compound(
 
   let asset_config = assert_asset_whitelisted(&deps, &gauge, &asset_info)?;
   let zapper = config.zapper(&deps.querier)?;
-  let asset_staking = config.asset_staking(&deps.querier, &gauge)?;
   let connector = config.connector(&deps.querier, &gauge)?;
 
   let msgs = vec![
     // 1. claim zassets
-    asset_staking.claim_reward_msg(asset_info.clone(), None)?,
+    asset_config.staking.claim_reward_msg(asset_info.clone(), None)?,
     // 2. withdraw zassets
     env.callback_msg(ExecuteMsg::Callback(CallbackMsg::WithdrawZasset {
       zasset_denom: asset_config.zasset_denom.clone(),
@@ -401,13 +401,11 @@ fn compound(
     env.callback_msg(ExecuteMsg::Callback(CallbackMsg::ZapRewards {
       zapper,
       config,
-      asset_staking: asset_staking.clone(),
       asset_config: asset_config.clone(),
       minimum_receive,
     }))?,
     // 4. track new exchange rate
     env.callback_msg(ExecuteMsg::Callback(CallbackMsg::TrackExchangeRate {
-      asset_staking: asset_staking.clone(),
       asset_config: asset_config.clone(),
       asset_info,
       gauge,
@@ -460,6 +458,7 @@ fn initialize_asset(
       fee: None,
       zasset_denom: connector_config.zasset_denom,
       reward_asset_info: connector_config.lst_asset_info,
+      staking: asset_staking,
     },
   )?;
 
@@ -500,7 +499,6 @@ pub fn handle_callback(
     CallbackMsg::ZapRewards {
       config,
       zapper,
-      asset_staking,
       asset_config,
       minimum_receive,
     } => {
@@ -519,7 +517,7 @@ pub fn handle_callback(
           vec![reward_asset_info.clone()],
           minimum_receive,
           Some(PostActionCreate::Stake {
-            asset_staking: asset_staking.0.clone(),
+            asset_staking: asset_config.staking.0.clone(),
             receiver: Some(env.contract.address.to_string()),
           }),
           vec![reward_asset_info.with_balance(remaining_amount).to_coin()?],
@@ -540,11 +538,10 @@ pub fn handle_callback(
     },
     CallbackMsg::TrackExchangeRate {
       asset_config,
-      asset_staking,
       asset_info,
       gauge,
     } => {
-      let staked_balance = asset_staking.query_staked_balance(
+      let staked_balance = asset_config.staking.query_staked_balance(
         &deps.querier,
         &env.contract.address,
         asset_info.clone(),

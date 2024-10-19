@@ -33,12 +33,12 @@ pub struct Config {
 pub struct CompoundingAssetConfig {
   pub asset_info: AssetInfo,
   pub gauge: String,
+  pub staking: AssetStaking,
 
   pub amp_denom: String,
   pub total_bond_share: Uint128,
   pub zasset_denom: String,
   pub reward_asset_info: AssetInfo,
-
   pub fee: Option<Decimal>,
 }
 
@@ -96,13 +96,11 @@ pub enum CallbackMsg {
   ZapRewards {
     config: Config,
     zapper: Zapper,
-    asset_staking: AssetStaking,
     asset_config: CompoundingAssetConfig,
     minimum_receive: Option<Uint128>,
   },
   TrackExchangeRate {
     asset_config: CompoundingAssetConfig,
-    asset_staking: AssetStaking,
     asset_info: AssetInfo,
     gauge: String,
   },
@@ -129,6 +127,7 @@ pub enum QueryMsg {
   #[returns(Vec<UserInfoResponse>)]
   UserInfos {
     assets: Option<Vec<(String, AssetInfo)>>,
+    addr: String,
   },
 
   #[returns(Vec<ExchangeRatesResponse>)]
@@ -145,9 +144,9 @@ pub struct UserInfoResponse {
   pub gauge: String,
   pub asset: AssetInfo,
   pub total_lp: Uint128,
-  pub total_amp_lp: Uint128,
+  pub total_amplp: Uint128,
   pub user_lp: Uint128,
-  pub user_amp_lp: Uint128,
+  pub user_amplp: Uint128,
 }
 
 #[cw_serde]
