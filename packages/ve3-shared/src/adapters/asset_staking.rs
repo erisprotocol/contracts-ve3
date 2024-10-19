@@ -1,13 +1,16 @@
 use crate::{
   error::SharedError,
   msgs_asset_staking::{
-    AssetDistribution, Cw20HookMsg, ExecuteMsg, QueryMsg, WhitelistedAssetsResponse,
+    AssetDistribution, AssetQuery, Cw20HookMsg, ExecuteMsg, QueryMsg, StakedBalanceRes,
+    WhitelistedAssetsResponse,
   },
 };
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{coins, to_json_binary, Addr, CosmosMsg, QuerierWrapper, WasmMsg};
 use cw20::Cw20ExecuteMsg;
 use cw_asset::{Asset, AssetInfo};
 
+#[cw_serde]
 pub struct AssetStaking(pub Addr);
 
 impl AssetStaking {
@@ -19,14 +22,22 @@ impl AssetStaking {
       contract_addr: self.0.to_string(),
       msg: to_json_binary(&ExecuteMsg::ClaimRewards {
         assets,
+        recipient: None,
       })?,
       funds: vec![],
     }))
   }
-  pub fn claim_reward_msg(&self, asset: AssetInfo) -> Result<CosmosMsg, SharedError> {
+  pub fn claim_reward_msg(
+    &self,
+    asset: AssetInfo,
+    recipient: Option<String>,
+  ) -> Result<CosmosMsg, SharedError> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
       contract_addr: self.0.to_string(),
-      msg: to_json_binary(&ExecuteMsg::ClaimReward(asset))?,
+      msg: to_json_binary(&ExecuteMsg::ClaimReward {
+        asset,
+        recipient,
+      })?,
       funds: vec![],
     }))
   }
@@ -59,12 +70,16 @@ impl AssetStaking {
     }
   }
 
-  pub fn withdraw_msg(&self, asset: Asset) -> Result<CosmosMsg, SharedError> {
+  pub fn withdraw_msg(
+    &self,
+    asset: Asset,
+    recipient: Option<String>,
+  ) -> Result<CosmosMsg, SharedError> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
       contract_addr: self.0.to_string(),
       msg: to_json_binary(&ExecuteMsg::Unstake {
         asset,
-        recipient: None,
+        recipient,
       })?,
       funds: vec![],
     }))
@@ -88,6 +103,22 @@ impl AssetStaking {
     let assets: WhitelistedAssetsResponse =
       querier.query_wasm_smart(self.0.clone(), &QueryMsg::WhitelistedAssets {})?;
     Ok(assets)
+  }
+
+  pub fn query_staked_balance(
+    &self,
+    querier: &QuerierWrapper,
+    user: &Addr,
+    asset: AssetInfo,
+  ) -> Result<StakedBalanceRes, SharedError> {
+    let staked: StakedBalanceRes = querier.query_wasm_smart(
+      self.0.clone(),
+      &QueryMsg::StakedBalance(AssetQuery {
+        address: user.to_string(),
+        asset,
+      }),
+    )?;
+    Ok(staked)
   }
 
   pub fn query_whitelisted_assets_str(

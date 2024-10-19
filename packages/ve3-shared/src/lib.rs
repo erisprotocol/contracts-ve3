@@ -3,6 +3,7 @@ pub mod constants;
 pub mod error;
 pub mod extensions;
 pub mod helpers;
+pub mod msgs_asset_compounding;
 pub mod msgs_asset_gauge;
 pub mod msgs_asset_staking;
 pub mod msgs_bribe_manager;

@@ -2,7 +2,15 @@ use cosmwasm_std::{Addr, QuerierWrapper};
 use cw_ownable::Ownership;
 use cw_storage_plus::{Item, Map};
 
-use crate::error::SharedError;
+use crate::{
+  constants::{at_asset_staking, at_connector, AT_ASSET_GAUGE, AT_VOTING_ESCROW, AT_ZAPPER},
+  error::SharedError,
+};
+
+use super::{
+  asset_gauge::AssetGauge, asset_staking::AssetStaking, connector::Connector,
+  voting_escrow::VotingEscrow, zapper::Zapper,
+};
 
 pub struct GlobalConfig(pub Addr);
 
@@ -97,85 +105,85 @@ impl GlobalConfig {
 }
 
 pub trait ConfigExt {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError>;
+  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
+    self.global_config().get_address(querier, address_type)
+  }
+
+  fn voting_escrow(&self, querier: &QuerierWrapper) -> Result<VotingEscrow, SharedError> {
+    self.global_config().get_address(querier, AT_VOTING_ESCROW).map(VotingEscrow)
+  }
+
+  fn asset_gauge(&self, querier: &QuerierWrapper) -> Result<AssetGauge, SharedError> {
+    self.global_config().get_address(querier, AT_ASSET_GAUGE).map(AssetGauge)
+  }
+
+  fn zapper(&self, querier: &QuerierWrapper) -> Result<Zapper, SharedError> {
+    self.global_config().get_address(querier, AT_ZAPPER).map(Zapper)
+  }
+
+  fn asset_staking(
+    &self,
+    querier: &QuerierWrapper,
+    gauge: &str,
+  ) -> Result<AssetStaking, SharedError> {
+    self.global_config().get_address(querier, &at_asset_staking(gauge)).map(AssetStaking)
+  }
+
+  fn connector(&self, querier: &QuerierWrapper, gauge: &str) -> Result<Connector, SharedError> {
+    self.global_config().get_address(querier, &at_connector(gauge)).map(Connector)
+  }
 
   fn global_config(&self) -> GlobalConfig;
 }
 
 impl ConfigExt for crate::msgs_asset_staking::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 impl ConfigExt for crate::msgs_voting_escrow::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 
 impl ConfigExt for crate::msgs_asset_gauge::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 
 impl ConfigExt for crate::msgs_connector_alliance::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 
 impl ConfigExt for crate::msgs_bribe_manager::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 
 impl ConfigExt for crate::msgs_connector_emission::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 
 impl ConfigExt for crate::msgs_zapper::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
-  }
-
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }
 }
 
 impl ConfigExt for crate::msgs_phoenix_treasury::Config {
-  fn get_address(&self, querier: &QuerierWrapper, address_type: &str) -> Result<Addr, SharedError> {
-    GlobalConfig(self.global_config_addr.clone()).get_address(querier, address_type)
+  fn global_config(&self) -> GlobalConfig {
+    GlobalConfig(self.global_config_addr.clone())
   }
+}
 
+impl ConfigExt for crate::msgs_asset_compounding::Config {
   fn global_config(&self) -> GlobalConfig {
     GlobalConfig(self.global_config_addr.clone())
   }

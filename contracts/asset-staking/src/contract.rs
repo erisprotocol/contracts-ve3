@@ -80,10 +80,20 @@ pub fn execute(
       let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
       unstake(deps, env, info, asset, recipient)
     },
-    ExecuteMsg::ClaimReward(asset) => claim_rewards(deps, info, Some(vec![asset])),
+    ExecuteMsg::ClaimReward {
+      asset,
+      recipient,
+    } => {
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
+      claim_rewards(deps, info, Some(vec![asset]), recipient)
+    },
     ExecuteMsg::ClaimRewards {
       assets,
-    } => claim_rewards(deps, info, assets),
+      recipient,
+    } => {
+      let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
+      claim_rewards(deps, info, assets, recipient)
+    },
 
     // bot
     ExecuteMsg::UpdateRewards {} => update_rewards(deps, env, info),
@@ -517,6 +527,7 @@ fn claim_rewards(
   deps: DepsMut,
   info: MessageInfo,
   assets: Option<Vec<AssetInfo>>,
+  recipient: Addr,
 ) -> Result<Response, ContractError> {
   let user = info.sender;
   let config = CONFIG.load(deps.storage)?;
@@ -551,7 +562,7 @@ fn claim_rewards(
   ]);
   if !total_rewards.is_zero() {
     let rewards_asset = config.reward_info.with_balance(total_rewards);
-    Ok(response.add_message(rewards_asset.transfer_msg(&user)?))
+    Ok(response.add_message(rewards_asset.transfer_msg(&recipient)?))
   } else {
     Ok(response)
   }

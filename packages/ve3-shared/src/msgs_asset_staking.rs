@@ -154,9 +154,13 @@ pub enum ExecuteMsg {
     asset: Asset,
     recipient: Option<String>,
   },
-  ClaimReward(AssetInfo),
+  ClaimReward {
+    asset: AssetInfo,
+    recipient: Option<String>,
+  },
   ClaimRewards {
     assets: Option<Vec<AssetInfo>>,
+    recipient: Option<String>,
   },
 
   // controller

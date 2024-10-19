@@ -14,6 +14,7 @@ pub const AT_FEE_COLLECTOR: &str = "FEE_COLLECTOR";
 pub const AT_TEAM_WALLET: &str = "TEAM_WALLET";
 pub const AT_MINT_PROXY: &str = "MINT_PROXY";
 pub const AT_ZAPPER: &str = "ZAPPER";
+pub const AT_BOT: &str = "BOT";
 
 pub fn at_asset_staking(gauge: &str) -> String {
   format!("ASSET_STAKING__{gauge}")
@@ -36,8 +37,7 @@ pub const SECONDS_PER_YEAR: u64 = 60 * 60 * 24 * 365;
 
 // VOTING ESCROW
 // Seconds in one week. It is intended for period number calculation.
-// mainnet: 7 * 86400
-// testnet: 60 * 60
+pub const SECONDS_PER_DAY: u64 = 86400;
 pub const SECONDS_PER_WEEK: u64 = 7 * 86400;
 pub const SECONDS_PER_30D: u64 = 30 * 86400;
 

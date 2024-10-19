@@ -109,7 +109,10 @@ impl TestingSuite {
     sender: &str,
     result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut TestingSuite {
-    let msg = ExecuteMsg::ClaimReward(asset_info);
+    let msg = ExecuteMsg::ClaimReward {
+      asset: asset_info,
+      recipient: None,
+    };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));
     self
@@ -123,6 +126,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::ClaimRewards {
       assets: asset_infos,
+      recipient: None,
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_active_staking(), &msg, &[]));

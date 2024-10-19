@@ -36,6 +36,13 @@ pub enum ExecuteMsg {
     receiver: Option<String>,
   },
 
+  Zap {
+    into: AssetInfoUnchecked,
+    assets: Vec<AssetInfo>,
+    min_received: Option<Uint128>,
+    post_action: Option<PostActionCreate>,
+  },
+
   UpdateConfig {
     insert_routes: Option<Vec<RouteInit>>,
     delete_routes: Option<Vec<RouteDelete>>,
@@ -74,8 +81,14 @@ pub enum CallbackMsg {
   },
 
   Stake {
-    asset_staking: Addr,
     token: AssetInfo,
+    asset_staking: Addr,
+    receiver: String,
+  },
+  LiquidStake {
+    token: AssetInfo,
+    compounder: Addr,
+    gauge: String,
     receiver: String,
   },
 
@@ -104,6 +117,11 @@ impl CallbackMsg {
 pub enum PostActionCreate {
   Stake {
     asset_staking: Addr,
+    receiver: Option<String>,
+  },
+  LiquidStake {
+    compounder: Addr,
+    gauge: String,
     receiver: Option<String>,
   },
   SendResult {

@@ -4,7 +4,7 @@ use crate::{
   constants::{CONTRACT_NAME, CONTRACT_VERSION, DEFAULT_MAX_SPREAD, DEFAULT_SLIPPAGE},
   error::{ContractError, ContractResult},
   optimal_swap::callback_optimal_swap,
-  state::{RouteConfig, CONFIG, ROUTES},
+  state::{RouteConfig, TokenConfig, CONFIG, ROUTES, TOKEN_CONFIG},
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -12,11 +12,12 @@ use cosmwasm_std::{
   Addr, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
-use cw20::Expiration;
+use cw20::{Cw20QueryMsg, Expiration, MinterResponse};
 use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase};
 use ve3_shared::{
   adapters::{
     asset_staking::AssetStaking,
+    compounder::Compounder,
     global_config_adapter::ConfigExt,
     pair::{Pair, PairInfo},
   },
@@ -123,57 +124,23 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       min_received,
       post_action,
     } => {
-      assert_uniq_assets(&assets)?;
-
       let pair_info = stage.get_pair_info(&deps.querier)?;
       let lp_token = pair_info.liquidity_token.clone();
 
-      let mut callbacks = get_swap_stages(deps.storage, &assets, &pair_info.asset_infos)?;
-
-      callbacks.push(CallbackMsg::OptimalSwap {
-        pair_info: pair_info.clone(),
-      });
-
-      callbacks.push(CallbackMsg::ProvideLiquidity {
-        pair_info,
-        receiver: None,
-      });
-
-      if let Some(min_received) = min_received {
-        callbacks.push(CallbackMsg::AssertReceived {
-          asset: lp_token.with_balance(min_received),
-        });
-      }
-
-      callbacks.push(match post_action {
-        Some(PostActionCreate::Stake {
-          asset_staking,
-          receiver,
-        }) => CallbackMsg::Stake {
-          asset_staking,
-          token: lp_token,
-          receiver: receiver.unwrap_or(info.sender.to_string()),
-        },
-
-        Some(PostActionCreate::SendResult {
-          receiver,
-        }) => CallbackMsg::SendResult {
-          token: lp_token,
-          receiver: receiver.unwrap_or(info.sender.to_string()),
-        },
-
-        None => CallbackMsg::SendResult {
-          token: lp_token,
-          receiver: info.sender.to_string(),
-        },
-      });
-
-      let messages = callbacks
-        .into_iter()
-        .map(|a| a.into_cosmos_msg(&env.contract.address))
-        .collect::<StdResult<Vec<_>>>()?;
+      let messages = zap(deps, env, info, lp_token, assets, min_received, post_action)?;
 
       Ok(Response::default().add_messages(messages).add_attribute("action", "zapper/create_lp"))
+    },
+
+    ExecuteMsg::Zap {
+      into,
+      assets,
+      min_received,
+      post_action,
+    } => {
+      let into = into.check(deps.api, None)?;
+      let messages = zap(deps, env, info, into, assets, min_received, post_action)?;
+      Ok(Response::default().add_messages(messages).add_attribute("action", "zapper/zap"))
     },
 
     ExecuteMsg::Swap {
@@ -182,26 +149,18 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       min_received,
       receiver,
     } => {
-      assert_uniq_assets(&assets)?;
       let into = into.check(deps.api, None)?;
-
-      let mut callbacks = get_swap_stages(deps.storage, &assets, &vec![into.clone()])?;
-
-      if let Some(min_received) = min_received {
-        callbacks.push(CallbackMsg::AssertReceived {
-          asset: into.with_balance(min_received),
-        })
-      }
-
-      callbacks.push(CallbackMsg::SendResult {
-        token: into,
-        receiver: receiver.unwrap_or(info.sender.to_string()),
-      });
-
-      let messages = callbacks
-        .into_iter()
-        .map(|a| a.into_cosmos_msg(&env.contract.address))
-        .collect::<StdResult<Vec<_>>>()?;
+      let messages = zap(
+        deps,
+        env,
+        info,
+        into,
+        assets,
+        min_received,
+        Some(PostActionCreate::SendResult {
+          receiver,
+        }),
+      )?;
 
       Ok(Response::default().add_messages(messages).add_attribute("action", "zapper/swap"))
     },
@@ -275,6 +234,135 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       Ok(Response::default().add_attribute("action", "zapper/update_config"))
     },
     ExecuteMsg::Callback(callback) => handle_callback(deps, env, info, callback),
+  }
+}
+
+fn zap(
+  mut deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  into: AssetInfo,
+  assets: Vec<AssetInfo>,
+  min_received: Option<Uint128>,
+  post_action: Option<PostActionCreate>,
+) -> Result<Vec<CosmosMsg>, ContractError> {
+  assert_uniq_assets(&assets)?;
+
+  let token_config = get_token_config(&mut deps, into.clone())?;
+
+  let mut callbacks = match token_config {
+    TokenConfig::TargetPair(stage) => {
+      let pair_info = stage.get_pair_info(&deps.querier)?;
+      let mut pair_msgs = get_swap_stages(deps.storage, &assets, &pair_info.asset_infos)?;
+
+      pair_msgs.push(CallbackMsg::OptimalSwap {
+        pair_info: pair_info.clone(),
+      });
+
+      pair_msgs.push(CallbackMsg::ProvideLiquidity {
+        pair_info,
+        receiver: None,
+      });
+      pair_msgs
+    },
+    TokenConfig::TargetSwap => get_swap_stages(deps.storage, &assets, &vec![into.clone()])?,
+  };
+
+  if let Some(min_received) = min_received {
+    callbacks.push(CallbackMsg::AssertReceived {
+      asset: into.with_balance(min_received),
+    });
+  }
+
+  callbacks.push(match post_action {
+    Some(PostActionCreate::Stake {
+      asset_staking,
+      receiver,
+    }) => CallbackMsg::Stake {
+      asset_staking,
+      token: into,
+      receiver: receiver.unwrap_or(info.sender.to_string()),
+    },
+
+    Some(PostActionCreate::LiquidStake {
+      compounder,
+      gauge,
+      receiver,
+    }) => CallbackMsg::LiquidStake {
+      token: into,
+      compounder,
+      gauge,
+      receiver: receiver.unwrap_or(info.sender.to_string()),
+    },
+
+    Some(PostActionCreate::SendResult {
+      receiver,
+    }) => CallbackMsg::SendResult {
+      token: into,
+      receiver: receiver.unwrap_or(info.sender.to_string()),
+    },
+
+    None => CallbackMsg::SendResult {
+      token: into,
+      receiver: info.sender.to_string(),
+    },
+  });
+
+  let messages = callbacks
+    .into_iter()
+    .map(|a| a.into_cosmos_msg(&env.contract.address))
+    .collect::<StdResult<Vec<_>>>()?;
+
+  Ok(messages)
+}
+
+fn get_token_config(
+  deps: &mut DepsMut,
+  lp: AssetInfoBase<Addr>,
+) -> Result<TokenConfig, ContractError> {
+  if let Some(lp_config) = TOKEN_CONFIG.may_load(deps.storage, &lp)? {
+    Ok(lp_config)
+  } else {
+    // check if we can find a pair for an LP address
+    let potential_pair_addr = match &lp {
+      AssetInfoBase::Native(native) => {
+        if native.starts_with("factory/") {
+          let contract = native.split('/').take(2).collect::<Vec<&str>>()[1];
+          Some(deps.api.addr_validate(contract)?)
+        } else {
+          None
+        }
+      },
+      AssetInfoBase::Cw20(cw20) => {
+        let minter: MinterResponse =
+          deps.querier.query_wasm_smart(cw20, &Cw20QueryMsg::Minter {})?;
+        Some(deps.api.addr_validate(&minter.minter)?)
+      },
+      _ => Err(SharedError::NotSupportedAssetInfo())?,
+    };
+
+    // check the found pair address if it is really a pair
+    let lp_config = match potential_pair_addr {
+      Some(pair_addr) => {
+        let pair = Pair(pair_addr.clone());
+        if pair.query_ww_pair_info(&deps.querier).is_ok() {
+          TokenConfig::TargetPair(StageType::WhiteWhale {
+            pair: pair_addr,
+          })
+        } else if pair.query_astroport_pair_info(&deps.querier).is_ok() {
+          TokenConfig::TargetPair(StageType::Astroport {
+            pair: pair_addr,
+          })
+        } else {
+          TokenConfig::TargetSwap
+        }
+      },
+      None => TokenConfig::TargetSwap,
+    };
+
+    TOKEN_CONFIG.save(deps.storage, &lp, &lp_config)?;
+
+    Ok(lp_config)
   }
 }
 
@@ -450,6 +538,12 @@ pub fn handle_callback(
       token,
       receiver,
     } => callback_stake_result(deps, env, info, token, asset_staking, receiver),
+    CallbackMsg::LiquidStake {
+      compounder,
+      gauge,
+      token,
+      receiver,
+    } => callback_liquid_stake_result(deps, env, info, token, compounder, gauge, receiver),
 
     CallbackMsg::SendResult {
       token,
@@ -536,6 +630,24 @@ fn callback_stake_result(
     Response::new()
       .add_message(AssetStaking(asset_staking).deposit_msg(amount, Some(receiver))?)
       .add_attribute("action", "zapper/callback_stake_result"),
+  )
+}
+
+fn callback_liquid_stake_result(
+  deps: DepsMut,
+  env: Env,
+  _info: MessageInfo,
+  info: AssetInfo,
+  compounder: Addr,
+  gauge: String,
+  receiver: String,
+) -> Result<Response, ContractError> {
+  let amount = info.with_balance_query(&deps.querier, &env.contract.address)?;
+
+  Ok(
+    Response::new()
+      .add_message(Compounder(compounder).deposit_msg(amount, gauge, Some(receiver))?)
+      .add_attribute("action", "zapper/callback_liquid_stake_result"),
   )
 }
 

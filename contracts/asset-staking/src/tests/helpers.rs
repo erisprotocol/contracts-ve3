@@ -98,7 +98,10 @@ pub fn unstake_cw20(deps: DepsMut, user: &str, amount: u128, denom: &str) -> Res
 pub fn claim_rewards(deps: DepsMut, user: &str, denom: &str) -> Response {
   let info = mock_info(user, &[]);
   let env = mock_env();
-  let msg = ExecuteMsg::ClaimReward(AssetInfo::Native(denom.to_string()));
+  let msg = ExecuteMsg::ClaimReward {
+    asset: AssetInfo::Native(denom.to_string()),
+    recipient: None,
+  };
   execute(deps, env, info, msg).unwrap()
 }
 
