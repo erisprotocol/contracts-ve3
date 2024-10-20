@@ -111,7 +111,7 @@ impl Addresses {
     AssetInfo::cw20(self.eris_hub_cw20_ampluna.clone())
   }
   pub(crate) fn ampluna(&self, a: u128) -> Asset {
-    cw20(self.eris_hub_cw20_ampluna.clone(), Uint128::new(a.into()))
+    cw20(self.eris_hub_cw20_ampluna.clone(), Uint128::new(a))
   }
 
   pub(crate) fn lp_cw20_info(&self) -> AssetInfoUnchecked {

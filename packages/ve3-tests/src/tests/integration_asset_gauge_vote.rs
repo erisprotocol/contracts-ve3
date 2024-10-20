@@ -1,6 +1,6 @@
 use crate::{
   common::{
-    helpers::{cw20_info, native_info, u},
+    helpers::{cw20_info,  u},
     suite::TestingSuite,
   },
   extensions::app_response_ext::Valid,
