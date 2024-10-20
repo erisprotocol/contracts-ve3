@@ -205,7 +205,6 @@ fn stake(
     config.deposit_profit_delay_s,
     bond_share,
   )?;
-
   let adjustment_amount = bond_share.saturating_sub(bond_share_adjusted);
 
   let deposit_msg = asset_config
@@ -216,19 +215,22 @@ fn stake(
     MsgMint {
       sender: env.contract.address.to_string(),
       amount: Some(Coin {
-        amount: bond_share_adjusted.to_string(),
+        // mint full bond_share
+        amount: bond_share.to_string(),
         denom: asset_config.amp_denom.to_string(),
       }),
       // not working on terra
       mint_to_address: env.contract.address.to_string(),
     }
     .into(),
+    // transfer adjusted to depositor
     AssetInfo::native(asset_config.amp_denom.clone())
       .with_balance(bond_share_adjusted)
       .transfer_msg(recipient.clone())?,
   ];
 
   if !adjustment_amount.is_zero() {
+    // transfer adjustment to fee collector
     msgs.push(
       AssetInfo::native(asset_config.amp_denom)
         .with_balance(adjustment_amount)
@@ -492,8 +494,6 @@ pub fn handle_callback(
   if info.sender != env.contract.address {
     Err(SharedError::UnauthorizedCallbackOnlyCallableByContract {})?
   }
-
-  // println!("callback {:?}", msg);
 
   match msg {
     CallbackMsg::WithdrawZasset {

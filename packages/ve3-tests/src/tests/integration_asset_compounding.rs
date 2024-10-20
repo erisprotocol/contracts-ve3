@@ -13,7 +13,7 @@ use ve3_shared::{
   adapters::asset_staking::AssetStaking,
   constants::AT_BOT,
   error::SharedError,
-  extensions::asset_ext::AssetExt,
+  extensions::{asset_ext::AssetExt, asset_info_ext::AssetInfoExt},
   msgs_asset_compounding::{
     CompoundingAssetConfig, Config, ExchangeHistory, ExchangeRatesResponse, UserInfoResponse,
   },
@@ -711,5 +711,15 @@ fn test_compounding_compound() {
           }]
         );
       },
-    );
+    )
+    .e_compound_stake(None, &addr.gauge_2, addr.lp_native(100_000000), "user2", |res| {
+      // getting more bond now due to take rate changing the ratio
+      res.assert_attribute(attr("action", "asset-compounding/stake"));
+      res.assert_attribute(attr("user", addr.user2.to_string()));
+      res.assert_attribute(attr("gauge", addr.gauge_2.to_string()));
+      res.assert_attribute(attr("bond_amount", "100000000"));
+      res.assert_attribute(attr("bond_share_adjusted", "84031580"));
+      res.assert_attribute(attr("bond_share", "84031602"));
+      res.assert_transfer(addr.fee.to_string(), addr.amplp1_info_checked().with_balance(u(22)));
+    });
 }
