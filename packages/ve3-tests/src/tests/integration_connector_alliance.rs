@@ -15,7 +15,10 @@ use ve3_shared::{
 #[test]
 fn test_alliance_connector_rebase() {
   let mut suite = TestingSuite::def();
-  suite.init();
+  suite.init_options(crate::common::suite::InitOptions {
+    rebase_asset: None,
+    mock_zapper: Some(true),
+  });
 
   let addr = suite.addresses.clone();
   let ampluna = addr.eris_hub_cw20_ampluna.to_string();

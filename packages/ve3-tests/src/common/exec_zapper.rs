@@ -9,6 +9,27 @@ impl TestingSuite {
   fn contract_zapper(&self) -> Addr {
     self.addresses.ve3_zapper.clone()
   }
+  pub fn e_zapper_zap(
+      &mut self,
+      into: AssetInfoUnchecked,
+      assets: Vec<AssetInfo>,
+      min_received: Option<Uint128>,
+      post_action: Option<PostActionCreate>,
+      sender: &str,
+      result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut Self {
+      let msg = ExecuteMsg::Zap {
+          into,
+          assets,
+          min_received,
+          post_action,
+      };
+
+      let sender = self.address(sender);
+      result(self.app.execute_contract(sender, self.contract_zapper(), &msg, &[]));
+      self
+  }
+
   pub fn e_zapper_create_lp(
     &mut self,
     stage: StageType,

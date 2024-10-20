@@ -11,7 +11,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use cw_asset::AssetInfo;
+use cw_asset::{AssetInfo, AssetInfoUnchecked};
 use std::ops::Div;
 use ve3_shared::{
   adapters::global_config_adapter::ConfigExt,
@@ -137,8 +137,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
 
       if let Some(fee_for_assets) = fee_for_assets {
         for (gauge, asset, fee) in fee_for_assets {
-          let mut asset_config = assert_asset_whitelisted(&deps, &gauge, &asset)?;
-          asset_config.fee = fee;
+          let asset = asset.check(deps.api, None)?;
+          let mut asset_config = assert_asset_whitelisted(deps.storage, &gauge, &asset)?;
+          asset_config.fee = match fee {
+            Some(fee) => Some(assert_fee(fee)?),
+            None => None,
+          };
           asset_config_map().save(deps.storage, (&gauge, &asset), &asset_config)?
         }
       }
@@ -182,9 +186,9 @@ fn stake(
   recipient: Addr,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
-  let asset_config = assert_asset_whitelisted(&deps, &gauge, &asset_info)?;
+  let asset_config = assert_asset_whitelisted(deps.storage, &gauge, &asset_info)?;
 
-  let staked_balance = asset_config.staking.query_staked_balance(
+  let staked_balance = asset_config.staking.query_staked_balance_fallback(
     &deps.querier,
     &env.contract.address,
     asset_info.clone(),
@@ -203,6 +207,10 @@ fn stake(
   )?;
 
   let adjustment_amount = bond_share.saturating_sub(bond_share_adjusted);
+
+  let deposit_msg = asset_config
+    .staking
+    .deposit_msg(asset_info.with_balance(amount), Some(env.contract.address.to_string()))?;
 
   let mut msgs = vec![
     MsgMint {
@@ -231,7 +239,7 @@ fn stake(
   Ok(
     Response::new()
       .add_attributes(vec![
-        attr("action", "asset/stake"),
+        attr("action", "asset-compounding/stake"),
         attr("user", recipient),
         attr("asset", asset_info.to_string()),
         attr("gauge", gauge),
@@ -239,6 +247,7 @@ fn stake(
         attr("bond_share_adjusted", bond_share_adjusted),
         attr("bond_share", bond_share),
       ])
+      .add_message(deposit_msg)
       .add_messages(msgs),
   )
 }
@@ -337,7 +346,7 @@ fn unstake(
 
   let asset_config = assert_asset_whitelisted_by_amplp_denom(&deps, &amplp_denom)?;
 
-  let staked_balance = asset_config.staking.query_staked_balance(
+  let staked_balance = asset_config.staking.query_staked_balance_fallback(
     &deps.querier,
     &env.contract.address,
     asset_config.asset_info.clone(),
@@ -379,13 +388,14 @@ fn compound(
   env: Env,
   info: MessageInfo,
   minimum_receive: Option<Uint128>,
-  asset_info: AssetInfo,
+  asset_info: AssetInfoUnchecked,
   gauge: String,
 ) -> ContractResult {
+  let asset_info = asset_info.check(deps.api, None)?;
   let config = CONFIG.load(deps.storage)?;
   config.global_config().assert_has_access(&deps.querier, AT_BOT, &info.sender)?;
 
-  let asset_config = assert_asset_whitelisted(&deps, &gauge, &asset_info)?;
+  let asset_config = assert_asset_whitelisted(deps.storage, &gauge, &asset_info)?;
   let zapper = config.zapper(&deps.querier)?;
   let connector = config.connector(&deps.querier, &gauge)?;
 
@@ -419,16 +429,17 @@ fn initialize_asset(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
-  asset_info: AssetInfo,
+  asset_info: AssetInfoUnchecked,
   gauge: String,
 ) -> ContractResult {
+  let asset_info = asset_info.check(deps.api, None)?;
   let config = CONFIG.load(deps.storage)?;
   let asset_staking = config.asset_staking(&deps.querier, &gauge)?;
   let connector = config.connector(&deps.querier, &gauge)?;
   let has_asset = asset_staking.query_whitelisted_assets(&deps.querier)?.contains(&asset_info);
 
   if !has_asset {
-    return Err(ContractError::InvalidAsset(gauge, asset_info.to_string()));
+    return Err(ContractError::AssetNotWhitelisted(gauge, asset_info.to_string()));
   }
 
   config.denom_creation_fee.assert_sent(&info)?;
@@ -453,18 +464,20 @@ fn initialize_asset(
     &CompoundingAssetConfig {
       asset_info,
       gauge,
-      amp_denom: amplp_full_denom,
+      amp_denom: amplp_full_denom.clone(),
       total_bond_share: Uint128::zero(),
       fee: None,
       zasset_denom: connector_config.zasset_denom,
       reward_asset_info: connector_config.lst_asset_info,
-      staking: asset_staking,
+      staking: asset_staking.clone(),
     },
   )?;
 
   Ok(
     Response::default()
       .add_attribute("action", "asset-compounding/initialize_asset")
+      .add_attribute("amplp", amplp_full_denom)
+      .add_attribute("staking", asset_staking.0.to_string())
       .add_message(amplp_create_msg),
   )
 }
@@ -480,6 +493,8 @@ pub fn handle_callback(
     Err(SharedError::UnauthorizedCallbackOnlyCallableByContract {})?
   }
 
+  // println!("callback {:?}", msg);
+
   match msg {
     CallbackMsg::WithdrawZasset {
       connector,
@@ -487,6 +502,11 @@ pub fn handle_callback(
     } => {
       let zasset =
         AssetInfo::native(zasset_denom).with_balance_query(&deps.querier, &env.contract.address)?;
+
+      if zasset.amount.is_zero() {
+        return Err(ContractError::NoRewards);
+      }
+
       let withdraw_msg = connector.withdraw_msg(zasset.to_coin()?)?;
 
       Ok(
@@ -506,9 +526,11 @@ pub fn handle_callback(
       let reward_amount = reward_asset_info.query_balance(&deps.querier, &env.contract.address)?;
 
       let fee = asset_config.fee.unwrap_or(config.fee) * reward_amount;
-      let remaining_amount = reward_amount.checked_sub(fee)?;
+      let zap_amount = reward_amount.checked_sub(fee)?;
 
       let mut msgs = vec![
+        // transfer rewards to zapper
+        reward_asset_info.with_balance(zap_amount).transfer_msg(zapper.0.to_string())?,
         // converts ampLP to LP or asset info + stakes it for current contract
         zapper.zap(
           // target asset
@@ -520,7 +542,6 @@ pub fn handle_callback(
             asset_staking: asset_config.staking.0.clone(),
             receiver: Some(env.contract.address.to_string()),
           }),
-          vec![reward_asset_info.with_balance(remaining_amount).to_coin()?],
         )?,
       ];
 
@@ -531,7 +552,7 @@ pub fn handle_callback(
       Ok(
         Response::new()
           .add_attribute("action", "asset-compounding/callback_zap_rewards")
-          .add_attribute("rewards", remaining_amount.to_string())
+          .add_attribute("rewards", zap_amount.to_string())
           .add_attribute("fee", fee.to_string())
           .add_messages(msgs),
       )
@@ -541,7 +562,7 @@ pub fn handle_callback(
       asset_info,
       gauge,
     } => {
-      let staked_balance = asset_config.staking.query_staked_balance(
+      let staked_balance = asset_config.staking.query_staked_balance_fallback(
         &deps.querier,
         &env.contract.address,
         asset_info.clone(),
@@ -560,19 +581,23 @@ pub fn handle_callback(
         },
       )?;
 
-      Ok(Response::new().add_attribute("action", "asset-compounding/callback_track_exchange_rate"))
+      Ok(
+        Response::new()
+          .add_attribute("action", "asset-compounding/callback_track_exchange_rate")
+          .add_attribute("exchange_rate", exchange_rate.to_string()),
+      )
     },
   }
 }
 
-fn assert_asset_whitelisted(
-  deps: &DepsMut,
+pub fn assert_asset_whitelisted(
+  storage: &dyn Storage,
   gauge: &str,
   asset: &AssetInfo,
 ) -> Result<CompoundingAssetConfig, ContractError> {
   asset_config_map()
-    .load(deps.storage, (gauge, asset))
-    .map_err(|_| ContractError::InvalidAsset(gauge.to_string(), asset.to_string()))
+    .load(storage, (gauge, asset))
+    .map_err(|_| ContractError::AssetNotWhitelisted(gauge.to_string(), asset.to_string()))
 }
 
 fn assert_asset_whitelisted_by_amplp_denom(
@@ -588,7 +613,7 @@ fn assert_asset_whitelisted_by_amplp_denom(
     .collect::<StdResult<Vec<((String, AssetInfo), CompoundingAssetConfig)>>>()?;
 
   if element.is_empty() {
-    return Err(ContractError::InvalidAsset("unknown".to_string(), amplp_denom.to_string()));
+    return Err(ContractError::AmplpNotFound(amplp_denom.to_string()));
   }
 
   Ok(element.swap_remove(0).1)

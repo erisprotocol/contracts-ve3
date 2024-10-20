@@ -29,11 +29,17 @@ pub enum ContractError {
   ConfigValueTooHigh(String),
 
   #[error("asset not whitelisted in gauge: {0}, asset: {1}")]
-  InvalidAsset(String, String),
+  AssetNotWhitelisted(String, String),
+
+  #[error("amplp not found: {0}")]
+  AmplpNotFound(String),
 
   #[error("Only a single asset is allowed")]
   OnlySingleAssetAllowed {},
 
   #[error("Amount cannot be zero")]
   AmountCannotBeZero {},
+
+  #[error("No rewards available")]
+  NoRewards,
 }

@@ -91,6 +91,16 @@ pub fn ve3_zapper() -> Box<dyn Contract<Empty>> {
 
   Box::new(contract)
 }
+pub fn ve3_asset_compounding() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    ve3_asset_compounding::contract::execute,
+    ve3_asset_compounding::contract::instantiate,
+    ve3_asset_compounding::query::query,
+  )
+  .with_migrate(ve3_asset_compounding::migrate::migrate);
+
+  Box::new(contract)
+}
 pub fn ve3_zapper_mock() -> Box<dyn Contract<Empty>> {
   let contract =
     ContractWrapper::new(zapper_mock::execute, zapper_mock::instantiate, zapper_mock::query);
@@ -163,6 +173,37 @@ pub fn incentive_mock() -> Box<dyn Contract<Empty>> {
     incentive_mock::execute,
     incentive_mock::instantiate,
     incentive_mock::query,
+  );
+
+  Box::new(contract)
+}
+
+pub fn astroport_pair() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    astroport_pair::contract::execute,
+    astroport_pair::contract::instantiate,
+    astroport_pair::contract::query,
+  )
+  .with_reply(astroport_pair::contract::reply);
+
+  Box::new(contract)
+}
+
+pub fn astroport_factory() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    astroport_factory::contract::execute,
+    astroport_factory::contract::instantiate,
+    astroport_factory::contract::query,
+  )
+  .with_reply(astroport_factory::contract::reply);
+
+  Box::new(contract)
+}
+pub fn astroport_native_coin_registry() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(
+    astroport_native_coin_registry::contract::execute,
+    astroport_native_coin_registry::contract::instantiate,
+    astroport_native_coin_registry::contract::query,
   );
 
   Box::new(contract)

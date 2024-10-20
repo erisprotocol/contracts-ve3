@@ -55,11 +55,10 @@ fn test_emission_connector_rebase_wrong() {
 #[test]
 fn test_emission_connector_rebase() {
   let mut suite = TestingSuite::def();
-  suite.init_options(InitOptions {
+  let addr = suite.init_options(InitOptions {
     rebase_asset: Some(suite.addresses.uluna_info()),
+    mock_zapper: None,
   });
-
-  let addr = suite.addresses.clone();
 
   suite
     .use_connector_emissions()
@@ -170,11 +169,10 @@ fn test_emission_connector_rebase() {
 #[test]
 fn test_emission_connector_rebase_fixed() {
   let mut suite = TestingSuite::def();
-  suite.init_options(InitOptions {
+  let addr = suite.init_options(InitOptions {
     rebase_asset: Some(suite.addresses.uluna_info()),
+    mock_zapper: None,
   });
-
-  let addr = suite.addresses.clone();
 
   suite
     .use_connector_emissions()
@@ -214,11 +212,10 @@ fn test_emission_connector_rebase_fixed() {
 #[test]
 fn test_emission_connector_rebase_apy() {
   let mut suite = TestingSuite::def();
-  suite.init_options(InitOptions {
+  let addr = suite.init_options(InitOptions {
     rebase_asset: Some(suite.addresses.uluna_info()),
+    mock_zapper: None,
   });
-
-  let addr = suite.addresses.clone();
 
   suite
     .use_connector_emissions()

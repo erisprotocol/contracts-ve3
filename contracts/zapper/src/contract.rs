@@ -81,7 +81,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
           receiver,
         }) => {
           let mut callbacks =
-            get_swap_stages(deps.storage, &pair_info.asset_infos, &vec![asset.clone()])?;
+            get_swap_stages(deps.storage, &pair_info.asset_infos, &vec![asset.clone()], true)?;
 
           if let Some(min_received) = min_received {
             callbacks.push(CallbackMsg::AssertReceived {
@@ -248,15 +248,22 @@ fn zap(
 ) -> Result<Vec<CosmosMsg>, ContractError> {
   assert_uniq_assets(&assets)?;
 
+  // println!(
+  //   "ZAP {0}->{1}",
+  //   assets.clone().into_iter().map(|a| a.to_string()).collect::<Vec<_>>().join(","),
+  //   into
+  // );
+
   let no_swap_required = assets.len() == 1 && assets[0] == into;
   let mut callbacks = if no_swap_required {
     vec![]
   } else {
     let token_config = get_token_config(&mut deps, into.clone())?;
+
     match token_config {
       TokenConfig::TargetPair(stage) => {
         let pair_info = stage.get_pair_info(&deps.querier)?;
-        let mut pair_msgs = get_swap_stages(deps.storage, &assets, &pair_info.asset_infos)?;
+        let mut pair_msgs = get_swap_stages(deps.storage, &assets, &pair_info.asset_infos, true)?;
 
         pair_msgs.push(CallbackMsg::OptimalSwap {
           pair_info: pair_info.clone(),
@@ -268,7 +275,7 @@ fn zap(
         });
         pair_msgs
       },
-      TokenConfig::TargetSwap => get_swap_stages(deps.storage, &assets, &vec![into.clone()])?,
+      TokenConfig::TargetSwap => get_swap_stages(deps.storage, &assets, &vec![into.clone()], true)?,
     }
   };
 
@@ -346,7 +353,7 @@ fn get_token_config(
     };
 
     // check the found pair address if it is really a pair
-    let lp_config = match potential_pair_addr {
+    let token_config = match potential_pair_addr {
       Some(pair_addr) => {
         let pair = Pair(pair_addr.clone());
         if pair.query_ww_pair_info(&deps.querier).is_ok() {
@@ -364,9 +371,10 @@ fn get_token_config(
       None => TokenConfig::TargetSwap,
     };
 
-    TOKEN_CONFIG.save(deps.storage, &lp, &lp_config)?;
+    TOKEN_CONFIG.save(deps.storage, &lp, &token_config)?;
 
-    Ok(lp_config)
+    // println!("token_config {:?}", token_config);
+    Ok(token_config)
   }
 }
 
@@ -375,6 +383,7 @@ fn get_swap_stages(
   storage: &dyn Storage,
   from_assets: &Vec<AssetInfo>,
   to_assets: &Vec<AssetInfo>,
+  check_centers: bool,
 ) -> Result<Vec<CallbackMsg>, ContractError> {
   let mut stages: Vec<Stage> = vec![];
   for from in from_assets {
@@ -400,17 +409,13 @@ fn get_swap_stages(
       }
     }
 
-    if shortest_route.is_none() {
+    if shortest_route.is_none() && check_centers {
       let config = CONFIG.load(storage)?;
 
       for center in config.center_asset_infos {
-        // if from_assets.contains(&center) || to_assets.contains(&center) {
-        //   continue;
-        // }
-
         match (
-          get_swap_stages(storage, from_assets, &vec![center.clone()]),
-          get_swap_stages(storage, &vec![center], to_assets),
+          get_swap_stages(storage, from_assets, &vec![center.clone()], false),
+          get_swap_stages(storage, &vec![center], to_assets, false),
         ) {
           (Ok(segment1), Ok(segment2)) => {
             let stages = [segment1, segment2]

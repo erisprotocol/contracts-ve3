@@ -34,6 +34,7 @@ cw721-base.workspace = true
 
 cw-multi-test = { version = "1.1.0", default-features = false, features = ["cosmwasm_1_1", "cosmwasm_1_3"]}
 
+ve3-asset-compounding = {path = "../../contracts/asset-compounding"}
 ve3-asset-gauge = {path = "../../contracts/asset-gauge"}
 ve3-asset-staking = {path = "../../contracts/asset-staking"}
 ve3-bribe-manager = {path = "../../contracts/bribe-manager"}
@@ -44,7 +45,10 @@ ve3-voting-escrow = {path = "../../contracts/voting-escrow"}
 ve3-zapper = {path = "../../contracts/zapper"}
 phoenix-treasury = {path = "../../contracts/phoenix-treasury"}
 
-# astroport = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "bc68bb65cc2f7d5916c1f0ea41de3b19b5b63b62" }
+astroport = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "9c20f5a7947333c0150457db1a5b342868311d03" }
+astroport-pair = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "9c20f5a7947333c0150457db1a5b342868311d03" }
+astroport-factory = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "9c20f5a7947333c0150457db1a5b342868311d03" }
+astroport-native-coin-registry = { git = "https://github.com/astroport-fi/astroport-core.git", default-features = false, rev = "9c20f5a7947333c0150457db1a5b342868311d03" }
 # stader = { git = "https://github.com/stader-labs/lunax.git", package="staking", default-features = false, rev = "20143548e2dea807b343fe6ad60375086af35ea9"}
 
 eris-staking-token = { git = "https://github.com/erisprotocol/contracts-terra.git", default-features = false, rev = "dbcaa4db951f2bec6e239ccf94f25c85f3bed80a"}

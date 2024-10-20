@@ -1,4 +1,4 @@
-use super::helpers::{u, Addr};
+use super::helpers::{u, uluna, Addr};
 use super::suite::{InitOptions, TestingSuite};
 use crate::common::suite_contracts::*;
 use crate::mocks::{alliance_rewards_mock, astroport_pair_mock, incentive_mock};
@@ -212,6 +212,20 @@ impl TestingSuite {
     self.addresses.ve3_voting_escrow = self.init_contract(code_id, msg, "ve3_voting_escrow");
   }
 
+  pub(super) fn create_asset_compounding(&mut self) {
+    let code_id = self.app.store_code(ve3_asset_compounding());
+
+    let msg = ve3_shared::msgs_asset_compounding::InstantiateMsg {
+      global_config_addr: self.addresses.ve3_global_config.to_string(),
+      denom_creation_fee: uluna(10_000000).into(),
+      fee: Decimal::percent(10),
+      deposit_profit_delay_s: 100,
+      fee_collector: self.addresses.fee.to_string(),
+    };
+
+    self.addresses.ve3_asset_compounding = self.init_contract(code_id, msg, "ve3_zapper");
+  }
+
   pub(super) fn create_zapper_mock(&mut self) {
     let code_id = self.app.store_code(ve3_zapper_mock());
 
@@ -238,6 +252,19 @@ impl TestingSuite {
         ],
       )
       .unwrap();
+  }
+
+  pub(super) fn create_zapper(&mut self) {
+    let code_id = self.app.store_code(ve3_zapper());
+
+    let addr = self.addresses.clone();
+
+    let msg = ve3_shared::msgs_zapper::InstantiateMsg {
+      center_asset_infos: vec![addr.uluna_info()],
+      global_config_addr: self.addresses.ve3_global_config.to_string(),
+    };
+
+    self.addresses.ve3_zapper = self.init_contract(code_id, msg, "ve3_zapper");
   }
 
   pub(super) fn create_pdt(&mut self) {

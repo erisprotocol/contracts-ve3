@@ -1,13 +1,13 @@
 use crate::{
   common::{
-    helpers::{native, u, Cw20, Native, Uint128},
+    helpers::{native, u, Cw20, Uint128},
     suite::TestingSuite,
   },
   extensions::app_response_ext::{EventChecker, Valid},
 };
 use cosmwasm_std::{attr, Decimal, StdError};
 use cw721::{AllNftInfoResponse, NftInfoResponse, OwnerOfResponse, TokensResponse};
-use cw_asset::{AssetInfo, AssetInfoBase};
+use cw_asset::AssetInfoBase;
 use ve3_asset_gauge::error::ContractError;
 use ve3_shared::{
   constants::{MAX_LOCK_PERIODS, SECONDS_PER_WEEK},
@@ -282,7 +282,7 @@ fn test_vote_asserts() {
     )
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 10000), ("native:lp".to_string(), 10000)],
+      vec![(addr.lp_native_info_str(), 10000), (addr.lp_native_info_str(), 10000)],
       "user1",
       |res| {
         let res = res.unwrap_err().downcast::<ContractError>().unwrap();
@@ -291,7 +291,7 @@ fn test_vote_asserts() {
     )
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 10000), (format!("cw20:{allowed_cw20}"), 10000)],
+      vec![(addr.lp_native_info_str(), 10000), (format!("cw20:{allowed_cw20}"), 10000)],
       "user1",
       |res| {
         let res = res.unwrap_err().downcast::<ContractError>().unwrap();
@@ -303,7 +303,7 @@ fn test_vote_asserts() {
     )
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
+      vec![(addr.lp_native_info_str(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
       "user2",
       |res| {
         let res = res.unwrap_err().downcast::<ContractError>().unwrap();
@@ -312,7 +312,7 @@ fn test_vote_asserts() {
     )
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
+      vec![(addr.lp_native_info_str(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
       "user1",
       |res| {
         res.assert_attribute(attr("action", "gauge/vote"));
@@ -336,7 +336,7 @@ fn test_query_infos() {
     .init_def_staking_whitelist()
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
+      vec![(addr.lp_native_info_str(), 5000), (format!("cw20:{allowed_cw20}"), 5000)],
       "user1",
       |res| {
         res.assert_valid()
@@ -356,7 +356,7 @@ fn test_query_infos() {
             }
           ),
           (
-            "native:lp".to_string(),
+            addr.lp_native_info_str(),
             VotedInfoResponse {
               voting_power: u(0),
               fixed_amount: u(0),
@@ -379,7 +379,7 @@ fn test_query_infos() {
             }
           ),
           (
-            "native:lp".to_string(),
+            addr.lp_native_info_str(),
             VotedInfoResponse {
               voting_power: u(86),
               fixed_amount: u(500),
@@ -403,7 +403,7 @@ fn test_query_infos() {
             }
           ),
           (
-            "native:lp".to_string(),
+            addr.lp_native_info_str(),
             VotedInfoResponse {
               voting_power: u(86),
               fixed_amount: u(500),
@@ -413,7 +413,7 @@ fn test_query_infos() {
         ]
       );
     })
-    .q_gauge_gauge_info(addr.gauge_1.clone(), "native:lp".to_string(), None, |res| {
+    .q_gauge_gauge_info(addr.gauge_1.clone(), addr.lp_native_info_str(), None, |res| {
       assert_eq!(
         res.unwrap(),
         VotedInfoResponse {
@@ -456,7 +456,7 @@ fn test_query_infos() {
         UserSharesResponse {
           shares: vec![UserShare {
             gauge: addr.gauge_1.clone(),
-            asset: AssetInfoBase::Native("lp".to_string()),
+            asset: addr.lp_native_info_checked(),
             period: 75,
             user_vp: u(586),
             total_vp: u(586)
@@ -479,7 +479,7 @@ fn test_query_infos() {
     })
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 10000)],
+      vec![(addr.lp_native_info_str(), 10000)],
       "user1",
       |res| {
         res.unwrap();
@@ -490,7 +490,7 @@ fn test_query_infos() {
     .add_periods(4)
     .e_gauge_vote(
       addr.gauge_1.clone(),
-      vec![("native:lp".to_string(), 8000), (format!("cw20:{allowed_cw20}"), 2000)],
+      vec![(addr.lp_native_info_str(), 8000), (format!("cw20:{allowed_cw20}"), 2000)],
       "user2",
       |res| {
         res.unwrap();
@@ -504,7 +504,7 @@ fn test_query_infos() {
         res,
         vec![
           AssetDistribution {
-            asset: AssetInfo::native("lp"),
+            asset: addr.lp_native_info_checked(),
             total_vp: u(22342),
             distribution: Decimal::one() - Decimal::from_ratio(u(3557), u(22342 + 3557)),
           },
@@ -523,7 +523,7 @@ fn test_query_infos() {
           shares: vec![
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: Uint128(586),
               total_vp: Uint128(586)
@@ -537,77 +537,77 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 76,
               user_vp: Uint128(12006),
               total_vp: Uint128(12006)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 77,
               user_vp: Uint128(11574),
               total_vp: Uint128(11574)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 78,
               user_vp: Uint128(11228),
               total_vp: Uint128(11228)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 79,
               user_vp: Uint128(10882),
               total_vp: Uint128(10882)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 80,
               user_vp: Uint128(10536),
               total_vp: Uint128(29608)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 81,
               user_vp: Uint128(10190),
               total_vp: Uint128(28570)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 82,
               user_vp: Uint128(9844),
               total_vp: Uint128(27532)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 83,
               user_vp: Uint128(9498),
               total_vp: Uint128(26494)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 84,
               user_vp: Uint128(9152),
               total_vp: Uint128(25456)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 85,
               user_vp: Uint128(8806),
               total_vp: Uint128(24418)
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 86,
               user_vp: Uint128(8460),
               total_vp: Uint128(23380)
@@ -623,7 +623,7 @@ fn test_query_infos() {
           shares: vec![
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 80,
               // cross check is possible by checking in the one before that the sum is correct.
               // between this and the stable-lp-80 from above
@@ -641,7 +641,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 81,
               // 28570 = 18380+10190...
               user_vp: Uint128(18380),
@@ -656,7 +656,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 82,
               user_vp: Uint128(17688),
               total_vp: Uint128(27532)
@@ -670,7 +670,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 83,
               user_vp: Uint128(16996),
               total_vp: Uint128(26494)
@@ -684,7 +684,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 84,
               user_vp: Uint128(16304),
               total_vp: Uint128(25456)
@@ -698,7 +698,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 85,
               user_vp: Uint128(15612),
               total_vp: Uint128(24418)
@@ -712,7 +712,7 @@ fn test_query_infos() {
             },
             UserShare {
               gauge: "stable".into(),
-              asset: Native("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 86,
               user_vp: Uint128(14920),
               total_vp: Uint128(23380)

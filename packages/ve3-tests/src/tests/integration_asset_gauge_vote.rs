@@ -31,7 +31,7 @@ fn test_vote_simple() {
           shares: vec![
             UserShare {
               gauge: "stable".to_string(),
-              asset: native_info("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: u(4800),
               total_vp: u(4800)
@@ -45,7 +45,7 @@ fn test_vote_simple() {
             },
             UserShare {
               gauge: "project".to_string(),
-              asset: native_info("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: u(12000),
               total_vp: u(12000)
@@ -68,7 +68,7 @@ fn test_vote_simple() {
             shares: vec![
               UserShare {
                 gauge: "stable".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 75,
                 user_vp: u(4800),
                 total_vp: u(4800)
@@ -82,14 +82,14 @@ fn test_vote_simple() {
               },
               UserShare {
                 gauge: "project".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 75,
                 user_vp: u(12000),
                 total_vp: u(12000)
               },
               UserShare {
                 gauge: "stable".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 76,
                 user_vp: u(6000),
                 total_vp: u(6000)
@@ -104,7 +104,7 @@ fn test_vote_simple() {
               // removed
               // UserShare {
               //   gauge: "project".to_string(),
-              //   asset: native_info("lp"),
+              //   asset: addr.lp_native_info_checked(),
               //   period: 76,
               //   user_vp: u(12000),
               //   total_vp: u(12000)
@@ -141,7 +141,7 @@ fn test_vote_with_two_no_vote() {
           shares: vec![
             UserShare {
               gauge: "stable".to_string(),
-              asset: native_info("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: u(4800),
               total_vp: u(4800)
@@ -155,7 +155,7 @@ fn test_vote_with_two_no_vote() {
             },
             UserShare {
               gauge: "project".to_string(),
-              asset: native_info("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: u(12000),
               total_vp: u(12000)
@@ -178,7 +178,7 @@ fn test_vote_with_two_no_vote() {
             shares: vec![
               UserShare {
                 gauge: "stable".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 75,
                 user_vp: u(4800),
                 total_vp: u(4800)
@@ -192,14 +192,14 @@ fn test_vote_with_two_no_vote() {
               },
               UserShare {
                 gauge: "project".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 75,
                 user_vp: u(12000),
                 total_vp: u(12000)
               },
               UserShare {
                 gauge: "stable".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 76,
                 user_vp: u(6000),
                 total_vp: u(6000)
@@ -214,7 +214,7 @@ fn test_vote_with_two_no_vote() {
               // removed
               // UserShare {
               //   gauge: "project".to_string(),
-              //   asset: native_info("lp"),
+              //   asset: addr.lp_native_info_checked(),
               //   period: 76,
               //   user_vp: u(12000),
               //   total_vp: u(12000)
@@ -252,7 +252,7 @@ fn test_vote_with_two() {
           shares: vec![
             UserShare {
               gauge: "stable".to_string(),
-              asset: native_info("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: u(4800),
               total_vp: u(10800) // +6000 due to user2
@@ -266,7 +266,7 @@ fn test_vote_with_two() {
             },
             UserShare {
               gauge: "project".to_string(),
-              asset: native_info("lp"),
+              asset: addr.lp_native_info_checked(),
               period: 75,
               user_vp: u(12000),
               total_vp: u(12000)
@@ -289,7 +289,7 @@ fn test_vote_with_two() {
             shares: vec![
               UserShare {
                 gauge: "stable".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 75,
                 user_vp: u(4800),
                 total_vp: u(10800) // +6000 due to user2
@@ -303,14 +303,14 @@ fn test_vote_with_two() {
               },
               UserShare {
                 gauge: "project".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 75,
                 user_vp: u(12000),
                 total_vp: u(12000)
               },
               UserShare {
                 gauge: "stable".to_string(),
-                asset: native_info("lp"),
+                asset: addr.lp_native_info_checked(),
                 period: 76,
                 user_vp: u(6000),
                 total_vp: u(12000) // +6000 due to user2
@@ -325,7 +325,7 @@ fn test_vote_with_two() {
               // removed
               // UserShare {
               //   gauge: "project".to_string(),
-              //   asset: native_info("lp"),
+              //   asset: addr.lp_native_info_checked(),
               //   period: 76,
               //   user_vp: u(12000),
               //   total_vp: u(12000)

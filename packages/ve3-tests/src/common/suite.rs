@@ -32,8 +32,10 @@ pub struct TestingSuite {
 }
 
 #[derive(Default)]
+#[cw_serde]
 pub struct InitOptions {
   pub rebase_asset: Option<AssetInfoUnchecked>,
+  pub mock_zapper: Option<bool>,
 }
 
 #[cw_serde]
@@ -44,8 +46,10 @@ pub struct Addresses {
   pub user1: Addr,
   pub user2: Addr,
   pub dca1: Addr,
+  pub fee: Addr,
 
   pub ve3_asset_gauge: Addr,
+  pub ve3_asset_compounding: Addr,
   pub ve3_bribe_manager: Addr,
   pub ve3_global_config: Addr,
   pub ve3_voting_escrow: Addr,
@@ -72,7 +76,12 @@ pub struct Addresses {
   pub fee_recipient: Addr,
 
   pub incentive_mock: Addr,
+  pub astroport_factory: Addr,
   pub astroport_pair_mock: Addr,
+  pub astroport_ampluna_luna_pair: Addr,
+  pub astroport_ampluna_luna_lp: String,
+  pub astroport_luna_usdc_pair: Addr,
+  pub astroport_luna_usdc_lp: String,
 
   pub active_asset_staking: Addr,
   pub active_connector_alliance: Addr,
@@ -101,7 +110,7 @@ impl Addresses {
   pub(crate) fn ampluna_info_checked(&self) -> AssetInfo {
     AssetInfo::cw20(self.eris_hub_cw20_ampluna.clone())
   }
-  pub(crate) fn ampluna(&self, a: u32) -> Asset {
+  pub(crate) fn ampluna(&self, a: u128) -> Asset {
     cw20(self.eris_hub_cw20_ampluna.clone(), Uint128::new(a.into()))
   }
 
@@ -117,13 +126,19 @@ impl Addresses {
   }
 
   pub(crate) fn lp_native_info(&self) -> AssetInfoUnchecked {
-    AssetInfoUnchecked::native("lp".to_string())
+    AssetInfoUnchecked::native(self.astroport_luna_usdc_lp.clone())
+  }
+  pub(crate) fn lp_native_info_str(&self) -> String {
+    self.lp_native_info_checked().to_string()
   }
   pub(crate) fn lp_native_info_checked(&self) -> AssetInfo {
-    AssetInfo::native("lp".to_string())
+    AssetInfo::native(self.astroport_luna_usdc_lp.clone())
   }
   pub(crate) fn lp_native(&self, a: u32) -> Asset {
-    native("lp", Uint128::new(a.into()))
+    native(self.astroport_luna_usdc_lp.clone(), Uint128::new(a.into()))
+  }
+  pub(crate) fn lp_native_str(&self, a: u32) -> String {
+    native(self.astroport_luna_usdc_lp.clone(), Uint128::new(a.into())).to_string()
   }
 
   pub(crate) fn uluna_info(&self) -> AssetInfoUnchecked {
@@ -151,6 +166,37 @@ impl Addresses {
   }
   pub(crate) fn fake_native(&self, a: u32) -> Asset {
     native("xxx", Uint128::new(a.into()))
+  }
+
+  pub(crate) fn amplp1_info(&self) -> AssetInfoUnchecked {
+    AssetInfoUnchecked::native(format!(
+      "factory/{0}/1/{1}/amplp",
+      self.ve3_asset_compounding, self.gauge_2
+    ))
+  }
+  pub(crate) fn amplp1_info_checked(&self) -> AssetInfo {
+    AssetInfo::native(format!("factory/{0}/1/{1}/amplp", self.ve3_asset_compounding, self.gauge_2))
+  }
+  pub(crate) fn amplp1(&self, a: u128) -> Asset {
+    native(
+      format!("factory/{0}/1/{1}/amplp", self.ve3_asset_compounding, self.gauge_2),
+      Uint128::new(a),
+    )
+  }
+  pub(crate) fn amplp0_info(&self) -> AssetInfoUnchecked {
+    AssetInfoUnchecked::native(format!(
+      "factory/{0}/0/{1}/amplp",
+      self.ve3_asset_compounding, self.gauge_2
+    ))
+  }
+  pub(crate) fn amplp0_info_checked(&self) -> AssetInfo {
+    AssetInfo::native(format!("factory/{0}/0/{1}/amplp", self.ve3_asset_compounding, self.gauge_2))
+  }
+  pub(crate) fn amplp0(&self, a: u128) -> Asset {
+    native(
+      format!("factory/{0}/0/{1}/amplp", self.ve3_asset_compounding, self.gauge_2),
+      Uint128::new(a),
+    )
   }
 }
 
@@ -234,6 +280,7 @@ impl TestingSuite {
     let user2 = api.addr_make("user2");
     let fee_recipient = api.addr_make("AT_FEE_COLLECTOR");
     let dca1 = api.addr_make("dca1");
+    let fee = api.addr_make("fee");
 
     let bank = BankKeeper::new();
 
@@ -305,6 +352,7 @@ impl TestingSuite {
       addresses: Addresses {
         senders: [creator.clone(), user1.clone(), user2.clone()],
 
+        ve3_asset_compounding: Addr(""),
         ve3_asset_gauge: Addr(""),
         ve3_bribe_manager: Addr(""),
         ve3_global_config: Addr(""),
@@ -330,12 +378,19 @@ impl TestingSuite {
         user2,
         fee_recipient,
         dca1,
+        fee,
 
         active_asset_staking: Addr(""),
         active_connector_alliance: Addr(""),
 
         incentive_mock: Addr(""),
+
+        astroport_factory: Addr(""),
         astroport_pair_mock: Addr(""),
+        astroport_ampluna_luna_pair: Addr(""),
+        astroport_luna_usdc_pair: Addr(""),
+        astroport_ampluna_luna_lp: "".to_string(),
+        astroport_luna_usdc_lp: "".to_string(),
 
         zasset_denom: "".to_string(),
         gauge_1: "stable".to_string(),
@@ -380,7 +435,7 @@ impl TestingSuite {
     self.addresses.clone()
   }
 
-  pub(crate) fn init_options(&mut self, init: InitOptions) -> &mut Self {
+  pub(crate) fn init_options(&mut self, init: InitOptions) -> Addresses {
     self.init_no_config(init);
 
     self.init_global_config();
@@ -394,7 +449,7 @@ impl TestingSuite {
       },
     );
 
-    self
+    self.addresses.clone()
   }
 
   #[track_caller]
@@ -410,13 +465,21 @@ impl TestingSuite {
     self.create_lp_cw20();
 
     self.create_global_config();
-    self.create_asset_gauge(init);
+    self.create_asset_gauge(init.clone());
     self.create_bribe_manager();
     self.create_connector_alliance_1();
     self.create_connector_alliance_eris();
     self.create_connector_emissions();
     self.create_voting_escrow();
-    self.create_zapper_mock();
+    // self.create_zapper_mock();
+
+    self.def_get_ampluna("creator", 100_000000);
+    self.def_change_exchange_rate(Decimal::percent(120));
+
+    self.def_get_ampluna("user1", 100_000000);
+    self.def_get_ampluna("user2", 100_000000);
+
+    self.create_asset_compounding();
     self.create_pdt();
 
     self.create_asset_staking_1();
@@ -429,11 +492,17 @@ impl TestingSuite {
     self.create_incentive_mock();
     self.create_astroport_pair_mock();
 
-    self.def_get_ampluna("creator", 100_000000);
-    self.def_change_exchange_rate(Decimal::percent(120));
-
-    self.def_get_ampluna("user1", 10_000000);
-    self.def_get_ampluna("user2", 10_000000);
+    if init.mock_zapper == Some(true) {
+      self.create_zapper_mock();
+      self.create_astroport(false);
+    } else {
+      println!("zapper-real");
+      self.def_get_ampluna("user1", 100000_000000);
+      self.def_get_ampluna("user2", 100000_000000);
+      self.create_zapper();
+      self.create_astroport(true);
+      self.def_setup_zapper();
+    }
 
     self
   }
@@ -487,6 +556,10 @@ impl TestingSuite {
           ],
         ),
         (PDT_DCA_EXECUTOR.to_string(), vec![self.addresses.dca1.to_string()]),
+        (
+          AT_BOT.to_string(),
+          vec![self.addresses.dca1.to_string(), self.addresses.creator.to_string()],
+        ),
       ],
       "creator",
       |a| {

@@ -36,7 +36,7 @@ fn test_asset_take_rate_multi_rebase() {
       res.assert_attribute(attr("action", "asset/stake"));
       res.assert_attribute(attr("share", "10000000"));
       res.assert_attribute(attr("action", "mock/deposit"));
-      res.assert_attribute(attr("mock/amount", "native:lp:10000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(10000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
     })
     .e_staking_stake(None, addr.fake_native(10_000_000), "user1", |res| {
@@ -49,15 +49,18 @@ fn test_asset_take_rate_multi_rebase() {
     .add_one_period()
     .e_staking_distribute_take_rate(Some(true), None, "user1", |res| {
       res.assert_attribute(attr("action", "asset/distribute_take_rate"));
-      res.assert_attribute(attr("take", "native:lp:19178"));
+      res.assert_attribute(attr("take", addr.lp_native_str(19178)));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:19178"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(19178)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       // setup to receive 10000 astro per week
       res.assert_attribute(attr("bribe", "native:astro:10000"));
       res.assert_attribute(attr("bribe", "native:astro:5000"));
       res.assert_attribute_ty("transfer", attr("recipient", take_recipient.to_string()));
       // 7 / 365 * 10% * 10_000000 = 19,178
-      res.assert_attribute_ty("transfer", attr("amount", "19178lp"));
+      res.assert_attribute_ty(
+        "transfer",
+        attr("amount", format!("19178{0}", addr.astroport_luna_usdc_lp)),
+      );
     });
 }

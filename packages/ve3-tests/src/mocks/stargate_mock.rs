@@ -43,11 +43,21 @@ impl Module for StargateMockModule {
       | "/cosmwasm.tokenfactory.v1beta1.MsgCreateDenom"
       | "/injective.tokenfactory.v1beta1.MsgCreateDenom" => {
         let tf_msg: MsgCreateDenom = msg.value.try_into()?;
+
+        // let new = format!("factory/{}/{}", tf_msg.sender, tf_msg.subdenom);
+        // println!("CREATE MESSAGE DENOM: {0}", new);
+
+        let astroport_response = astroport::token_factory::MsgCreateDenomResponse {
+          new_token_denom: format!("factory/{}/{}", tf_msg.sender, tf_msg.subdenom),
+        };
+
+        let _old_response = to_json_binary(&MsgCreateDenomResponse {
+          new_token_denom: format!("factory/{}/{}", tf_msg.sender, tf_msg.subdenom),
+        })?;
+
         let submsg_response = SubMsgResponse {
           events: vec![],
-          data: Some(to_json_binary(&MsgCreateDenomResponse {
-            new_token_denom: format!("factory/{}/{}", tf_msg.sender, tf_msg.subdenom),
-          })?),
+          data: Some(astroport_response.into()),
         };
         Ok(submsg_response.into())
       },

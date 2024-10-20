@@ -1,3 +1,4 @@
+use crate::contract::assert_asset_whitelisted;
 use crate::state::{CONFIG, EXCHANGE_HISTORY};
 use crate::{error::ContractError, state::asset_config_map};
 #[cfg(not(feature = "library"))]
@@ -17,7 +18,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     QueryMsg::AssetConfig {
       asset_info,
       gauge,
-    } => Ok(to_json_binary(&asset_config_map().load(deps.storage, (&gauge, &asset_info))?)?),
+    } => Ok(to_json_binary(&assert_asset_whitelisted(deps.storage, &gauge, &asset_info)?)?),
+    QueryMsg::AssetConfigs {
+      assets,
+    } => Ok(to_json_binary(&query_asset_configs(deps, assets)?)?),
     QueryMsg::UserInfos {
       assets,
       addr,
@@ -27,6 +31,31 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       start_after,
       limit,
     } => Ok(to_json_binary(&query_exchange_rates(deps, assets, start_after, limit)?)?),
+  }
+}
+
+fn query_asset_configs(
+  deps: Deps,
+  assets: Option<Vec<(String, AssetInfo)>>,
+) -> Result<Vec<CompoundingAssetConfig>, ContractError> {
+  match assets {
+    Some(assets) => {
+      let mut results = vec![];
+      for (gauge, asset) in assets {
+        let asset_config = assert_asset_whitelisted(deps.storage, &gauge, &asset)?;
+        results.push(asset_config);
+      }
+      Ok(results)
+    },
+    None => Ok(
+      asset_config_map()
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|a| {
+          let (_, a) = a?;
+          Ok(a)
+        })
+        .collect::<StdResult<Vec<_>>>()?,
+    ),
   }
 }
 
@@ -43,7 +72,7 @@ fn query_user_infos(
   match assets {
     Some(assets) => {
       for (gauge, asset) in assets {
-        let asset_config = asset_config_map().load(deps.storage, (&gauge, &asset))?;
+        let asset_config = assert_asset_whitelisted(deps.storage, &gauge, &asset)?;
         results.push(get_user_info(&deps, &env, asset_config, &addr)?);
       }
     },
@@ -64,7 +93,7 @@ fn get_user_info(
   asset_config: CompoundingAssetConfig,
   user: &Addr,
 ) -> Result<UserInfoResponse, ContractError> {
-  let staked_balance = asset_config.staking.query_staked_balance(
+  let staked_balance = asset_config.staking.query_staked_balance_fallback(
     &deps.querier,
     &env.contract.address,
     asset_config.asset_info.clone(),

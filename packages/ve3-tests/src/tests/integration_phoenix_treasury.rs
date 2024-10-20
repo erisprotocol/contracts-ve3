@@ -1,7 +1,7 @@
 use crate::{
   common::{
     helpers::{u, uluna},
-    suite::TestingSuite,
+    suite::{InitOptions, TestingSuite},
   },
   extensions::app_response_ext::{EventChecker, Valid},
 };
@@ -1543,7 +1543,10 @@ fn test_vesting() {
 #[test]
 fn test_dca() {
   let mut suite = TestingSuite::def();
-  let addr = suite.init();
+  let addr = suite.init_options(InitOptions {
+    rebase_asset: None,
+    mock_zapper: Some(true),
+  });
   let current_time = suite.app.block_info().time.seconds();
   let week = WEEK as u128;
 

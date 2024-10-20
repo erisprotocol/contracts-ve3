@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
-use cw_asset::{Asset, AssetInfo, AssetUnchecked};
+use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked, AssetUnchecked};
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
@@ -66,12 +66,12 @@ pub enum ExecuteMsg {
 
   Compound {
     minimum_receive: Option<Uint128>,
-    asset_info: AssetInfo,
+    asset_info: AssetInfoUnchecked,
     gauge: String,
   },
 
   InitializeAsset {
-    asset_info: AssetInfo,
+    asset_info: AssetInfoUnchecked,
     gauge: String,
   },
 
@@ -81,7 +81,7 @@ pub enum ExecuteMsg {
     deposit_profit_delay_s: Option<u64>,
     denom_creation_fee: Option<AssetUnchecked>,
 
-    fee_for_assets: Option<Vec<(String, AssetInfo, Option<Decimal>)>>,
+    fee_for_assets: Option<Vec<(String, AssetInfoUnchecked, Option<Decimal>)>>,
   },
 
   Callback(CallbackMsg),
@@ -122,6 +122,11 @@ pub enum QueryMsg {
   AssetConfig {
     asset_info: AssetInfo,
     gauge: String,
+  },
+
+  #[returns(Vec<CompoundingAssetConfig>)]
+  AssetConfigs {
+    assets: Option<Vec<(String, AssetInfo)>>,
   },
 
   #[returns(Vec<UserInfoResponse>)]

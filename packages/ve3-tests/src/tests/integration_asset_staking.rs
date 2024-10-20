@@ -21,7 +21,7 @@ fn test_add_remove_asset() {
 
   suite
     .e_staking_whitelist_assets(
-      vec![AssetInfo::native("lp").into(), AssetInfo::cw20(addr.lp_cw20.clone()).into()],
+      vec![addr.lp_native_info_checked().into(), AssetInfo::cw20(addr.lp_cw20.clone()).into()],
       "user1",
       |res| {
         let res = res.unwrap_err().downcast::<ContractError>().unwrap();
@@ -36,14 +36,17 @@ fn test_add_remove_asset() {
       },
     )
     .e_staking_whitelist_assets(
-      vec![AssetInfo::native("lp").into(), AssetInfo::cw20(addr.lp_cw20.clone()).into()],
+      vec![addr.lp_native_info_checked().into(), AssetInfo::cw20(addr.lp_cw20.clone()).into()],
       "AT_ASSET_WHITELIST_CONTROLLER",
       |res| {
         res.unwrap();
       },
     )
     .q_staking_whitelisted_assets(|res| {
-      assert_eq!(res.unwrap(), vec![AssetInfo::cw20(addr.lp_cw20.clone()), AssetInfo::native("lp")])
+      assert_eq!(
+        res.unwrap(),
+        vec![AssetInfo::cw20(addr.lp_cw20.clone()), addr.lp_native_info_checked()]
+      )
     })
     .e_staking_remove_assets(vec![AssetInfo::cw20(addr.lp_cw20.clone())], "user1", |res| {
       let res = res.unwrap_err().downcast::<ContractError>().unwrap();
@@ -63,7 +66,9 @@ fn test_add_remove_asset() {
         res.unwrap();
       },
     )
-    .q_staking_whitelisted_assets(|res| assert_eq!(res.unwrap(), vec![AssetInfo::native("lp")]));
+    .q_staking_whitelisted_assets(|res| {
+      assert_eq!(res.unwrap(), vec![addr.lp_native_info_checked()])
+    });
 }
 
 #[test]
@@ -77,7 +82,7 @@ fn test_asset_config() {
     .e_staking_whitelist_assets(
       vec![
         AssetInfoWithConfig::new(
-          AssetInfoUnchecked::native("lp"),
+          addr.lp_native_info(),
           Some(AssetConfig {
             yearly_take_rate: Some(Decimal::percent(20)),
             stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
@@ -117,7 +122,7 @@ fn test_asset_config() {
           },
           AssetInfoWithRuntime {
             whitelisted: true,
-            info: AssetInfo::native("lp"),
+            info: addr.lp_native_info_checked(),
             config: AssetConfigRuntime {
               yearly_take_rate: Decimal::percent(20),
               stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
@@ -186,7 +191,7 @@ fn test_asset_set_config() {
       |res| {
         res.assert_attribute(attr("action", "asset/update_asset_config"));
         res.assert_attribute(attr("action", "mock/deposit"));
-        res.assert_attribute(attr("mock/amount", "native:lp:1000"));
+        res.assert_attribute(attr("mock/amount", addr.lp_native_str(1000)));
         res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       },
     )
@@ -199,7 +204,7 @@ fn test_asset_set_config() {
       |res| {
         res.assert_attribute(attr("action", "asset/update_asset_config"));
         res.assert_attribute(attr("action", "mock/withdraw"));
-        res.assert_attribute(attr("mock/amount", "native:lp:1000"));
+        res.assert_attribute(attr("mock/amount", addr.lp_native_str(1000)));
         res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       },
     );
@@ -221,21 +226,24 @@ fn test_asset_take_rate() {
       res.assert_attribute(attr("action", "asset/stake"));
       res.assert_attribute(attr("share", "10000000"));
       res.assert_attribute(attr("action", "mock/deposit"));
-      res.assert_attribute(attr("mock/amount", "native:lp:10000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(10000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
     })
     .add_one_period()
     .e_staking_distribute_take_rate(Some(true), None, "user1", |res| {
       res.assert_attribute(attr("action", "asset/distribute_take_rate"));
-      res.assert_attribute(attr("take", "native:lp:19178"));
+      res.assert_attribute(attr("take", addr.lp_native_str(19178)));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:19178"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(19178)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       // setup to receive 10000 astro per week
       res.assert_attribute(attr("bribe", "native:astro:10000"));
       res.assert_attribute_ty("transfer", attr("recipient", take_recipient.to_string()));
       // 7 / 365 * 10% * 10_000000 = 19,178
-      res.assert_attribute_ty("transfer", attr("amount", "19178lp"));
+      res.assert_attribute_ty(
+        "transfer",
+        attr("amount", format!("19178{0}", addr.astroport_luna_usdc_lp)),
+      );
     })
     .add_one_period()
     .e_staking_distribute_bribes(Some(true), None, "user1", |res| {
@@ -281,7 +289,7 @@ fn test_asset_unstake() {
       res.assert_attribute(attr("action", "asset/stake"));
       res.assert_attribute(attr("share", "10000000"));
       res.assert_attribute(attr("action", "mock/deposit"));
-      res.assert_attribute(attr("mock/amount", "native:lp:10000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(10000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
     })
     .q_staking_all_staked_balances(
@@ -370,11 +378,14 @@ fn test_asset_unstake() {
       res.assert_attribute(attr("amount", "999999"));
       res.assert_attribute(attr("share", "1001921"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:999999"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(999999)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute(attr("bribe", "native:astro:10000"));
       res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
-      res.assert_attribute_ty("transfer", attr("amount", "999999lp"));
+      res.assert_attribute_ty(
+        "transfer",
+        attr("amount", format!("999999{0}", addr.astroport_luna_usdc_lp)),
+      );
     })
     .e_staking_unstake(addr.lp_native(10000000), "user1", |res| {
       res.assert_attribute(attr("action", "asset/unstake"));
@@ -382,10 +393,13 @@ fn test_asset_unstake() {
       res.assert_attribute(attr("amount", "8980823"));
       res.assert_attribute(attr("share", "8998079"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:8980823"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(8980823)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
-      res.assert_attribute_ty("transfer", attr("amount", "8980823lp"));
+      res.assert_attribute_ty(
+        "transfer",
+        attr("amount", format!("8980823{0}", addr.astroport_luna_usdc_lp)),
+      );
     })
     .q_staking_all_staked_balances(
       AllStakedBalancesQuery {
@@ -418,7 +432,7 @@ fn test_asset_unstake_recipient() {
       res.assert_attribute(attr("action", "asset/stake"));
       res.assert_attribute(attr("share", "10000000"));
       res.assert_attribute(attr("action", "mock/deposit"));
-      res.assert_attribute(attr("mock/amount", "native:lp:10000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(10000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
     })
     .e_staking_unstake_recipient(addr.lp_native(1000000), "user1", "user2", |res| {
@@ -426,20 +440,26 @@ fn test_asset_unstake_recipient() {
       res.assert_attribute(attr("amount", "1000000"));
       res.assert_attribute(attr("share", "1000000"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:1000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(1000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute_ty("transfer", attr("recipient", addr.user2.to_string()));
-      res.assert_attribute_ty("transfer", attr("amount", "1000000lp"));
+      res.assert_attribute_ty(
+        "transfer",
+        attr("amount", format!("1000000{0}", addr.astroport_luna_usdc_lp)),
+      );
     })
     .e_staking_unstake(addr.lp_native(9000000), "user1", |res| {
       res.assert_attribute(attr("action", "asset/unstake"));
       res.assert_attribute(attr("amount", "9000000"));
       res.assert_attribute(attr("share", "9000000"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:9000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(9000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute_ty("transfer", attr("recipient", addr.user1.to_string()));
-      res.assert_attribute_ty("transfer", attr("amount", "9000000lp"));
+      res.assert_attribute_ty(
+        "transfer",
+        attr("amount", format!("9000000{0}", addr.astroport_luna_usdc_lp)),
+      );
     })
     .q_staking_all_staked_balances(
       AllStakedBalancesQuery {
@@ -468,7 +488,7 @@ fn test_asset_second_user() {
       res.assert_attribute(attr("amount", "1000000"));
       res.assert_attribute(attr("share", "1001921"));
       res.assert_attribute(attr("action", "mock/deposit"));
-      res.assert_attribute(attr("mock/amount", "native:lp:1000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(1000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute(attr("bribe", "native:astro:10000"));
     })
@@ -520,7 +540,7 @@ fn test_asset_recipient() {
       res.assert_attribute(attr("amount", "1000000"));
       res.assert_attribute(attr("share", "1001921"));
       res.assert_attribute(attr("action", "mock/deposit"));
-      res.assert_attribute(attr("mock/amount", "native:lp:1000000"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(1000000)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
       res.assert_attribute(attr("bribe", "native:astro:10000"));
     })
@@ -579,7 +599,7 @@ fn test_asset_recipient() {
       res.assert_attribute(attr("amount", "10980822"));
       res.assert_attribute(attr("share", "11001921"));
       res.assert_attribute(attr("action", "mock/withdraw"));
-      res.assert_attribute(attr("mock/amount", "native:lp:10980822"));
+      res.assert_attribute(attr("mock/amount", addr.lp_native_str(10980822)));
       res.assert_attribute(attr("action", "asset/track_bribes_callback"));
     })
     .q_staking_total_staked_balances(|res| {

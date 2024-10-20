@@ -7,6 +7,7 @@ use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{
   extensions::{asset_ext::AssetExt, asset_info_ext::AssetInfoExt},
   msgs_asset_staking::{AssetConfig, AssetInfoWithConfig},
+  msgs_zapper::{RouteInit, Stage, StageType},
 };
 
 #[allow(dead_code)]
@@ -16,7 +17,7 @@ impl TestingSuite {
     self.e_staking_whitelist_assets(
       vec![
         AssetInfoWithConfig::new(
-          AssetInfoUnchecked::native("lp"),
+          addr.lp_native_info(),
           Some(AssetConfig {
             yearly_take_rate: Some(Decimal::percent(20)),
             stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
@@ -38,7 +39,7 @@ impl TestingSuite {
   pub fn init_def_staking_whitelist(&mut self) -> &mut Self {
     let addr = self.addresses.clone();
     self.e_staking_whitelist_assets(
-      vec![AssetInfo::native("lp").into(), AssetInfo::cw20(addr.lp_cw20.clone()).into()],
+      vec![addr.lp_native_info().into(), AssetInfo::cw20(addr.lp_cw20.clone()).into()],
       "AT_ASSET_WHITELIST_CONTROLLER",
       |res| {
         res.unwrap();
@@ -55,9 +56,10 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let addr = self.addresses.clone();
     let allowed_cw20 = addr.lp_cw20.to_string();
+    let native_lp = addr.lp_native_info_checked().to_string();
     let msg = ve3_shared::msgs_asset_gauge::ExecuteMsg::Vote {
       gauge: addr.gauge_1.to_string(),
-      votes: vec![("native:lp".to_string(), lp), (format!("cw20:{allowed_cw20}"), cw20)],
+      votes: vec![(native_lp, lp), (format!("cw20:{allowed_cw20}"), cw20)],
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, addr.ve3_asset_gauge.clone(), &msg, &[]));
@@ -73,9 +75,10 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let addr = self.addresses.clone();
     let allowed_cw20 = addr.lp_cw20.to_string();
+    let native_lp = addr.lp_native_info_checked().to_string();
     let msg = ve3_shared::msgs_asset_gauge::ExecuteMsg::Vote {
       gauge: addr.gauge_2.to_string(),
-      votes: vec![("native:lp".to_string(), lp), (format!("cw20:{allowed_cw20}"), cw20)],
+      votes: vec![(native_lp, lp), (format!("cw20:{allowed_cw20}"), cw20)],
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, addr.ve3_asset_gauge.clone(), &msg, &[]));
@@ -91,9 +94,11 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let addr = self.addresses.clone();
     let allowed_cw20 = addr.lp_cw20.to_string();
+    let native_lp = addr.lp_native_info_checked().to_string();
+
     let msg = ve3_shared::msgs_asset_gauge::ExecuteMsg::Vote {
       gauge: addr.gauge_3.to_string(),
-      votes: vec![("native:lp".to_string(), lp), (format!("cw20:{allowed_cw20}"), cw20)],
+      votes: vec![(native_lp, lp), (format!("cw20:{allowed_cw20}"), cw20)],
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, addr.ve3_asset_gauge.clone(), &msg, &[]));
@@ -108,7 +113,7 @@ impl TestingSuite {
 
     self.e_staking_whitelist_assets(
       vec![AssetInfoWithConfig::new(
-        AssetInfoUnchecked::native("lp"),
+        addr.lp_native_info(),
         Some(AssetConfig {
           yearly_take_rate: Some(Decimal::percent(10)),
           stake_config: ve3_shared::stake_config::StakeConfig::Astroport {
@@ -128,7 +133,7 @@ impl TestingSuite {
     self.e_staking_whitelist_assets(
       vec![
         AssetInfoWithConfig::new(
-          AssetInfoUnchecked::native("lp"),
+          addr.lp_native_info(),
           Some(AssetConfig {
             yearly_take_rate: Some(Decimal::percent(10)),
             stake_config: ve3_shared::stake_config::StakeConfig::Default,
@@ -267,6 +272,63 @@ impl TestingSuite {
     self
       .def_send("creator", addr.ve3_connector_alliance_eris.clone(), addr.uluna(amount))
       .e_staking_update_rewards("user1", |res| res.assert_valid());
+    self
+  }
+
+  pub fn def_setup_compounding(&mut self) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+    self
+      .def_setup_staking()
+      .e_compound_initialize_asset(
+        addr.lp_cw20_info(),
+        &addr.gauge_2,
+        "user1",
+        vec![addr.uluna(10000000).to_coin().unwrap()],
+        |res| {
+          res.assert_valid();
+        },
+      )
+      .e_compound_initialize_asset(
+        addr.lp_native_info(),
+        &addr.gauge_2,
+        "user2",
+        vec![addr.uluna(10000000).to_coin().unwrap()],
+        |res| {
+          res.assert_valid();
+        },
+      );
+
+    self
+  }
+
+  pub fn def_setup_zapper(&mut self) -> &mut TestingSuite {
+    let addr = self.addresses.clone();
+
+    self.e_zapper_update_config(
+      Some(vec![RouteInit {
+        routes: vec![
+          Stage {
+            from: addr.ampluna_info_checked(),
+            to: addr.uluna_info_checked(),
+            stage_type: StageType::Astroport {
+              pair: addr.astroport_ampluna_luna_pair.clone(),
+            },
+          },
+          Stage {
+            from: addr.uluna_info_checked(),
+            to: addr.usdc_info_checked(),
+            stage_type: StageType::Astroport {
+              pair: addr.astroport_luna_usdc_pair.clone(),
+            },
+          },
+        ],
+      }]),
+      None,
+      None,
+      "creator",
+      |res| res.assert_valid(),
+    );
+
     self
   }
 }

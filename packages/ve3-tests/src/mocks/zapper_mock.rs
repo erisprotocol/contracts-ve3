@@ -9,7 +9,8 @@ use ve3_shared::{
   extensions::asset_info_ext::AssetInfoExt,
   helpers::{assets::Assets, general::addr_opt_fallback},
 };
-pub type ContractResult = Result<Response, SharedError>;
+use ve3_zapper::error::ContractError;
+pub type ContractResult = Result<Response, ContractError>;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -45,8 +46,8 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
   deps: DepsMut,
-  _env: Env,
-  _info: MessageInfo,
+  env: Env,
+  info: MessageInfo,
   msg: ve3_shared::msgs_zapper::ExecuteMsg,
 ) -> ContractResult {
   match msg {
@@ -63,16 +64,16 @@ pub fn execute(
       let exchange_rate =
         config.exchange_rate.iter().find(|a| a.0 == asset && a.1 == into).unwrap().2;
       let previously = config.assets.get(&asset).map(|a| a.amount).unwrap_or_default();
-      let currently = asset.query_balance(&deps.querier, _env.contract.address.to_string())?;
+      let currently = asset.query_balance(&deps.querier, env.contract.address.to_string())?;
       let received = currently - previously;
 
       let returning = received * exchange_rate;
-      let receiver = addr_opt_fallback(deps.api, &receiver, _info.sender)?;
+      let receiver = addr_opt_fallback(deps.api, &receiver, info.sender)?;
       let returning = into.with_balance(returning);
 
       if let Some(min_received) = min_received {
         if returning.amount < min_received {
-          return Err(SharedError::Std(StdError::generic_err("not enough returnt")));
+          return Err(SharedError::Std(StdError::generic_err("not enough returnt")))?;
         }
       }
 

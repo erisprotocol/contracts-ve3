@@ -104,7 +104,10 @@ fn test_staking_claim_native() {
 #[test]
 fn test_staking_claim_both() {
   let mut suite = TestingSuite::def();
-  suite.init();
+  suite.init_options(crate::common::suite::InitOptions {
+    rebase_asset: None,
+    mock_zapper: Some(true),
+  });
 
   let addr = suite.addresses.clone();
 

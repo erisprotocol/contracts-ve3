@@ -7,7 +7,7 @@ use ve3_shared::msgs_connector_alliance::*;
 
 #[allow(dead_code)]
 impl TestingSuite {
-  fn contract_5(&self) -> Addr {
+  fn contract_connector_alliance(&self) -> Addr {
     self.addresses.active_connector_alliance.clone()
   }
 
@@ -36,7 +36,7 @@ impl TestingSuite {
       update,
     };
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
@@ -52,7 +52,7 @@ impl TestingSuite {
     let sender = self.address(sender);
     result(self.app.execute_contract(
       sender,
-      self.contract_5(),
+      self.contract_connector_alliance(),
       &msg,
       &[coin(amount.into(), self.addresses.zasset_denom.clone())],
     ));
@@ -66,7 +66,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::ClaimRewards {};
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
@@ -78,7 +78,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::AllianceDelegate(alliance_delegate_msg);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
@@ -90,7 +90,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::AllianceUndelegate(alliance_undelegate_msg);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
@@ -102,7 +102,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::AllianceRedelegate(alliance_redelegate_msg);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
@@ -116,7 +116,7 @@ impl TestingSuite {
       validator,
     };
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
@@ -128,24 +128,29 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::Callback(callback_msg);
     let sender = self.address(sender);
-    result(self.app.execute_contract(sender, self.contract_5(), &msg, &[]));
+    result(self.app.execute_contract(sender, self.contract_connector_alliance(), &msg, &[]));
     self
   }
 
   pub fn q_alliance_config(&mut self, result: impl Fn(StdResult<Config>)) -> &mut Self {
-    let response = self.app.wrap().query_wasm_smart(self.contract_5(), &QueryMsg::Config {});
+    let response =
+      self.app.wrap().query_wasm_smart(self.contract_connector_alliance(), &QueryMsg::Config {});
     result(response);
     self
   }
 
   pub fn q_alliance_validators(&mut self, result: impl Fn(StdResult<HashSet<Addr>>)) -> &mut Self {
-    let response = self.app.wrap().query_wasm_smart(self.contract_5(), &QueryMsg::Validators {});
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_connector_alliance(), &QueryMsg::Validators {});
     result(response);
     self
   }
 
   pub fn q_alliance_state(&mut self, result: impl Fn(StdResult<StateResponse>)) -> &mut Self {
-    let response = self.app.wrap().query_wasm_smart(self.contract_5(), &QueryMsg::State {});
+    let response =
+      self.app.wrap().query_wasm_smart(self.contract_connector_alliance(), &QueryMsg::State {});
     result(response);
     self
   }
