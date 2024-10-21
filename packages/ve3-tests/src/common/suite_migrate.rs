@@ -39,6 +39,10 @@ impl TestingSuite {
     let msg = ve3_shared::msgs_voting_escrow::MigrateMsg {};
     self.migrate_contract(&addr.ve3_voting_escrow, code_id, msg);
 
+    let code_id = self.app.store_code(ve3_asset_compounding());
+    let msg = ve3_shared::msgs_asset_compounding::MigrateMsg {};
+    self.migrate_contract(&addr.ve3_asset_compounding, code_id, msg);
+
     // TEST ALLIANCE CONNECTOR
     let code_id = self.app.store_code(ve3_connector_alliance());
     let init = msgs_connector_alliance::InstantiateMsg {
