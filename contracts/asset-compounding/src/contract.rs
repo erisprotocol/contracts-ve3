@@ -444,6 +444,10 @@ fn initialize_asset(
     return Err(ContractError::AssetNotWhitelisted(gauge, asset_info.to_string()));
   }
 
+  if asset_config_map().has(deps.storage, (&gauge, &asset_info)) {
+    return Err(ContractError::AssetAlreadyInitialized(gauge, asset_info.to_string()));
+  }
+
   config.denom_creation_fee.assert_sent(&info)?;
 
   let token_index = TOKEN_INDEX.load(deps.storage)?;

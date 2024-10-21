@@ -22,6 +22,7 @@ pub enum ContractError {
 
   #[error("{0}")]
   OverflowError(#[from] OverflowError),
+
   #[error("{0}")]
   CheckedFromRatioError(#[from] CheckedFromRatioError),
 
@@ -42,4 +43,7 @@ pub enum ContractError {
 
   #[error("No rewards available")]
   NoRewards,
+
+  #[error("asset already initialized gauge: {0}, asset: {1}")]
+  AssetAlreadyInitialized(String, String),
 }

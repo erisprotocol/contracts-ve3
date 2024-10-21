@@ -505,6 +505,8 @@ fn test_compounding_compound() {
       res.assert_attribute(attr("exchange_rate", "1.17225378"));
       res.assert_attribute(attr("assets", "29845154uluna, 9941781ibc/usdc"));
       res.assert_attribute(attr("amount", "17225378"));
+      res.assert_attribute(attr("fee", "5555555"));
+      res.assert_transfer(addr.fee.clone(), addr.ampluna(5555555));
     })
     .q_compound_user_infos(None, "user1", |res| {
       assert_eq!(
@@ -722,4 +724,25 @@ fn test_compounding_compound() {
       res.assert_attribute(attr("bond_share", "84031602"));
       res.assert_transfer(addr.fee.to_string(), addr.amplp1_info_checked().with_balance(u(22)));
     });
+}
+
+#[test]
+fn test_compounding_double_setup() {
+  let mut suite = TestingSuite::def();
+  suite.init();
+
+  let addr = suite.addresses.clone();
+
+  suite.def_setup_compounding().e_compound_initialize_asset(
+    addr.lp_cw20_info(),
+    &addr.gauge_2,
+    "user1",
+    vec![addr.uluna(10000000).to_coin().unwrap()],
+    |res| {
+      res.assert_error(ContractError::AssetAlreadyInitialized(
+        addr.gauge_2.to_string(),
+        addr.lp_cw20_info_checked().to_string(),
+      ));
+    },
+  );
 }

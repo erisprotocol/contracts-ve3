@@ -3,7 +3,7 @@ use crate::state::{CONFIG, EXCHANGE_HISTORY};
 use crate::{error::ContractError, state::asset_config_map};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Addr, Binary, Decimal, Deps, Env, Order, StdResult};
+use cosmwasm_std::{to_json_binary, Addr, Binary, Decimal, Deps, Env, Order, StdResult, Uint128};
 use cw_asset::AssetInfo;
 use cw_storage_plus::Bound;
 use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT, SECONDS_PER_DAY};
@@ -103,7 +103,11 @@ fn get_user_info(
   let total_lp = staked_balance.asset.amount;
 
   let user_amplp = deps.querier.query_balance(user, asset_config.amp_denom)?.amount;
-  let user_lp = total_lp.multiply_ratio(user_amplp, total_amplp);
+  let user_lp = if user_amplp.is_zero() {
+    Uint128::zero()
+  } else {
+    total_lp.multiply_ratio(user_amplp, total_amplp)
+  };
 
   Ok(UserInfoResponse {
     gauge: asset_config.gauge,
