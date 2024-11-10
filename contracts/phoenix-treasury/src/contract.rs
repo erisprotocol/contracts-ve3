@@ -610,17 +610,22 @@ fn execute_setup(
 
   // calculate usd value
   let value_usd = calculate_value_usd(&deps, &reserved)?;
-
-  let epoch_30d = env.block.time.seconds() / SECONDS_PER_30D;
-  let mut spent_in_month = SPENT_IN_EPOCH.may_load(deps.storage, epoch_30d)?.unwrap_or_default();
-  spent_in_month += value_usd;
-  SPENT_IN_EPOCH.save(deps.storage, epoch_30d, &spent_in_month)?;
-
+  
   // get delay by usd value
   let mut delay = 0u64;
-  for veto in config.vetos {
-    if value_usd >= veto.spend_above_usd || spent_in_month >= veto.spend_above_usd_30d {
-      delay = cmp::max(veto.delay_s, delay);
+  let epoch_30d = env.block.time.seconds() / SECONDS_PER_30D;
+  let mut spent_in_month = SPENT_IN_EPOCH.may_load(deps.storage, epoch_30d)?.unwrap_or_default();
+
+  let apply_veto = !matches!(&action, TreasuryActionSetup::Otc { .. } | TreasuryActionSetup::Dca { .. });
+
+  if apply_veto {
+    spent_in_month += value_usd;
+    SPENT_IN_EPOCH.save(deps.storage, epoch_30d, &spent_in_month)?;
+  
+    for veto in config.vetos {
+      if value_usd >= veto.spend_above_usd || spent_in_month >= veto.spend_above_usd_30d {
+        delay = cmp::max(veto.delay_s, delay);
+      }
     }
   }
 
@@ -863,6 +868,23 @@ fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Con
         )?;
 
         let price = Decimal::from_ratio(result.amount, simulation_amount);
+        price * asset.amount
+        // Factor not needed as asset.amount already has it.
+        // * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))
+      },
+      Oracle::RouteAsset {
+        contract,
+        path,
+        simulation_amount,
+        ..
+      } => {
+        let result = Router(contract).query_simulate(
+          &deps.querier,
+          simulation_amount.clone(),
+          path,
+        )?;
+
+        let price = Decimal::from_ratio(result.amount, simulation_amount.amount);
         price * asset.amount
         // Factor not needed as asset.amount already has it.
         // * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))

@@ -7,7 +7,7 @@ use crate::{
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Api, Decimal, QuerierWrapper, Uint128};
 use cw_address_like::AddressLike;
-use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
+use cw_asset::{Asset, AssetBase, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
@@ -72,6 +72,13 @@ pub enum Oracle<T: AddressLike> {
     #[serde(default)]
     from_decimals: Option<u32>,
   },
+  RouteAsset {
+    contract: T,
+    path: Vec<AssetInfoBase<T>>,
+    simulation_amount: AssetBase<T>,
+    #[serde(default)]
+    from_decimals: Option<u32>,
+  },
 }
 
 impl Oracle<String> {
@@ -95,6 +102,20 @@ impl Oracle<String> {
       } => Oracle::Route {
         contract: api.addr_validate(&contract)?,
         simulation_amount,
+        path: path
+          .into_iter()
+          .map(|a| a.check(api, None))
+          .collect::<Result<Vec<AssetInfo>, AssetError>>()?,
+        from_decimals,
+      },
+      Oracle::RouteAsset {
+        contract,
+        path,
+        simulation_amount,
+        from_decimals,
+      } => Oracle::RouteAsset {
+        contract: api.addr_validate(&contract)?,
+        simulation_amount: simulation_amount.check(api, None)?,
         path: path
           .into_iter()
           .map(|a| a.check(api, None))

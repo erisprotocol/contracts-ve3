@@ -214,6 +214,21 @@ fn get_oracle_prices(
         Decimal::from_ratio(result.amount, simulation_amount)
           * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))
       },
+      Oracle::RouteAsset {
+        contract,
+        path,
+        simulation_amount,
+        from_decimals,
+      } => {
+        let result = Router(contract).query_simulate(
+          &deps.querier,
+          simulation_amount.clone(),
+          path,
+        )?;
+
+        Decimal::from_ratio(result.amount, simulation_amount.amount)
+          * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))
+      },
     };
 
     prices.push((info, price));
