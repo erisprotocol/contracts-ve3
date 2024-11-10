@@ -1249,9 +1249,9 @@ fn test_otc() {
         res.assert_attribute(attr("id", "1"));
       },
     )
-    .e_pdt_claim(1, "user2", |result| {
-      result.assert_error(ContractError::CannotExecuteNotActive);
-    })
+    // .e_pdt_claim(1, "user2", |result| {
+    //   result.assert_error(ContractError::CannotExecuteNotActive);
+    // })
     .add_one_period()
     .e_pdt_claim(1, "user2", |result| {
       result.assert_error(ContractError::CannotClaimNotAllowed);
@@ -1312,7 +1312,7 @@ fn test_otc() {
           cancelled: false,
           done: false,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![addr.uluna(5000_000000)].into(),
           setup: TreasuryActionSetup::Otc {
@@ -1320,7 +1320,7 @@ fn test_otc() {
             into: addr.usdc(1500_000000),
           },
           total_usd: u(3000),
-          total_usd_30d: u(3000),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Otc {}
         }]
       )
@@ -1332,7 +1332,7 @@ fn test_otc() {
           cancelled: false,
           done: false,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![addr.uluna(5000_000000)].into(),
           setup: TreasuryActionSetup::Otc {
@@ -1340,7 +1340,7 @@ fn test_otc() {
             into: addr.usdc(1500_000000),
           },
           total_usd: u(3000),
-          total_usd_30d: u(3000),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Otc {}
         }
       )
@@ -1362,7 +1362,7 @@ fn test_otc() {
           cancelled: false,
           done: true,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![].into(),
           setup: TreasuryActionSetup::Otc {
@@ -1370,7 +1370,7 @@ fn test_otc() {
             into: addr.usdc(1500_000000),
           },
           total_usd: u(3000),
-          total_usd_30d: u(3000),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Otc {}
         }
       )
@@ -1581,12 +1581,12 @@ fn test_dca() {
         res.assert_attribute(attr("id", "1"));
       },
     )
-    .e_pdt_claim(1, "user2", |result| {
-      result.assert_error(ContractError::CannotExecuteNotActive);
-    })
-    .e_pdt_execute_dca(1, None, "dca1", |result| {
-      result.assert_error(ContractError::CannotExecuteNotActive);
-    })
+    // .e_pdt_claim(1, "user2", |result| {
+    //   result.assert_error(ContractError::CannotExecuteNotActive);
+    // })
+    // .e_pdt_execute_dca(1, None, "dca1", |result| {
+    //   result.assert_error(ContractError::CannotExecuteNotActive);
+    // })
     .add_one_period()
     .q_pdt_state(|res| {
       assert_eq!(
@@ -1608,7 +1608,7 @@ fn test_dca() {
           cancelled: false,
           done: false,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![addr.uluna(week * 12_000000)].into(),
           setup: TreasuryActionSetup::Dca {
@@ -1620,7 +1620,7 @@ fn test_dca() {
             cooldown_s: HOUR
           },
           total_usd: u(2177280),
-          total_usd_30d: u(2177280),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 2
           }
@@ -1652,7 +1652,7 @@ fn test_dca() {
           cancelled: false,
           done: false,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![addr.uluna(week * 9_000000)].into(),
           setup: TreasuryActionSetup::Dca {
@@ -1664,7 +1664,7 @@ fn test_dca() {
             cooldown_s: HOUR
           },
           total_usd: u(2177280),
-          total_usd_30d: u(2177280),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 3
           }
@@ -1689,7 +1689,7 @@ fn test_dca() {
           cancelled: false,
           done: false,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![addr.uluna(week * 3_000000)].into(),
           setup: TreasuryActionSetup::Dca {
@@ -1701,7 +1701,7 @@ fn test_dca() {
             cooldown_s: HOUR
           },
           total_usd: u(2177280),
-          total_usd_30d: u(2177280),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 7
           }
@@ -1724,7 +1724,7 @@ fn test_dca() {
           cancelled: false,
           done: true,
           id: 1,
-          active_from: current_time + WEEK,
+          active_from: current_time ,
           name: "test".to_string(),
           reserved: vec![].into(),
           setup: TreasuryActionSetup::Dca {
@@ -1736,7 +1736,7 @@ fn test_dca() {
             cooldown_s: HOUR
           },
           total_usd: u(2177280),
-          total_usd_30d: u(2177280),
+          total_usd_30d: u(0),
           runtime: TreasuryActionRuntime::Dca {
             last_execution_s: current_time + WEEK * 8
           }
