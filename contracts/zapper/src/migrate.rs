@@ -11,7 +11,7 @@ use ve3_shared::{error::SharedError, msgs_global_config::MigrateMsg};
 
 /// Manages contract migration
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
   let contract_version = get_contract_version(deps.storage)?;
   set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -21,8 +21,10 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     );
   }
 
-  // clear only for development environment
-  ROUTES.clear(deps.storage);
+  if msg.clear == Some(true) {
+    // clear routes
+    ROUTES.clear(deps.storage);
+  }
 
   Ok(
     Response::new()

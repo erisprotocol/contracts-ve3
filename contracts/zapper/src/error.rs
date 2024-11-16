@@ -1,4 +1,4 @@
-use cosmwasm_std::{Response, StdError, Uint128};
+use cosmwasm_std::{DivideByZeroError, Response, StdError, Uint128};
 use cw_asset::{AssetError, AssetInfo};
 use cw_ownable::OwnershipError;
 use thiserror::Error;
@@ -13,6 +13,8 @@ pub enum ContractError {
 
   #[error("{0}")]
   OwnershipError(#[from] OwnershipError),
+  #[error("{0}")]
+  DivideByZeroError(#[from] DivideByZeroError),
 
   #[error("{0}")]
   SharedError(#[from] SharedError),
@@ -34,4 +36,11 @@ pub enum ContractError {
 
   #[error("Expecting assets that are unknown")]
   ExpectingUnknownAssets(),
+
+  #[error("No solution found for optimal swap in configured iterations: deposit: {deposit}, pool: {pool}, msg: {msg}")]
+  OptimalSwapNoSolution {
+    deposit: String,
+    pool: String,
+    msg: String,
+  },
 }

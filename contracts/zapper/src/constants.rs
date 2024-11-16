@@ -10,3 +10,5 @@ pub const COMMISSION_DEFAULT: u64 = 30u64;
 
 pub const DEFAULT_MAX_SPREAD: Decimal = Decimal::percent(10);
 pub const DEFAULT_SLIPPAGE: Decimal = Decimal::percent(10);
+
+pub const OPTIMAL_SWAP_ITERATIONS: u64 = 16;

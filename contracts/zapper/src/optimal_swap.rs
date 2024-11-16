@@ -1,9 +1,10 @@
 use crate::{
   constants::{COMMISSION_DEFAULT, COMMISSION_DENOM, DEFAULT_MAX_SPREAD},
   error::ContractError,
+  optimal_swap_stable::calculate_optimal_swap_stableswap,
 };
 use cosmwasm_std::{
-  CosmosMsg, Decimal, Decimal256, DepsMut, Env, Isqrt, QuerierWrapper, Response, StdError,
+  attr, CosmosMsg, Decimal, Decimal256, DepsMut, Env, Isqrt, QuerierWrapper, Response, StdError,
   StdResult, Uint128, Uint256,
 };
 use cw_asset::Asset;
@@ -18,9 +19,40 @@ pub fn callback_optimal_swap(
 ) -> Result<Response, ContractError> {
   let mut messages: Vec<CosmosMsg> = vec![];
 
+  let mut attrs = vec![];
   match &pair_info.pair_type {
     PairType::Stable {} => {
       //Do nothing for stable pair
+    },
+    PairType::StableWhiteWhale {} => {
+      let assets = pair_info.query_pools(&deps.querier, &env.contract.address)?;
+      let asset_a = assets[0].clone();
+      let asset_b = assets[1].clone();
+      let max_spread = DEFAULT_MAX_SPREAD;
+      if !asset_a.amount.is_zero() || !asset_b.amount.is_zero() {
+        let (
+          swap_asset_a_amount,
+          swap_asset_b_amount,
+          return_a_amount,
+          return_b_amount,
+          iterations,
+          difference,
+        ) = calculate_optimal_swap_stableswap(
+          &deps.querier,
+          &pair_info,
+          asset_a,
+          asset_b,
+          &mut messages,
+          max_spread,
+        )?;
+
+        attrs.push(attr("swap_asset_a_amount", swap_asset_a_amount));
+        attrs.push(attr("swap_asset_b_amount", swap_asset_b_amount));
+        attrs.push(attr("return_a_amount", return_a_amount));
+        attrs.push(attr("return_b_amount", return_b_amount));
+        attrs.push(attr("iterations", iterations.to_string()));
+        attrs.push(attr("difference", difference.to_string()));
+      }
     },
     PairType::Custom(custom) => {
       if custom == "concentrated" {
@@ -60,7 +92,12 @@ pub fn callback_optimal_swap(
     },
   }
 
-  Ok(Response::new().add_messages(messages).add_attribute("action", "zapper/optimal_swap"))
+  Ok(
+    Response::new()
+      .add_messages(messages)
+      .add_attribute("action", "zapper/optimal_swap")
+      .add_attributes(attrs),
+  )
 }
 
 /// # Description

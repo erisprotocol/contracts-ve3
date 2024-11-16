@@ -45,4 +45,7 @@ pub enum SharedError {
 
   #[error("Contract_name does not match: prev: {0}, new: {1}")]
   ContractMismatch(String, String),
+
+  #[error("{0}, containing: {1}")]
+  StdExtended(String, String),
 }

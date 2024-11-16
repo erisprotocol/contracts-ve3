@@ -104,6 +104,16 @@ impl PairInfo {
       .map(|a| a.with_balance_query(querier, address))
       .collect::<Result<Vec<_>, AssetError>>()
   }
+
+  pub fn is_ww(&self) -> bool {
+    match self.pair_type {
+      PairType::Xyk {} => false,
+      PairType::Stable {} => false,
+      PairType::Custom(_) => false,
+      PairType::StableWhiteWhale {} => true,
+      PairType::XykWhiteWhale {} => true,
+    }
+  }
 }
 
 #[cw_serde]
@@ -182,10 +192,26 @@ pub enum PairQueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum PairQueryWwMsg {
+  //   /// Returns information about a pool in an object of type [`PoolResponse`].
+  //   Pool {},
+  //   /// Returns contract configuration settings in a custom [`ConfigResponse`] structure.
+  //   Config {},
+  Simulation {
+    offer_asset: OldAsset,
+  },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub struct SimulationResponse {
   pub return_amount: Uint128,
   pub spread_amount: Uint128,
-  pub commission_amount: Uint128,
+  pub commission_amount: Option<Uint128>,
+
+  pub swap_fee_amount: Option<Uint128>,
+  pub protocol_fee_amount: Option<Uint128>,
+  pub burn_fee_amount: Option<Uint128>,
 }
 
 impl Pair {
@@ -208,22 +234,48 @@ impl Pair {
   pub fn query_simulate(
     &self,
     querier: &QuerierWrapper,
+    is_ww: bool,
     offer_asset: Asset,
     ask_asset_info: Option<AssetInfo>,
   ) -> Result<SimulationResponse, SharedError> {
-    let response: SimulationResponse = querier.query_wasm_smart(
-      self.0.to_string(),
-      &PairQueryMsg::Simulation {
-        ask_asset_info: if let Some(ask_asset_info) = ask_asset_info {
-          Some(OldAssetInfo::from_new(ask_asset_info)?)
-        } else {
-          None
-        },
-        offer_asset: OldAsset::from_new(offer_asset)?,
-      },
-    )?;
+    if is_ww {
+      let response: SimulationResponse = querier
+        .query_wasm_smart(
+          self.0.to_string(),
+          &PairQueryWwMsg::Simulation {
+            offer_asset: OldAsset::from_new(offer_asset.clone())?,
+          },
+        )
+        .map_err(|e| {
+          SharedError::StdExtended(
+            format!("issue with ww simulation {0} -> {1}", offer_asset, self.0),
+            e.to_string(),
+          )
+        })?;
 
-    Ok(response)
+      Ok(response)
+    } else {
+      let response: SimulationResponse = querier
+        .query_wasm_smart(
+          self.0.to_string(),
+          &PairQueryMsg::Simulation {
+            ask_asset_info: if let Some(ask_asset_info) = ask_asset_info {
+              Some(OldAssetInfo::from_new(ask_asset_info)?)
+            } else {
+              None
+            },
+            offer_asset: OldAsset::from_new(offer_asset.clone())?,
+          },
+        )
+        .map_err(|e| {
+          SharedError::StdExtended(
+            format!("issue with simulation {0} -> {1}", offer_asset, self.0),
+            e.to_string(),
+          )
+        })?;
+
+      Ok(response)
+    }
   }
 
   pub fn query_ww_pair_info(&self, querier: &QuerierWrapper) -> StdResult<PairInfo> {

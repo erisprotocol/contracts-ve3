@@ -18,7 +18,9 @@ impl TestingSuite {
     let addr = self.addresses.clone();
 
     let code_id = self.app.store_code(ve3_global_config());
-    let msg = ve3_shared::msgs_global_config::MigrateMsg {};
+    let msg = ve3_shared::msgs_global_config::MigrateMsg {
+      clear: Some(true),
+    };
     self.migrate_contract(&addr.ve3_global_config, code_id, msg);
 
     let code_id = self.app.store_code(ve3_asset_gauge());

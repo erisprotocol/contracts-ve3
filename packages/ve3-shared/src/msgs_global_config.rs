@@ -55,4 +55,6 @@ pub type AddressResponse = (String, Addr);
 pub type AddressListResponse = Vec<Addr>;
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+  pub clear: Option<bool>,
+}
