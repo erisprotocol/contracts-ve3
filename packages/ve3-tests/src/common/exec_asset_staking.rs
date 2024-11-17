@@ -355,4 +355,17 @@ impl TestingSuite {
     result(response);
     self
   }
+
+  pub fn q_staking_pool_stakers(
+    &mut self,
+    query: PoolStakersQuery,
+    result: impl Fn(StdResult<Vec<UserStakedBalanceRes>>),
+  ) -> &mut Self {
+    let response = self
+      .app
+      .wrap()
+      .query_wasm_smart(self.contract_active_staking(), &QueryMsg::PoolStakers(query));
+    result(response);
+    self
+  }
 }

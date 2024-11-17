@@ -610,18 +610,19 @@ fn execute_setup(
 
   // calculate usd value
   let value_usd = calculate_value_usd(&deps, &reserved)?;
-  
+
   // get delay by usd value
   let mut delay = 0u64;
   let epoch_30d = env.block.time.seconds() / SECONDS_PER_30D;
   let mut spent_in_month = SPENT_IN_EPOCH.may_load(deps.storage, epoch_30d)?.unwrap_or_default();
 
-  let apply_veto = !matches!(&action, TreasuryActionSetup::Otc { .. } | TreasuryActionSetup::Dca { .. });
+  let apply_veto =
+    !matches!(&action, TreasuryActionSetup::Otc { .. } | TreasuryActionSetup::Dca { .. });
 
   if apply_veto {
     spent_in_month += value_usd;
     SPENT_IN_EPOCH.save(deps.storage, epoch_30d, &spent_in_month)?;
-  
+
     for veto in config.vetos {
       if value_usd >= veto.spend_above_usd || spent_in_month >= veto.spend_above_usd_30d {
         delay = cmp::max(veto.delay_s, delay);
@@ -845,6 +846,7 @@ fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Con
       } => {
         let result = Pair(contract).query_simulate(
           &deps.querier,
+          false,
           asset.info.with_balance(simulation_amount),
           None,
         )?;
@@ -878,11 +880,8 @@ fn calculate_value_usd(deps: &DepsMut, reserved: &Assets) -> Result<Uint128, Con
         simulation_amount,
         ..
       } => {
-        let result = Router(contract).query_simulate(
-          &deps.querier,
-          simulation_amount.clone(),
-          path,
-        )?;
+        let result =
+          Router(contract).query_simulate(&deps.querier, simulation_amount.clone(), path)?;
 
         let price = Decimal::from_ratio(result.amount, simulation_amount.amount);
         price * asset.amount

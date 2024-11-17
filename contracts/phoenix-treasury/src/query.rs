@@ -191,6 +191,7 @@ fn get_oracle_prices(
       } => {
         let result = Pair(contract).query_simulate(
           &deps.querier,
+          false,
           info.with_balance(simulation_amount),
           None,
         )?;
@@ -220,11 +221,8 @@ fn get_oracle_prices(
         simulation_amount,
         from_decimals,
       } => {
-        let result = Router(contract).query_simulate(
-          &deps.querier,
-          simulation_amount.clone(),
-          path,
-        )?;
+        let result =
+          Router(contract).query_simulate(&deps.querier, simulation_amount.clone(), path)?;
 
         Decimal::from_ratio(result.amount, simulation_amount.amount)
           * Decimal::from_ratio(u32::pow(10, from_decimals.unwrap_or(6)), u32::pow(10, 6))

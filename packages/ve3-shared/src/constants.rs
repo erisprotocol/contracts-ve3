@@ -32,6 +32,7 @@ pub const PDT_DCA_EXECUTOR: &str = "PDT_DCA_EXECUTOR";
 pub const DEFAULT_LIMIT: u32 = 30;
 pub const DEFAULT_PERIODS_LIMIT: u64 = 20;
 pub const MAX_LIMIT: u32 = 100;
+pub const MAX_LIMIT_HIGH: u32 = 10000;
 
 pub const SECONDS_PER_YEAR: u64 = 60 * 60 * 24 * 365;
 

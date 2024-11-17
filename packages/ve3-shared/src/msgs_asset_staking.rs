@@ -215,10 +215,20 @@ pub enum QueryMsg {
 
   #[returns(Vec<StakedBalanceRes>)]
   TotalStakedBalances {},
+
+  #[returns(Vec<UserStakedBalanceRes>)]
+  PoolStakers(PoolStakersQuery),
 }
 
 pub type WhitelistedAssetsResponse = Vec<AssetInfo>;
 pub type WhitelistedAssetsDetailsResponse = Vec<AssetInfoWithRuntime>;
+
+#[cw_serde]
+pub struct PoolStakersQuery {
+  pub asset: AssetInfo,
+  pub start_after: Option<Addr>,
+  pub limit: Option<u32>,
+}
 
 #[cw_serde]
 pub struct AssetQuery {
@@ -245,6 +255,13 @@ pub struct StakedBalanceRes {
   pub shares: Uint128,
   pub total_shares: Uint128,
   pub config: AssetConfigRuntime,
+}
+
+#[cw_serde]
+pub struct UserStakedBalanceRes {
+  pub user: Addr,
+  pub shares: Uint128,
+  pub balance: Uint128,
 }
 
 #[cw_serde]

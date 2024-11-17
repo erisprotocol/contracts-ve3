@@ -517,6 +517,30 @@ fn test_asset_second_user() {
         )
       },
     )
+    .q_staking_pool_stakers(
+      PoolStakersQuery {
+        asset: addr.lp_native_info_checked(),
+        start_after: None,
+        limit: None,
+      },
+      |res| {
+        assert_eq!(
+          res.unwrap(),
+          vec![
+            UserStakedBalanceRes {
+              user: addr.user1.clone(),
+              shares: u(10000000),
+              balance: u(9998253)
+            },
+            UserStakedBalanceRes {
+              user: addr.user2.clone(),
+              shares: u(1001921),
+              balance: u(1001746)
+            }
+          ]
+        )
+      },
+    )
     .e_staking_unstake(addr.lp_native(1_000_000), "user2", |res| {
       res.assert_attribute(attr("action", "asset/unstake"));
       res.assert_attribute(attr("amount", "999999"));
@@ -669,5 +693,22 @@ fn test_asset_recipient() {
           }
         }]
       )
-    });
+    })
+    .q_staking_pool_stakers(
+      PoolStakersQuery {
+        asset: addr.lp_native_info_checked(),
+        start_after: None,
+        limit: None,
+      },
+      |res| {
+        assert_eq!(
+          res.unwrap(),
+          vec![UserStakedBalanceRes {
+            user: addr.user2.clone(),
+            shares: u(1000000),
+            balance: u(1019178)
+          }]
+        )
+      },
+    );
 }

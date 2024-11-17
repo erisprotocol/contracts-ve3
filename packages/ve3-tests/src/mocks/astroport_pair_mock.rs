@@ -75,7 +75,10 @@ pub fn query(deps: Deps, _env: Env, msg: PairQueryMsg) -> StdResult<Binary> {
       to_json_binary(&SimulationResponse {
         return_amount: offer_asset.amount * config.price,
         spread_amount: u(0),
-        commission_amount: u(0),
+        commission_amount: Some(u(0)),
+        burn_fee_amount: None,
+        protocol_fee_amount: None,
+        swap_fee_amount: None,
       })
     },
   }

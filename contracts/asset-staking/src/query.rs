@@ -1,15 +1,16 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult, Uint128};
+use cw_storage_plus::Bound;
 use std::cmp::min;
 use ve3_shared::{
-  constants::SECONDS_PER_YEAR,
+  constants::{DEFAULT_LIMIT, MAX_LIMIT_HIGH, SECONDS_PER_YEAR},
   extensions::asset_info_ext::AssetInfoExt,
   helpers::take::compute_balance_amount,
   msgs_asset_staking::{
     AllPendingRewardsQuery, AllStakedBalancesQuery, AssetInfoWithRuntime, AssetQuery,
-    PendingRewardsDetailRes, PendingRewardsRes, QueryMsg, StakedBalanceRes,
-    WhitelistedAssetsDetailsResponse, WhitelistedAssetsResponse,
+    PendingRewardsDetailRes, PendingRewardsRes, PoolStakersQuery, QueryMsg, StakedBalanceRes,
+    UserStakedBalanceRes, WhitelistedAssetsDetailsResponse, WhitelistedAssetsResponse,
   },
 };
 
@@ -31,6 +32,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     QueryMsg::AllPendingRewards(query) => get_all_pending_rewards(deps, query)?,
     QueryMsg::AllPendingRewardsDetail(query) => get_all_pending_rewards_detail(deps, env, query)?,
     QueryMsg::TotalStakedBalances {} => get_total_staked_balances(deps, env)?,
+    QueryMsg::PoolStakers(query) => get_pool_stakers(deps, env, query)?,
   })
 }
 
@@ -144,6 +146,33 @@ fn get_all_staked_balances(
   }
 
   to_json_binary(&res)
+}
+
+fn get_pool_stakers(deps: Deps, _env: Env, query: PoolStakersQuery) -> StdResult<Binary> {
+  let start = query.start_after.map(|start| Bound::exclusive((start, &query.asset)));
+  let limit = query.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT_HIGH) as usize;
+  let (balance, total_shares) = TOTAL.load(deps.storage, &query.asset)?;
+
+  let result = SHARES
+    .range(deps.storage, start, None, Order::Ascending)
+    .take(limit)
+    .filter_map(|a| match a {
+      Ok(((addr, asset), user_shares)) => {
+        if asset == query.asset {
+          Some(UserStakedBalanceRes {
+            user: addr,
+            shares: user_shares,
+            balance: balance.multiply_ratio(user_shares, total_shares),
+          })
+        } else {
+          None
+        }
+      },
+      Err(_) => None,
+    })
+    .collect::<Vec<_>>();
+
+  to_json_binary(&result)
 }
 
 fn get_pending_rewards(deps: Deps, asset_query: AssetQuery) -> StdResult<Binary> {
