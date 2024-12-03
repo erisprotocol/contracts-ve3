@@ -1,7 +1,7 @@
 use crate::{
   constants::{CONTRACT_NAME, CONTRACT_VERSION},
   error::ContractError,
-  state::ROUTES,
+  state::{ROUTES, TOKEN_CONFIG},
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -24,6 +24,7 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
   if msg.clear == Some(true) {
     // clear routes
     ROUTES.clear(deps.storage);
+    TOKEN_CONFIG.clear(deps.storage);
   }
 
   Ok(

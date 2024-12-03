@@ -114,6 +114,16 @@ impl PairInfo {
       PairType::XykWhiteWhale {} => true,
     }
   }
+
+  pub fn is_virtual(&self) -> bool {
+    match &self.pair_type {
+      PairType::Xyk {} => false,
+      PairType::Stable {} => false,
+      PairType::Custom(custom) => custom == "virtual",
+      PairType::StableWhiteWhale {} => false,
+      PairType::XykWhiteWhale {} => true,
+    }
+  }
 }
 
 #[cw_serde]

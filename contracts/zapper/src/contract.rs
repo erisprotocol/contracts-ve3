@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  constants::{CONTRACT_NAME, CONTRACT_VERSION, DEFAULT_MAX_SPREAD, DEFAULT_SLIPPAGE},
+  constants::{CONTRACT_NAME, CONTRACT_VERSION, DEFAULT_MAX_PROVIDE_SLIPPAGE, DEFAULT_MAX_SPREAD},
   error::{ContractError, ContractResult},
   optimal_swap::callback_optimal_swap,
   state::{RouteConfig, TokenConfig, CONFIG, ROUTES, TOKEN_CONFIG},
@@ -360,10 +360,14 @@ fn get_token_config(
           TokenConfig::TargetPair(StageType::WhiteWhale {
             pair: pair_addr,
           })
-        } else if pair.query_astroport_pair_info(&deps.querier).is_ok() {
-          TokenConfig::TargetPair(StageType::Astroport {
-            pair: pair_addr,
-          })
+        } else if let Ok(pair_info) = pair.query_astroport_pair_info(&deps.querier) {
+          if pair_info.is_virtual() {
+            TokenConfig::TargetSwap
+          } else {
+            TokenConfig::TargetPair(StageType::Astroport {
+              pair: pair_addr,
+            })
+          }
         } else {
           TokenConfig::TargetSwap
         }
@@ -708,7 +712,7 @@ fn callback_provide_liquidity(
 
   let provide_liquidity = Pair(pair_contract).provide_liquidity_msg(
     provide_assets,
-    Some(DEFAULT_SLIPPAGE),
+    Some(DEFAULT_MAX_PROVIDE_SLIPPAGE),
     receiver,
     funds,
   )?;
