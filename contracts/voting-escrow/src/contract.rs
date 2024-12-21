@@ -17,7 +17,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use cw_asset::Asset;
+use cw_asset::{Asset, AssetInfoUnchecked};
 use std::collections::HashSet;
 use ve3_shared::adapters::global_config_adapter::ConfigExt;
 use ve3_shared::constants::{
@@ -191,6 +191,11 @@ pub fn execute(
       let recipient = addr_opt_fallback(deps.api, &recipient, info.sender.clone())?;
       split_lock(deps, env, nft, info.sender, token_id, amount, recipient)
     },
+    ExecuteMsg::MigrateLock {
+      token_id,
+      into,
+      min_received,
+    } => migrate_lock(deps, env, nft, info.sender, token_id, into, min_received),
 
     ExecuteMsg::Receive(cw20_msg) => receive(deps, env, info, cw20_msg),
 
@@ -680,6 +685,77 @@ fn split_lock(
       // add new lock msgs
       .add_attributes(create_response.attributes)
       .add_submessages(create_response.messages),
+  )
+}
+
+fn migrate_lock(
+  mut deps: DepsMut,
+  env: Env,
+  nft: VeNftCollection,
+  sender: Addr,
+  token_id: String,
+  into: AssetInfoUnchecked,
+  min_received: Option<Uint128>,
+) -> Result<Response, ContractError> {
+  let (config, lock, _, _) = _get_lock_context(&deps, &sender, &token_id, &nft, &env, None, true)?;
+
+  let into = into.check(deps.api, None)?;
+
+  if lock.asset.info == into {
+    return Err(ContractError::CannotMigrateToSameToken(token_id.to_string(), into.to_string()));
+  }
+
+  let block_period = get_period(env.block.time.seconds())?;
+  let migrate_amount = lock.asset.clone();
+  let underlying_before: Uint128 = lock.underlying_amount.clone();
+  let recipient = Some(lock.owner.to_string());
+  let time = match lock.end {
+    End::Permanent => None,
+    End::Period(period) => {
+      let remaining = period - block_period;
+      Some(remaining * SECONDS_PER_WEEK)
+    },
+  };
+
+  // burn lock without transfering assets.
+  // this also removes it from LOCKED
+  // burn checks that the sender has approval for the lock or is the owner
+  let burn_attrs = _burn(&mut deps, &env, nft, sender, &token_id, lock, block_period)?;
+
+  let zapper = config.zapper(&deps.querier)?;
+  // zapper needs all assets in ownership of the zapper
+  let transfer_msg = migrate_amount.transfer_msg(zapper.0.to_string())?;
+  let zap_msg = zapper.zap(
+    into.into(),
+    vec![migrate_amount.clone().info],
+    min_received,
+    Some(ve3_shared::msgs_zapper::PostActionCreate::ExecuteResult {
+      contract: env.contract.address.to_string(),
+      // create lock makes sure the into is supported
+      msg: to_json_binary(&ExecuteMsg::CreateLock {
+        recipient,
+        time,
+      })?,
+    }),
+  )?;
+
+  let lock_info = get_token_lock_info(deps.as_ref(), &env, &token_id, None)?;
+
+  Ok(
+    Response::default()
+      .add_event(get_metadata_changed(&token_id))
+      .add_attribute("action", "ve/migrate_lock")
+      .add_attribute("token_id", token_id.to_string())
+      .add_attribute("fixed_power_before", underlying_before.to_string())
+      .add_attribute("migrate_amount", migrate_amount.to_string())
+      .add_attribute("voting_power", lock_info.voting_power.to_string())
+      .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
+      .add_attribute("lock_end", lock_info.end_string())
+      .add_messages(get_push_update_msgs(&config, &token_id, Ok(lock_info))?)
+      .add_message(transfer_msg)
+      .add_message(zap_msg)
+      // add burnt lock attrs
+      .add_attributes(burn_attrs),
   )
 }
 

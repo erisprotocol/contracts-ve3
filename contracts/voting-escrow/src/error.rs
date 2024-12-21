@@ -83,4 +83,7 @@ pub enum ContractError {
 
   #[error("Cannot merge the same lock id: {0}")]
   CannotMergeSameLock(String),
+
+  #[error("Cannot migrate lock to same token id: {0}, {1}")]
+  CannotMigrateToSameToken(String, String),
 }

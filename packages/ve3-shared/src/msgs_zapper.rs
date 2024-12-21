@@ -1,6 +1,8 @@
 use crate::adapters::pair::{Pair, PairInfo};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{
+  to_json_binary, Addr, Binary, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg,
+};
 use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked};
 #[allow(unused_imports)]
 use cw_ownable::{cw_ownable_execute, Ownership};
@@ -101,6 +103,11 @@ pub enum CallbackMsg {
     receiver: String,
     min_received: Option<Vec<Asset>>,
   },
+  ExecuteResult {
+    token: AssetInfo,
+    contract: Addr,
+    msg: Binary,
+  },
 }
 
 impl CallbackMsg {
@@ -126,6 +133,10 @@ pub enum PostActionCreate {
   },
   SendResult {
     receiver: Option<String>,
+  },
+  ExecuteResult {
+    contract: String,
+    msg: Binary,
   },
 }
 

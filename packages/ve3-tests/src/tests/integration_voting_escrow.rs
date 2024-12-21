@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::{
   common::{
     helpers::{cw20, native, u},
@@ -9,6 +7,7 @@ use crate::{
 };
 use cosmwasm_std::{attr, Decimal};
 use cw721::{AllNftInfoResponse, Approval, NftInfoResponse, OwnerOfResponse, TokensResponse};
+use std::str::FromStr;
 use ve3_shared::{
   constants::{MAX_LOCK_PERIODS, SECONDS_PER_WEEK},
   extensions::decimal_ext::DecimalExt,

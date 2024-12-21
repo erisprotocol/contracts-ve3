@@ -5,7 +5,7 @@ use cw721::{
   AllNftInfoResponse, ApprovalResponse, ApprovalsResponse, NftInfoResponse, NumTokensResponse,
   OperatorsResponse, OwnerOfResponse, TokensResponse,
 };
-use cw_asset::Asset;
+use cw_asset::{Asset, AssetInfoUnchecked};
 use cw_multi_test::{AppResponse, Executor};
 use ve3_shared::{extensions::asset_ext::AssetExt, helpers::time::Time, msgs_voting_escrow::*};
 
@@ -46,6 +46,24 @@ impl TestingSuite {
       _ => panic!("not supported"),
     }
 
+    self
+  }
+
+  pub fn e_ve_migrate_lock(
+    &mut self,
+    token_id: String,
+    into: AssetInfoUnchecked,
+    min_received: Option<Uint128>,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
+  ) -> &mut Self {
+    let msg = ExecuteMsg::MigrateLock {
+      token_id,
+      into,
+      min_received,
+    };
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract(), &msg, &[]));
     self
   }
 

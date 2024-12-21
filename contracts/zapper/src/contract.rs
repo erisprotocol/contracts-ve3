@@ -9,7 +9,8 @@ use crate::{
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-  Addr, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, Uint128,
+  Addr, Binary, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage,
+  Uint128,
 };
 use cw2::set_contract_version;
 use cw20::{Cw20QueryMsg, Expiration, MinterResponse};
@@ -313,6 +314,15 @@ fn zap(
       receiver: receiver.unwrap_or(info.sender.to_string()),
     },
 
+    Some(PostActionCreate::ExecuteResult {
+      contract,
+      msg,
+    }) => CallbackMsg::ExecuteResult {
+      token: into,
+      contract: deps.api.addr_validate(&contract)?,
+      msg,
+    },
+
     None => CallbackMsg::SendResult {
       token: into,
       receiver: info.sender.to_string(),
@@ -568,6 +578,12 @@ pub fn handle_callback(
       receiver,
       min_received,
     } => callback_send_results(deps, env, info, tokens, receiver, min_received),
+
+    CallbackMsg::ExecuteResult {
+      token,
+      contract,
+      msg,
+    } => callback_execute_result(deps, env, info, token, contract, msg),
   }
 }
 
@@ -587,6 +603,25 @@ fn callback_send_result(
       .add_attribute("amount", return_amount.to_string()),
   )
 }
+
+fn callback_execute_result(
+  deps: DepsMut,
+  env: Env,
+  _info: MessageInfo,
+  info: AssetInfo,
+  contract: Addr,
+  msg: Binary,
+) -> Result<Response, ContractError> {
+  let return_amount = info.with_balance_query(&deps.querier, &env.contract.address)?;
+  let execute_msg = return_amount.send_or_execute_msg_raw(contract, msg)?;
+  Ok(
+    Response::new()
+      .add_message(execute_msg)
+      .add_attribute("action", "zapper/callback_execute_result")
+      .add_attribute("amount", return_amount.to_string()),
+  )
+}
+
 fn callback_send_results(
   deps: DepsMut,
   env: Env,

@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use cosmwasm_std::{coin, to_json_binary, Api, Coin, CosmosMsg, MessageInfo, WasmMsg};
+use cosmwasm_std::{coin, to_json_binary, Api, Binary, Coin, CosmosMsg, MessageInfo, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Expiration};
 use cw_asset::{Asset, AssetError, AssetInfo, AssetInfoBase, AssetInfoUnchecked};
 use serde::Serialize;
@@ -20,6 +20,12 @@ pub trait AssetExt {
     &self,
     to: A,
     msg: &T,
+  ) -> Result<CosmosMsg, SharedError>;
+
+  fn send_or_execute_msg_raw<A: Into<String>>(
+    &self,
+    to: A,
+    msg: Binary,
   ) -> Result<CosmosMsg, SharedError>;
 }
 
@@ -56,19 +62,27 @@ impl AssetExt for Asset {
     contract: A,
     msg: &T,
   ) -> Result<CosmosMsg, SharedError> {
+    self.send_or_execute_msg_raw(contract, to_json_binary(msg)?)
+  }
+
+  fn send_or_execute_msg_raw<A: Into<String>>(
+    &self,
+    contract: A,
+    msg: Binary,
+  ) -> Result<CosmosMsg, SharedError> {
     match &self.info {
       AssetInfo::Cw20(contract_addr) => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: contract_addr.into(),
         msg: to_json_binary(&Cw20ExecuteMsg::Send {
           contract: contract.into(),
           amount: self.amount,
-          msg: to_json_binary(msg)?,
+          msg,
         })?,
         funds: vec![],
       })),
       AssetInfo::Native(denom) => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: contract.into(),
-        msg: to_json_binary(msg)?,
+        msg,
         funds: vec![coin(self.amount.u128(), denom)],
       })),
       _ => Err(SharedError::NotSupported("only cw20 or native".to_string())),

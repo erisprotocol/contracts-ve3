@@ -13,7 +13,7 @@ use cw721_base::MinterResponse;
 use cw721_base::QueryMsg as CW721QueryMsg;
 use cw721_base::{state::TokenInfo, ExecuteMsg as CW721ExecuteMsg};
 use cw_address_like::AddressLike;
-use cw_asset::{Asset, AssetInfoBase};
+use cw_asset::{Asset, AssetInfoBase, AssetInfoUnchecked};
 use std::fmt;
 
 /// This structure stores general parameters for the voting escrow contract.
@@ -43,6 +43,12 @@ pub enum ExecuteMsg {
   MergeLock {
     token_id: String,
     token_id_add: String,
+  },
+  MigrateLock {
+    token_id: String,
+    into: AssetInfoUnchecked,
+
+    min_received: Option<Uint128>,
   },
   SplitLock {
     token_id: String,

@@ -14,4 +14,5 @@ pub mod integration_migrate;
 pub mod integration_phoenix_treasury;
 pub mod integration_voting_escrow;
 pub mod integration_voting_escrow_blacklist;
+pub mod integration_voting_escrow_migrate;
 pub mod integration_zapper;
