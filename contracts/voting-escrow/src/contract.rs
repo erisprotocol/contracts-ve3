@@ -707,7 +707,7 @@ fn migrate_lock(
 
   let block_period = get_period(env.block.time.seconds())?;
   let migrate_amount = lock.asset.clone();
-  let underlying_before: Uint128 = lock.underlying_amount.clone();
+  let underlying_before: Uint128 = lock.underlying_amount;
   let recipient = Some(lock.owner.to_string());
   let time = match lock.end {
     End::Permanent => None,

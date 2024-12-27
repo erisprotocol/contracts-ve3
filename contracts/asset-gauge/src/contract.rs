@@ -26,7 +26,7 @@ use ve3_shared::helpers::bps::BasicPoints;
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, ReceiveMsg};
 use ve3_shared::msgs_asset_staking::AssetDistribution;
-use ve3_shared::msgs_voting_escrow::{End, LockInfoResponse};
+use ve3_shared::msgs_voting_escrow::LockInfoResponse;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -140,11 +140,10 @@ fn claim_rebase(
   deps: DepsMut,
   env: Env,
   user: Addr,
-  token_id: Option<String>,
+  _token_id: Option<String>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let rebase = REBASE.load(deps.storage)?;
-  let voting_escrow = config.get_voting_escrow(&deps)?;
   let block_period = get_period(env.block.time.seconds())?;
   let fixed_amount = user_idx().get_latest_fixed(deps.storage, block_period + 1, user.as_str())?;
 
@@ -158,24 +157,27 @@ fn claim_rebase(
 
   let rebase_asset = config.rebase_asset.with_balance(rebase_amount);
 
-  let msg = match token_id {
-    Some(id) => {
-      // if id provided -> check if permanent lock
-      // if yes, add it to the permanent lock
-      let lock = LOCK_INFO.load(deps.storage, &id).map_err(|_| ContractError::LockNotFound)?;
-      if lock.end == End::Permanent {
-        if lock.asset.info != rebase_asset.info {
-          Err(ContractError::RebaseWrongTargetLockAsset)?;
-        }
+  // let voting_escrow = config.get_voting_escrow(&deps)?;
+  // let create_lock_msg = match token_id {
+  //   Some(id) => {
+  //     // if id provided -> check if permanent lock
+  //     // if yes, add it to the permanent lock
+  //     let lock = LOCK_INFO.load(deps.storage, &id).map_err(|_| ContractError::LockNotFound)?;
+  //     if lock.end == End::Permanent {
+  //       if lock.asset.info != rebase_asset.info {
+  //         Err(ContractError::RebaseWrongTargetLockAsset)?;
+  //       }
 
-        voting_escrow.create_extend_lock_amount_msg(rebase_asset, id)?
-      } else {
-        Err(ContractError::RebaseClaimingOnlyForPermanent)?
-      }
-    },
-    // otherwise create a new permanent lock
-    None => voting_escrow.create_permanent_lock_msg(rebase_asset, Some(user.to_string()))?,
-  };
+  //       voting_escrow.create_extend_lock_amount_msg(rebase_asset, id)?
+  //     } else {
+  //       Err(ContractError::RebaseClaimingOnlyForPermanent)?
+  //     }
+  //   },
+  //   // otherwise create a new permanent lock
+  //   None => voting_escrow.create_permanent_lock_msg(rebase_asset, Some(user.to_string()))?,
+  // };
+
+  let transfer_msg = rebase_asset.transfer_msg(user.clone())?;
 
   let mut resp = Response::new();
 
@@ -183,7 +185,7 @@ fn claim_rebase(
     .add_attribute("action", "gauge/claim_rebase")
     .add_attribute("user", user.as_ref())
     .add_attribute("rebase_amount", rebase_amount.to_string())
-    .add_message(msg);
+    .add_message(transfer_msg);
 
   Ok(resp)
 }
