@@ -44,6 +44,7 @@ pub enum ExecuteMsg {
 
   ClaimRebase {
     token_id: Option<String>,
+    recipient: Option<String>,
   },
 
   AddRebase {},

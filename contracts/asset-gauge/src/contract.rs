@@ -23,6 +23,7 @@ use ve3_shared::constants::AT_VOTING_ESCROW;
 use ve3_shared::error::SharedError;
 use ve3_shared::extensions::asset_info_ext::AssetInfoExt;
 use ve3_shared::helpers::bps::BasicPoints;
+use ve3_shared::helpers::general::addr_opt_fallback;
 use ve3_shared::helpers::governance::get_period;
 use ve3_shared::msgs_asset_gauge::{Config, ExecuteMsg, GaugeConfig, InstantiateMsg, ReceiveMsg};
 use ve3_shared::msgs_asset_staking::AssetDistribution;
@@ -86,7 +87,8 @@ pub fn execute(
 
     ExecuteMsg::ClaimRebase {
       token_id,
-    } => claim_rebase(deps, env, info.sender, token_id),
+      recipient,
+    } => claim_rebase(deps, env, info.sender, token_id, recipient),
 
     ExecuteMsg::SetDistribution {} => set_distribution(deps, env),
 
@@ -141,6 +143,7 @@ fn claim_rebase(
   env: Env,
   user: Addr,
   _token_id: Option<String>,
+  recipient: Option<String>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let rebase = REBASE.load(deps.storage)?;
@@ -155,29 +158,9 @@ fn claim_rebase(
     Err(SharedError::InsufficientBalance("no rebase amount".to_string()))?;
   }
 
-  let rebase_asset = config.rebase_asset.with_balance(rebase_amount);
-
-  // let voting_escrow = config.get_voting_escrow(&deps)?;
-  // let create_lock_msg = match token_id {
-  //   Some(id) => {
-  //     // if id provided -> check if permanent lock
-  //     // if yes, add it to the permanent lock
-  //     let lock = LOCK_INFO.load(deps.storage, &id).map_err(|_| ContractError::LockNotFound)?;
-  //     if lock.end == End::Permanent {
-  //       if lock.asset.info != rebase_asset.info {
-  //         Err(ContractError::RebaseWrongTargetLockAsset)?;
-  //       }
-
-  //       voting_escrow.create_extend_lock_amount_msg(rebase_asset, id)?
-  //     } else {
-  //       Err(ContractError::RebaseClaimingOnlyForPermanent)?
-  //     }
-  //   },
-  //   // otherwise create a new permanent lock
-  //   None => voting_escrow.create_permanent_lock_msg(rebase_asset, Some(user.to_string()))?,
-  // };
-
-  let transfer_msg = rebase_asset.transfer_msg(user.clone())?;
+  let rebase = config.rebase_asset.with_balance(rebase_amount);
+  let recipient = addr_opt_fallback(deps.api, &recipient, user.clone())?;
+  let transfer_msg = rebase.transfer_msg(recipient)?;
 
   let mut resp = Response::new();
 

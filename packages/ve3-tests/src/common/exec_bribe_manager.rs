@@ -152,6 +152,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::ClaimBribes {
       periods,
+      recipient: None,
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_bribe(), &msg, &[]));

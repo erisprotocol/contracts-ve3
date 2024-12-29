@@ -18,7 +18,7 @@ use ve3_shared::{
     asset_ext::{AssetExt, AssetsExt, AssetsUncheckedExt},
     asset_info_ext::AssetInfoExt,
   },
-  helpers::{assets::Assets, governance::get_period, time::Times},
+  helpers::{assets::Assets, general::addr_opt_fallback, governance::get_period, time::Times},
   msgs_asset_gauge::UserShare,
   msgs_bribe_manager::{BribeBuckets, BribeDistribution, Config, ExecuteMsg, InstantiateMsg},
 };
@@ -70,7 +70,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
     } => withdraw_bribes(deps, info, env, period),
     ExecuteMsg::ClaimBribes {
       periods,
-    } => claim_bribes(deps, env, info, periods),
+      recipient,
+    } => claim_bribes(deps, env, info, periods, recipient),
 
     // controller
     ExecuteMsg::WhitelistAssets(assets) => {
@@ -247,6 +248,7 @@ fn claim_bribes(
   _env: Env,
   info: MessageInfo,
   periods: Option<Vec<u64>>,
+  recipient: Option<String>,
 ) -> Result<Response, ContractError> {
   let config = CONFIG.load(deps.storage)?;
   let user = &info.sender;
@@ -366,7 +368,9 @@ fn claim_bribes(
 
   context.maybe_save(deps.storage, user)?;
 
-  let transfer_msgs = bribe_total.transfer_msgs(user)?;
+  let recipient = addr_opt_fallback(deps.api, &recipient, user.clone())?;
+
+  let transfer_msgs = bribe_total.transfer_msgs(&recipient)?;
   let periods = periods.iter().map(|asset| asset.to_string()).collect::<Vec<_>>().join(",");
   Ok(
     Response::new()

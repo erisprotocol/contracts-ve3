@@ -123,6 +123,7 @@ pub enum ExecuteMsg {
 
   ClaimBribes {
     periods: Option<Vec<u64>>,
+    recipient: Option<String>,
   },
 
   // controller

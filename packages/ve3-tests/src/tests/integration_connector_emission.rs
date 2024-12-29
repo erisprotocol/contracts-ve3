@@ -116,11 +116,12 @@ fn test_emission_connector_rebase() {
     })
     .e_gauge_claim_rebase(None, "user2", |res| {
       res.assert_attribute(attr("action", "gauge/claim_rebase"));
-      res.assert_attribute(attr("action", "ve/create_lock"));
-      res.assert_attribute(attr("action", "gauge/update_vote"));
+      res.assert_attribute(attr(
+        "user",
+        "terra1vqjarrly327529599rcc4qhzvhwe34pp5uyy4gylvxe5zupeqx3sl7x356",
+      ));
       res.assert_attribute(attr("rebase_amount", "32"));
-      res.assert_attribute(attr("fixed_power", "32"));
-      res.assert_attribute(attr("voting_power", "288"));
+      res.assert_transfer(addr.user2.to_string(), addr.uluna(32));
     })
     .q_gauge_user_pending_rebase("user2", |res| {
       assert_eq!(

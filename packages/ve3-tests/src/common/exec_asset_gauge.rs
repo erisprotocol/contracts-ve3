@@ -66,6 +66,7 @@ impl TestingSuite {
   ) -> &mut TestingSuite {
     let msg = ExecuteMsg::ClaimRebase {
       token_id: token_id.map(|id| id.to_string()),
+      recipient: None,
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_1(), &msg, &[]));
