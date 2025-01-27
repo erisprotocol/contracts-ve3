@@ -159,6 +159,10 @@ impl Assets {
     total_vp: Uint128,
   ) -> Result<Vec<Asset>, SharedError> {
     let mut results = vec![];
+    if total_vp.is_zero() {
+      return Ok(results);
+    }
+
     for a in &self.0 {
       let share_amount = a.amount.checked_multiply_ratio(vp, total_vp)?;
 
