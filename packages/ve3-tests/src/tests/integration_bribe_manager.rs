@@ -36,7 +36,6 @@ fn test_lock_add_bribes() {
       addr.lp_cw20_info(),
       ve3_shared::msgs_bribe_manager::BribeDistribution::Next,
       None,
-      // creator part of AT_FREE_BRIBES
       "creator",
       |res| {
         res.assert_attribute(attr("action", "bribe/add_bribe"));

@@ -116,7 +116,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
 
       fee_for_assets,
     } => {
-      let mut config = CONFIG.load(deps.storage)?;
+      let mut config: Config = CONFIG.load(deps.storage)?;
       config.global_config().assert_owner(&deps.querier, &info.sender)?;
 
       if let Some(fee) = fee {

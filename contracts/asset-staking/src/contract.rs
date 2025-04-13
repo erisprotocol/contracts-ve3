@@ -350,7 +350,7 @@ fn stake(
   amount: Uint128,
   recipient: Addr,
 ) -> Result<Response, ContractError> {
-  assert_asset_whitelisted(&deps, &asset)?;
+  // assert_asset_whitelisted(&deps, &asset)?;
 
   let rewards = _calc_reward_share(deps.storage, recipient.clone(), asset.clone())?;
   if !rewards.is_zero() {
