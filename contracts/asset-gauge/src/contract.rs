@@ -336,7 +336,7 @@ fn update_vote(
   // println!("------- old {old_lock:?}");
   // println!("------- new {new_lock:?}");
 
-  let is_same_owner = old_lock.as_ref().map_or(false, |a| a.owner == new_lock.owner);
+  let is_same_owner = old_lock.as_ref().is_some_and(|a| a.owner == new_lock.owner);
 
   if let Some(old_lock) = old_lock {
     if old_lock.has_vp() {

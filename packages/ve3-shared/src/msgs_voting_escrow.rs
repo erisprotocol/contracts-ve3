@@ -331,7 +331,6 @@ pub enum QueryMsg {
   },
 
   /// CW721 Queries
-
   /// Return the owner of the given token, error if token does not exist
   #[returns(OwnerOfResponse)]
   OwnerOf {

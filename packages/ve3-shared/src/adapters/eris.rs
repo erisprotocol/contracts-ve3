@@ -28,7 +28,7 @@ pub struct StateResponse {
   pub exchange_rate: Decimal,
 }
 
-impl<'a> ErisHub<'a> {
+impl ErisHub<'_> {
   pub fn bond_msg(&self, asset: Asset, receiver: Option<String>) -> Result<CosmosMsg, SharedError> {
     match asset.info {
       cw_asset::AssetInfoBase::Native(denom) => Ok(CosmosMsg::Wasm(WasmMsg::Execute {

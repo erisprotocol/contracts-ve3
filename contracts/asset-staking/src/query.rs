@@ -3,14 +3,16 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult, Uint128};
 use cw_storage_plus::Bound;
 use std::cmp::min;
+use std::collections::HashMap;
 use ve3_shared::{
   constants::{DEFAULT_LIMIT, MAX_LIMIT_HIGH, SECONDS_PER_YEAR},
   extensions::asset_info_ext::AssetInfoExt,
   helpers::take::compute_balance_amount,
   msgs_asset_staking::{
-    AllPendingRewardsQuery, AllStakedBalancesQuery, AssetInfoWithRuntime, AssetQuery,
-    PendingRewardsDetailRes, PendingRewardsRes, PoolStakersQuery, QueryMsg, StakedBalanceRes,
-    UserStakedBalanceRes, WhitelistedAssetsDetailsResponse, WhitelistedAssetsResponse,
+    AllPendingRewardsQuery, AllStakedBalancesQuery, AllStakersQuery, AssetInfoWithRuntime,
+    AssetQuery, PendingRewardsDetailRes, PendingRewardsRes, PoolStakersQuery, QueryMsg,
+    StakedBalanceRes, UserStakedAssetRes, UserStakedBalanceRes, WhitelistedAssetsDetailsResponse,
+    WhitelistedAssetsResponse,
   },
 };
 
@@ -33,6 +35,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     QueryMsg::AllPendingRewardsDetail(query) => get_all_pending_rewards_detail(deps, env, query)?,
     QueryMsg::TotalStakedBalances {} => get_total_staked_balances(deps, env)?,
     QueryMsg::PoolStakers(query) => get_pool_stakers(deps, env, query)?,
+    QueryMsg::AllStakers(query) => get_all_stakers(deps, env, query)?,
   })
 }
 
@@ -167,6 +170,45 @@ fn get_pool_stakers(deps: Deps, _env: Env, query: PoolStakersQuery) -> StdResult
         } else {
           None
         }
+      },
+      Err(_) => None,
+    })
+    .collect::<Vec<_>>();
+
+  to_json_binary(&result)
+}
+
+pub fn get_all_stakers(deps: Deps, _env: Env, query: AllStakersQuery) -> StdResult<Binary> {
+  let start =
+    query.start_after.as_ref().map(|(addr, asset)| Bound::exclusive((addr.clone(), asset)));
+  let limit = query.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT_HIGH) as usize;
+
+  // Cache for TOTAL values per asset
+  let mut total_cache: HashMap<String, (Uint128, Uint128)> = HashMap::new();
+
+  let result = SHARES
+    .range(deps.storage, start, None, Order::Ascending)
+    .take(limit)
+    .filter_map(|item| match item {
+      Ok(((addr, asset_info), user_shares)) => {
+        // Load and cache TOTAL only once per asset
+        let (balance, total_shares) = match total_cache.get(&asset_info.to_string()) {
+          Some(&(b, ts)) => (b, ts),
+          None => match TOTAL.load(deps.storage, &asset_info) {
+            Ok(totals) => {
+              total_cache.insert(asset_info.to_string(), totals);
+              totals
+            },
+            Err(_) => return None, // skip entries with missing total
+          },
+        };
+
+        Some(UserStakedAssetRes {
+          user: addr,
+          shares: user_shares,
+          asset_info,
+          balance: balance.multiply_ratio(user_shares, total_shares),
+        })
       },
       Err(_) => None,
     })
