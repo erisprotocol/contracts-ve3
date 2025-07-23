@@ -70,6 +70,12 @@ pub enum ExecuteMsg {
     gauge: String,
   },
 
+  ClaimTransfer {
+    asset_info: AssetInfoUnchecked,
+    gauge: String,
+    receiver: Option<String>,
+  },
+
   InitializeAsset {
     asset_info: AssetInfoUnchecked,
     gauge: String,
@@ -98,6 +104,11 @@ pub enum CallbackMsg {
     zapper: Zapper,
     asset_config: CompoundingAssetConfig,
     minimum_receive: Option<Uint128>,
+  },
+  Transfer {
+    config: Config,
+    asset_config: CompoundingAssetConfig,
+    receiver: Addr,
   },
   TrackExchangeRate {
     asset_config: CompoundingAssetConfig,

@@ -106,6 +106,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       gauge,
     } => compound(deps, env, info, minimum_receive, asset_info, gauge),
 
+    ExecuteMsg::ClaimTransfer {
+      asset_info,
+      gauge,
+      receiver,
+    } => claim_transfer(deps, env, info, asset_info, gauge, receiver),
+
     ExecuteMsg::Callback(callback) => handle_callback(deps, env, info, callback),
 
     ExecuteMsg::UpdateConfig {
@@ -427,6 +433,45 @@ fn compound(
   Ok(Response::default().add_attribute("action", "asset-compounding/compound").add_messages(msgs))
 }
 
+fn claim_transfer(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  asset_info: AssetInfoUnchecked,
+  gauge: String,
+  receiver: Option<String>,
+) -> ContractResult {
+  let asset_info = asset_info.check(deps.api, None)?;
+  let config = CONFIG.load(deps.storage)?;
+  config.global_config().assert_owner(&deps.querier, &info.sender)?;
+  let receiver = addr_opt_fallback(deps.api, &receiver, info.sender)?;
+
+  let asset_config = assert_asset_whitelisted(deps.storage, &gauge, &asset_info)?;
+  let connector = config.connector(&deps.querier, &gauge)?;
+
+  let msgs = vec![
+    // 1. claim zassets
+    asset_config.staking.claim_reward_msg(asset_info.clone(), None)?,
+    // 2. withdraw zassets
+    env.callback_msg(ExecuteMsg::Callback(CallbackMsg::WithdrawZasset {
+      zasset_denom: asset_config.zasset_denom.clone(),
+      connector,
+    }))?,
+    // 3. transfer
+    env.callback_msg(ExecuteMsg::Callback(CallbackMsg::Transfer {
+      config,
+      asset_config,
+      receiver,
+    }))?,
+  ];
+
+  Ok(
+    Response::default()
+      .add_attribute("action", "asset-compounding/claim_transfer")
+      .add_messages(msgs),
+  )
+}
+
 fn initialize_asset(
   deps: DepsMut,
   env: Env,
@@ -561,6 +606,36 @@ pub fn handle_callback(
           .add_messages(msgs),
       )
     },
+
+    CallbackMsg::Transfer {
+      config,
+      asset_config,
+      receiver,
+    } => {
+      let reward_asset_info = asset_config.reward_asset_info;
+      let reward_amount = reward_asset_info.query_balance(&deps.querier, &env.contract.address)?;
+
+      let fee = asset_config.fee.unwrap_or(config.fee) * reward_amount;
+      let transfer_amount = reward_amount.checked_sub(fee)?;
+
+      let mut msgs = vec![
+        // transfer rewards to zapper
+        reward_asset_info.with_balance(transfer_amount).transfer_msg(receiver.to_string())?,
+      ];
+
+      if !fee.is_zero() {
+        msgs.push(reward_asset_info.with_balance(fee).transfer_msg(config.fee_collector)?);
+      }
+
+      Ok(
+        Response::new()
+          .add_attribute("action", "asset-compounding/callback_transfer")
+          .add_attribute("rewards", transfer_amount.to_string())
+          .add_attribute("fee", fee.to_string())
+          .add_messages(msgs),
+      )
+    },
+
     CallbackMsg::TrackExchangeRate {
       asset_config,
       asset_info,
