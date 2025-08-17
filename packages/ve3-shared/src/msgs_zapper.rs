@@ -49,6 +49,7 @@ pub enum ExecuteMsg {
     insert_routes: Option<Vec<RouteInit>>,
     delete_routes: Option<Vec<RouteDelete>>,
     update_centers: Option<Vec<AssetInfoUnchecked>>,
+    register_single_direction: Option<bool>,
   },
 
   Callback(CallbackMsg),

@@ -533,7 +533,7 @@ fn _create_lock(
   assert_periods_remaining(&end, start)?;
 
   let lock = Lock {
-    asset,
+    asset: asset.clone(),
     underlying_amount,
     start,
     end: end.clone(),
@@ -560,6 +560,7 @@ fn _create_lock(
     Response::default()
       .add_event(get_metadata_changed(&token_id))
       .add_attribute("action", "ve/create_lock")
+      .add_attribute("asset", asset.to_string())
       .add_attribute("voting_power", lock_info.voting_power.to_string())
       .add_attribute("fixed_power", lock_info.fixed_amount.to_string())
       .add_attribute("lock_end", lock_info.end_string())

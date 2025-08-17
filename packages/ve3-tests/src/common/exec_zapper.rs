@@ -10,24 +10,24 @@ impl TestingSuite {
     self.addresses.ve3_zapper.clone()
   }
   pub fn e_zapper_zap(
-      &mut self,
-      into: AssetInfoUnchecked,
-      assets: Vec<AssetInfo>,
-      min_received: Option<Uint128>,
-      post_action: Option<PostActionCreate>,
-      sender: &str,
-      result: impl Fn(Result<AppResponse, anyhow::Error>),
+    &mut self,
+    into: AssetInfoUnchecked,
+    assets: Vec<AssetInfo>,
+    min_received: Option<Uint128>,
+    post_action: Option<PostActionCreate>,
+    sender: &str,
+    result: impl Fn(Result<AppResponse, anyhow::Error>),
   ) -> &mut Self {
-      let msg = ExecuteMsg::Zap {
-          into,
-          assets,
-          min_received,
-          post_action,
-      };
+    let msg = ExecuteMsg::Zap {
+      into,
+      assets,
+      min_received,
+      post_action,
+    };
 
-      let sender = self.address(sender);
-      result(self.app.execute_contract(sender, self.contract_zapper(), &msg, &[]));
-      self
+    let sender = self.address(sender);
+    result(self.app.execute_contract(sender, self.contract_zapper(), &msg, &[]));
+    self
   }
 
   pub fn e_zapper_create_lp(
@@ -100,6 +100,7 @@ impl TestingSuite {
       insert_routes,
       delete_routes,
       update_centers,
+      register_single_direction: None,
     };
     let sender = self.address(sender);
     result(self.app.execute_contract(sender, self.contract_zapper(), &msg, &[]));

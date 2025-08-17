@@ -169,6 +169,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
       insert_routes,
       delete_routes,
       update_centers,
+      register_single_direction,
     } => {
       let mut config = CONFIG.load(deps.storage)?;
       config.global_config().assert_owner(&deps.querier, &info.sender)?;
@@ -192,22 +193,24 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> C
                   },
                 )?;
 
-                let reversed = stages
-                  .into_iter()
-                  .rev()
-                  .map(|mut item| {
-                    std::mem::swap(&mut item.from, &mut item.to);
-                    item
-                  })
-                  .collect::<Vec<_>>();
+                if register_single_direction != Some(true) {
+                  let reversed = stages
+                    .into_iter()
+                    .rev()
+                    .map(|mut item| {
+                      std::mem::swap(&mut item.from, &mut item.to);
+                      item
+                    })
+                    .collect::<Vec<_>>();
 
-                ROUTES.save(
-                  deps.storage,
-                  (end.to_string(), start.to_string()),
-                  &RouteConfig {
-                    stages: reversed,
-                  },
-                )?
+                  ROUTES.save(
+                    deps.storage,
+                    (end.to_string(), start.to_string()),
+                    &RouteConfig {
+                      stages: reversed,
+                    },
+                  )?
+                }
               }
             }
           }
