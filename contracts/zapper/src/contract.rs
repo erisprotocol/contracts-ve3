@@ -431,7 +431,7 @@ fn get_swap_stages(
 
       for center in config.center_asset_infos {
         match (
-          get_swap_stages(storage, from_assets, &vec![center.clone()], false),
+          get_swap_stages(storage, &vec![from.clone()], &vec![center.clone()], false),
           get_swap_stages(storage, &vec![center], to_assets, false),
         ) {
           (Ok(segment1), Ok(segment2)) => {

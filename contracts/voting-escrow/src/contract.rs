@@ -671,7 +671,7 @@ fn split_lock(
 
   // creating new lock
   let new_asset = lock.asset.info.with_balance(new_lock_amount);
-  let new_underlying = exchange_rate.map_or(lock.asset.amount, |e| e * new_lock_amount);
+  let new_underlying = exchange_rate.map_or(new_lock_amount, |e| e * new_lock_amount);
   let create_response =
     _create_lock(deps, env, nft, &config, new_asset, new_underlying, recipient, lock.end)?;
 
