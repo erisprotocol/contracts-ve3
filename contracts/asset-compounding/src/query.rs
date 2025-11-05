@@ -7,8 +7,10 @@ use cosmwasm_std::{to_json_binary, Addr, Binary, Decimal, Deps, Env, Order, StdR
 use cw_asset::AssetInfo;
 use cw_storage_plus::Bound;
 use ve3_shared::constants::{DEFAULT_LIMIT, MAX_LIMIT, SECONDS_PER_DAY};
+use ve3_shared::error::SharedError;
 use ve3_shared::msgs_asset_compounding::{
-  CompoundingAssetConfig, ExchangeHistory, ExchangeRatesResponse, QueryMsg, UserInfoResponse,
+  AmplpExchangeRatesResponse, CompoundingAssetConfig, ExchangeHistory, ExchangeRatesResponse,
+  QueryMsg, UserInfoResponse,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -31,6 +33,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
       start_after,
       limit,
     } => Ok(to_json_binary(&query_exchange_rates(deps, assets, start_after, limit)?)?),
+    QueryMsg::AmplpExchangeRates {} => Ok(to_json_binary(&query_amplp_exchange_rates(deps)?)?),
   }
 }
 
@@ -174,4 +177,36 @@ fn get_assets(
       .collect::<StdResult<Vec<_>>>()?,
   };
   Ok(assets)
+}
+
+fn query_amplp_exchange_rates(
+  deps: Deps,
+) -> Result<Vec<AmplpExchangeRatesResponse>, ContractError> {
+  let mut results = vec![];
+
+  let assets = asset_config_map()
+    .range(deps.storage, None, None, Order::Ascending)
+    .collect::<StdResult<Vec<_>>>()?;
+  for ((gauge, asset), asset_config) in assets {
+    // Get the latest exchange rate from EXCHANGE_HISTORY
+    let exchange_rate = EXCHANGE_HISTORY
+      .prefix((&gauge, &asset))
+      .range(deps.storage, None, None, Order::Descending)
+      .next()
+      .transpose()?
+      .map(|(_, history)| history.exchange_rate)
+      .ok_or(SharedError::NotFound(format!(
+        "No exchange rate found for gauge: {}, asset: {}",
+        gauge, asset
+      )))?;
+
+    results.push(AmplpExchangeRatesResponse {
+      gauge,
+      asset,
+      amplp_denom: asset_config.amp_denom,
+      exchange_rate,
+    });
+  }
+
+  Ok(results)
 }

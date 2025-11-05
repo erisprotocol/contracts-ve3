@@ -2,8 +2,6 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use cw_asset::{Asset, AssetInfo, AssetInfoUnchecked, AssetUnchecked};
-#[allow(unused_imports)]
-use std::collections::HashSet;
 
 use crate::adapters::{asset_staking::AssetStaking, connector::Connector, zapper::Zapper};
 
@@ -153,6 +151,17 @@ pub enum QueryMsg {
     start_after: Option<u64>,
     limit: Option<u32>,
   },
+
+  #[returns(Vec<AmplpExchangeRatesResponse>)]
+  AmplpExchangeRates {},
+}
+
+#[cw_serde]
+pub struct AmplpExchangeRatesResponse {
+  pub gauge: String,
+  pub asset: AssetInfo,
+  pub amplp_denom: String,
+  pub exchange_rate: Decimal,
 }
 
 #[cw_serde]
